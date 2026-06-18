@@ -15,51 +15,84 @@ import { isMainModule } from './shared/cli';
 import { createClient } from '@supabase/supabase-js';
 
 /**
- * Run the full OceanLog data ETL pipeline in the correct order.
+ * Run the full OceanLog data ETL pipeline in dependency order.
  *
- * Order is significant: taxonomy first (so GBIF/OBIS occurrences can
- * be linked to species), then dive sites, then occurrences, then the
- * image backfill chain (Wikimedia → iNaturalist → Tavily fallback).
- * Finally we run the open-water reconciliation to mop up sightings
- * that couldn't be linked to a known site.
+ * This file is the SINGLE SOURCE OF TRUTH for ETL ordering. README.md
+ * and docs/decisions.md (ADR-015) are kept in sync with it.
+ *
+ * Order is significant:
+ *   1. WoRMS taxonomy first, so GBIF/OBIS occurrences can link to species
+ *      by canonical scientific name.
+ *   2. Dive sites in parallel (opendivemap, overpass, divenumber), so
+ *      occurrences can be matched to nearby sites.
+ *   3. Apify Google Maps last in the site batch (slowest source).
+ *   4. GBIF + OBIS occurrences IN PARALLEL (independent sources).
+ *   5. Open-water reconciliation: placeholder sites for unmatched sightings.
+ *   6. inat-taxon-lookup BEFORE the image backfills (images need inat_taxon_id).
+ *   7. Image backfills in increasing cost / decreasing quality:
+ *      wikimedia -> inaturalist -> tavily.
+ *
+ * Each top-level step is isolated: a failure is logged and the pipeline
+ * continues to the next step, so one flaky upstream (e.g. a Tavily 429 or
+ * a GBIF timeout) does not abort the entire nightly run. The process exits
+ * non-zero if any step failed.
  */
 export async function runAllDataEtl(): Promise<void> {
   const startedAt = Date.now();
   logger.info('Starting full OceanLog data ETL pipeline');
 
+  const failures: string[] = [];
+
+  /** Run a step, isolating and recording any failure. */
+  async function step(name: string, fn: () => Promise<unknown>): Promise<void> {
+    const stepStart = Date.now();
+    try {
+      await fn();
+      logger.info(`Step "${name}" finished in ${Date.now() - stepStart}ms`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      failures.push(`${name}: ${message}`);
+      logger.error(`Step "${name}" failed (continuing)`, { error: message });
+    }
+  }
+
   // 1. Taxonomy first.
-  await runWormsEtl();
+  await step('worms', runWormsEtl);
 
-  // 2. GBIF taxonomy enrichment (depends on WoRMS having populated the
-  // canonical scientific names).
-  // await runGbifEtl(); // re-enabled in CI
+  // 2. Dive site sources in parallel.
+  await step('dive-sites (opendivemap, overpass, divenumber)', () =>
+    Promise.all([runOpenDiveMapEtl(), runOverpassEtl(), runDiveNumberEtl()]),
+  );
 
-  // 3. Open dive site sources in parallel.
-  await Promise.all([runOpenDiveMapEtl(), runOverpassEtl(), runDiveNumberEtl()]);
+  // 3. Apify Google Maps crawl. Last in the site batch because it is the slowest.
+  await step('apify:google-maps', runApifyGoogleMapsEtl);
 
-  // 4. Apify Google Maps crawl. Last because it is the slowest.
-  await runApifyGoogleMapsEtl();
+  // 4. GBIF + OBIS occurrences in parallel. They link to species via
+  // scientific name and to dive sites via nearby_dive_sites; neither
+  // depends on the other, so we run them concurrently.
+  await step('occurrences (gbif, obis)', () => Promise.all([runGbifEtl(), runObisEtl()]));
 
-  // 5. GBIF + OBIS occurrences. These link to species via scientific
-  // name, and to dive sites via nearby_dive_sites.
-  await runGbifEtl();
-  await runObisEtl();
-
-  // 6. Post-import reconciliation: create placeholder sites for any
+  // 5. Post-import reconciliation: create placeholder sites for any
   // sightings that didn't link to a known site within 30 km.
-  await runOpenWaterReconciliation();
+  await step('reconcile-unmatched-occurrences', runOpenWaterReconciliation);
 
-  // 7. Resolve iNaturalist taxon IDs for species that don't have one
-  // yet. This must run BEFORE the image backfills, because
-  // inaturalist-images uses inat_taxon_id.
-  await runInatTaxonLookupEtl();
+  // 6. Resolve iNaturalist taxon IDs for species missing one. MUST run
+  // before the image backfills, because inaturalist-images uses inat_taxon_id.
+  await step('inat:taxon-lookup', runInatTaxonLookupEtl);
 
-  // 8. Image backfills, in increasing cost / decreasing quality.
-  await runWikimediaImagesEtl();
-  await runInaturalistImageEtl();
-  await runTavilySpeciesEtl();
+  // 7. Image backfills, in increasing cost / decreasing quality.
+  await step('wikimedia:images', runWikimediaImagesEtl);
+  await step('inaturalist:images', runInaturalistImageEtl);
+  await step('tavily:species', runTavilySpeciesEtl);
 
-  logger.info(`Full data ETL finished in ${Date.now() - startedAt}ms`);
+  const elapsed = Date.now() - startedAt;
+  if (failures.length > 0) {
+    logger.error(`Full data ETL finished in ${elapsed}ms with ${failures.length} failed step(s)`, {
+      failures,
+    });
+    throw new Error(`ETL pipeline completed with ${failures.length} failed step(s)`);
+  }
+  logger.info(`Full data ETL finished in ${elapsed}ms (all steps OK)`);
 }
 
 /**
