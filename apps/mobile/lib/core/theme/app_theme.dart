@@ -186,6 +186,112 @@ class AppTheme {
     );
   }
 
+  /// Sunlight high-contrast theme.
+  ///
+  /// Tuned for topside use in bright Mediterranean glare and for divers
+  /// reading the screen with the sun overhead. Design rules:
+  ///   - Near-white background with very dark, high-contrast text
+  ///     (maximises legibility under glare; AA/AAA on body text).
+  ///   - Primary actions use the deep navy fill (NOT the bright cyan
+  ///     accent, which washes out and loses contrast in sunlight).
+  ///   - Thicker borders and larger min tap targets keep targets findable
+  ///     with wet/gloved hands.
+  static ThemeData sunlight() {
+    const sunBg = Color(0xFFFFFFFF);
+    const sunSurface = Color(0xFFEFF3F7);
+    const sunText = Color(0xFF06121F); // near-black navy, very high contrast
+    const sunBorder = Color(0xFF0A2342);
+
+    final scheme = ColorScheme.fromSeed(
+      seedColor: AppColors.primary,
+      brightness: Brightness.light,
+      primary: AppColors.primary,
+      onPrimary: Colors.white,
+      secondary: AppColors.primary,
+      surface: sunSurface,
+      onSurface: sunText,
+      error: const Color(0xFFC1121F), // darker red for contrast
+    );
+
+    final base = _textTheme(Brightness.light).apply(
+      bodyColor: sunText,
+      displayColor: sunText,
+    );
+
+    return ThemeData(
+      useMaterial3: true,
+      colorScheme: scheme,
+      scaffoldBackgroundColor: sunBg,
+      textTheme: base,
+      appBarTheme: AppBarTheme(
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        titleTextStyle: GoogleFonts.spaceGrotesk(
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
+          color: Colors.white,
+        ),
+      ),
+      cardTheme: CardThemeData(
+        color: sunBg,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: sunBorder, width: 1.5),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          minimumSize: const Size(AppSpacing.minTapTarget, 56),
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          textStyle: GoogleFonts.inter(fontWeight: FontWeight.w700),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size(AppSpacing.minTapTarget, 56),
+          foregroundColor: AppColors.primary,
+          side: const BorderSide(color: sunBorder, width: 2),
+          textStyle: GoogleFonts.inter(fontWeight: FontWeight.w700),
+        ),
+      ),
+      iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(
+          minimumSize:
+              const Size(AppSpacing.minTapTarget, AppSpacing.minTapTarget),
+          foregroundColor: sunText,
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: sunBorder, width: 1.5),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: sunBorder, width: 1.5),
+        ),
+        filled: true,
+        fillColor: sunBg,
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        height: 76,
+        backgroundColor: sunBg,
+        indicatorColor: AppColors.primary.withValues(alpha: 0.18),
+        labelTextStyle: WidgetStatePropertyAll(
+          GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600,
+              color: sunText),
+        ),
+      ),
+      floatingActionButtonTheme: const FloatingActionButtonThemeData(
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+      ),
+    );
+  }
+
   static ThemeData get lightTheme => light();
   static ThemeData get darkTheme => dark();
+  static ThemeData get sunlightTheme => sunlight();
 }

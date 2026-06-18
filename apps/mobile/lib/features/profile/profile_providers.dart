@@ -46,7 +46,7 @@ final badgeProvider = FutureProvider.family<Badge?, String>((ref, id) {
   return ref.watch(profileRepositoryProvider).fetchBadgeById(id);
 });
 
-enum AppThemeMode { system, light, dark }
+enum AppThemeMode { system, light, dark, sunlight }
 
 class SettingsNotifier extends StateNotifier<AppThemeMode> {
   SettingsNotifier() : super(AppThemeMode.system) {
@@ -83,6 +83,15 @@ final appThemeModeProvider = Provider<ThemeMode>((ref) {
   return switch (setting) {
     AppThemeMode.light => ThemeMode.light,
     AppThemeMode.dark => ThemeMode.dark,
+    // Sunlight is a light-family theme; we force the light slot and supply
+    // the sunlight ThemeData into MaterialApp.theme (see main.dart).
+    AppThemeMode.sunlight => ThemeMode.light,
     AppThemeMode.system => ThemeMode.system,
   };
+});
+
+/// True when the user has explicitly chosen the sunlight high-contrast
+/// theme. main.dart uses this to swap the light-slot ThemeData.
+final isSunlightThemeProvider = Provider<bool>((ref) {
+  return ref.watch(settingsProvider) == AppThemeMode.sunlight;
 });

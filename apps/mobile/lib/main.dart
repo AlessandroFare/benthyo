@@ -43,8 +43,12 @@ class OceanLogApp extends ConsumerWidget {
 
     final router = ref.watch(appRouterProvider);
     final themeMode = ref.watch(appThemeModeProvider);
+    final isSunlight = ref.watch(isSunlightThemeProvider);
 
-    final lightTheme = AppTheme.light().copyWith(
+    // When the user selects the sunlight high-contrast theme we feed the
+    // sunlight ThemeData into the light slot and pin themeMode to light.
+    final lightBase = isSunlight ? AppTheme.sunlight() : AppTheme.light();
+    final lightTheme = lightBase.copyWith(
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
           TargetPlatform.iOS: FadeUpPageTransitionsBuilder(),
