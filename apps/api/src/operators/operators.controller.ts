@@ -25,6 +25,7 @@ import {
   ListOperatorSpeciesDto,
   ListOperatorsDto,
   OperatorAnalyticsQueryDto,
+  OperatorRosterQueryDto,
   UpdateOperatorDto,
 } from './dto/operator.dto';
 import { OperatorsService } from './operators.service';
@@ -112,6 +113,19 @@ export class OperatorsController {
   ) {
     return this.operatorsService.getMyOperator(token, user.id).then((op) =>
       this.operatorsService.getSpeciesRanked(token, op.id, query),
+    );
+  }
+
+  @Get('me/roster')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Today's trip roster for current operator" })
+  getMyRoster(
+    @CurrentUser() user: AuthUser,
+    @AccessToken() token: string,
+    @Query() query: OperatorRosterQueryDto,
+  ) {
+    return this.operatorsService.getMyOperator(token, user.id).then((op) =>
+      this.operatorsService.getTodayRoster(token, op.id, query.date),
     );
   }
 

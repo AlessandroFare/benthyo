@@ -11,6 +11,7 @@ const LoginPage = lazy(() =>
 const DashboardPage = lazy(() =>
   import("@/pages/Dashboard").then((m) => ({ default: m.DashboardPage })),
 );
+const TodayPage = lazy(() => import("@/pages/Today"));
 const SitesPage = lazy(() =>
   import("@/pages/Sites").then((m) => ({ default: m.SitesPage })),
 );
@@ -114,6 +115,14 @@ export default function App() {
       >
         <Route
           index
+          element={
+            <PageLoader>
+              <TodayPage />
+            </PageLoader>
+          }
+        />
+        <Route
+          path="overview"
           element={
             <PageLoader>
               <DashboardPage />

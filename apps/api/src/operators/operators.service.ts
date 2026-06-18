@@ -500,4 +500,27 @@ export class OperatorsService {
       occurred_at: log.dive_date,
     }));
   }
+
+  /**
+   * Today's roster for an operator: scheduled trips with boat, guide, site
+   * and booked / checked-in counts. Backed by the operator_today_roster()
+   * RPC (SECURITY DEFINER, authz enforced inside the function via
+   * is_operator_member). `date` is an optional YYYY-MM-DD override; when
+   * omitted the RPC defaults to current_date.
+   */
+  async getTodayRoster(
+    token: string,
+    operatorId: string,
+    date?: string,
+  ): Promise<Array<Record<string, unknown>>> {
+    const client = this.supabase.createClient(token);
+    const params: Record<string, unknown> = { p_operator_id: operatorId };
+    if (date) {
+      params.p_date = date;
+    }
+    const rows = assertNoError(
+      await client.rpc('operator_today_roster', params),
+    ) as Array<Record<string, unknown>> | null;
+    return rows ?? [];
+  }
 }
