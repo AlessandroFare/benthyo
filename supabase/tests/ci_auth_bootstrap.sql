@@ -18,23 +18,31 @@ CREATE TABLE IF NOT EXISTS auth.users (
   email TEXT
 );
 
--- auth.uid(): the current request's user id. In CI it is driven by a GUC so
--- the RLS suite can impersonate users via `SET LOCAL request.jwt.claim.sub`.
+-- auth.uid(): the current request's user id. Matches the real Supabase
+-- helper, which extracts `sub` from the `request.jwt.claims` JSON GUC. The
+-- RLS suite impersonates users via
+--   SET LOCAL request.jwt.claims = '{"sub":"..."}';
+-- A `request.jwt.claim.sub` scalar GUC is also honoured as a fallback.
 CREATE OR REPLACE FUNCTION auth.uid()
 RETURNS UUID
 LANGUAGE sql
 STABLE
 AS $$
-  SELECT NULLIF(current_setting('request.jwt.claim.sub', true), '')::uuid
+  SELECT COALESCE(
+    NULLIF(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub',
+    NULLIF(current_setting('request.jwt.claim.sub', true), '')
+  )::uuid
 $$;
 
--- auth.role(): mirrors the real helper. Defaults to the Postgres role name.
+-- auth.role(): mirrors the real helper. Reads role from the claims JSON,
+-- then a scalar GUC, then falls back to the Postgres role name.
 CREATE OR REPLACE FUNCTION auth.role()
 RETURNS TEXT
 LANGUAGE sql
 STABLE
 AS $$
   SELECT COALESCE(
+    NULLIF(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role',
     NULLIF(current_setting('request.jwt.claim.role', true), ''),
     current_user
   )
