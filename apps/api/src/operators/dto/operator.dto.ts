@@ -167,3 +167,13 @@ export class OperatorAnalyticsQueryDto {
   @Max(365)
   window_days = 30;
 }
+
+export class OperatorRosterQueryDto {
+  @ApiPropertyOptional({
+    description: 'Roster date (YYYY-MM-DD). Defaults to today.',
+    example: '2026-06-18',
+  })
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'date must be in YYYY-MM-DD format' })
+  date?: string;
+}
