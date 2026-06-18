@@ -149,6 +149,17 @@ stripe webhooks endpoints update we_xxx --new-webhook-secret
 
 ## 8. Medical encryption key derivation & rotation
 
+### 8.0 GUC bootstrap quick-reference
+
+| GUC | Env var | Purpose |
+|-----|---------|---------|
+| `app.medical_master_key` | `MEDICAL_ENCRYPTION_MASTER_KEY` | HMAC key for derivation |
+| `app.medical_key_salt` | `MEDICAL_ENCRYPTION_KEY_SALT` | secret salt mixed into every key |
+
+The key-derivation functions are `STABLE` (migration 040) because they read
+these GUCs; never re-mark them `IMMUTABLE` (the planner could cache a stale
+key across the rotation in §8.3).
+
 Medical form answers (GDPR Article 9 "special category" data) are stored
 as pgcrypto `pgp_sym_encrypt` ciphertext in `medical_form_submissions.answers`.
 The passphrase is derived per scope (per-operator, or per-user for global

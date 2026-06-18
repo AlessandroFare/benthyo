@@ -60,3 +60,41 @@ jobs:
           node-version: 20
       - run: pnpm install || npm install
       - run: pnpm test || npx jest gbif/gbif.test.ts --passWithNoTests
+
+  rls:
+    # Applies every migration + seed against a real Postgres/PostGIS and
+    # runs the RLS correctness suite. A red suite blocks the PR.
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+      # Dev placeholders so the medical-encryption migrations run; the suite
+      # never asserts on real key material.
+      PGOPTIONS: "-c app.medical_master_key=ci-master-key -c app.medical_key_salt=ci-salt"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install psql client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Apply migrations in order
+        run: |
+          for f in supabase/migrations/0*.sql; do
+            echo "== applying $f"
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"
+          done
+      - name: Seed
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/seed.sql
+      - name: Run RLS test suite
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/rls.sql
