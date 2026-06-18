@@ -15,8 +15,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -34,8 +32,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -53,8 +49,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -80,7 +74,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
       # Dev placeholders so the medical-encryption migrations run; the suite
       # never asserts on real key material.
       PGOPTIONS: "-c app.medical_master_key=ci-master-key -c app.medical_key_salt=ci-salt"
@@ -88,6 +82,13 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install psql client
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Bootstrap Supabase auth shim
+        # The bare postgis image has no Supabase-managed `auth` schema, so the
+        # application migrations (003 REFERENCES auth.users, 041 auth.uid())
+        # cannot apply. Create a minimal compatible shim. The anon/authenticated
+        # roles are also created here so the GRANTs and SET ROLE in the
+        # migrations + RLS suite resolve.
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/ci_auth_bootstrap.sql
       - name: Apply migrations in order
         run: |
           for f in supabase/migrations/0*.sql; do
