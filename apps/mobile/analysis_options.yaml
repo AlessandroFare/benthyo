@@ -1,0 +1,51 @@
+# OceanLog mobile analysis options.
+#
+# Base: Flutter's recommended lints.
+# Additions: a curated stricter set focused on the categories that
+# historically bit this codebase.
+#
+# Last reviewed: 2026-06.
+
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  language:
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
+  errors:
+    invalid_assignment: warning
+    invalid_override: error
+    missing_required_param: error
+  exclude:
+    - "**/*.g.dart"
+    - "**/*.freezed.dart"
+    - "build/**"
+
+linter:
+  rules:
+    # --- Style ---------------------------------------------------------------
+    prefer_const_constructors: true
+    prefer_const_declarations: true
+    prefer_const_literals_to_create_immutables: true
+    require_trailing_commas: true
+    sort_child_properties_last: true
+    use_super_parameters: true
+    omit_local_variable_types: true
+
+    # --- Safety --------------------------------------------------------------
+    unawaited_futures: true
+    avoid_catching_errors: true
+    avoid_dynamic_calls: true
+
+    # --- Riverpod-friendly ---------------------------------------------------
+    # (no public notifier surface yet — add `avoid_public_notifier_properties`
+    # when we migrate to riverpod_generator's Notifier classes.)
+
+    # --- Intentionally NOT enabled (existing-code debt, see follow-ups) -----
+    # - cancel_subscriptions    : a few StreamSubscriptions in legacy screens
+    #   are not yet cancelled in `dispose`. Add as part of the next pass.
+    # - close_sinks              : paired with the above.
+    # - avoid_print              : we have one stray `print` in seed data.
+    # - always_declare_return_types : a handful of `dynamic` shortcuts in
+    #   the test helpers; typing them is part of the strictness sweep.

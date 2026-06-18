@@ -1,0 +1,24 @@
+name: oceanlog
+repository: https://github.com/oceanlog/oceanlog
+
+packages:
+  - packages/**
+  - apps/**
+
+scripts:
+  analyze:
+    run: melos exec -- flutter analyze
+    description: Run Flutter analyzer across mobile packages
+  test:
+    run: melos exec --fail-fast -- flutter test
+    description: Run Flutter tests
+  types:build:
+    run: melos exec --scope="@oceanlog/types" -- pnpm build
+    description: Build shared TypeScript types package
+  ui:build:
+    run: melos exec --scope="@oceanlog/ui" -- pnpm build
+    description: Build shared React UI package
+
+command:
+  bootstrap:
+    runPubGetInParallel: true

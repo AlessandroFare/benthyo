@@ -1,0 +1,69 @@
+# OceanLog — ignore secrets, build artifacts, IDE noise.
+
+# Secrets — never commit.
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.p12
+
+# Node / pnpm
+node_modules/
+.pnpm-store/
+dist/
+build/
+.next/
+.nuxt/
+.vercel/
+.netlify/
+
+# Flutter / Dart
+apps/mobile/.dart_tool/
+apps/mobile/.flutter-plugins
+apps/mobile/.flutter-plugins-dependencies
+apps/mobile/build/
+apps/mobile/.packages
+apps/mobile/.pub-cache/
+apps/mobile/.pub/
+apps/mobile/pubspec.lock
+apps/mobile/android/.gradle/
+apps/mobile/android/local.properties
+apps/mobile/android/app/google-services.json
+apps/mobile/ios/Pods/
+apps/mobile/ios/Flutter/Flutter.framework
+apps/mobile/ios/Flutter/Flutter.podspec
+apps/mobile/.idea/
+apps/mobile/*.iml
+
+# Coverage
+coverage/
+.nyc_output/
+*.lcov
+
+# Supabase / generated
+supabase/.branches/
+supabase/.temp/
+**/*.snap
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# ETL transient
+etl/.cache/
+etl/tiles/
+
+# Tooling
+.cursor/
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.recommended.json
+
+# Generated docs
+docs/_generated/

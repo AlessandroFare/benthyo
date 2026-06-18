@@ -1,0 +1,18 @@
+{
+  "name": "oceanlog",
+  "private": true,
+  "version": "0.1.0",
+  "description": "OceanLog monorepo root",
+  "scripts": {
+    "build": "pnpm --filter @oceanlog/types build && pnpm --filter @oceanlog/ui build",
+    "dev:api": "pnpm --filter @oceanlog/api start:dev",
+    "dev:dashboard": "pnpm --filter @oceanlog/dashboard dev",
+    "test:etl": "pnpm --filter @oceanlog/etl test",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.15.0"
+}

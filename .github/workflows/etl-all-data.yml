@@ -1,0 +1,53 @@
+name: ETL All Data
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Weekly on Sunday 06:00 UTC — runs after the daily GBIF/OBIS jobs
+    # so we don't double up.
+    - cron: '0 6 * * 0'
+
+jobs:
+  etl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      # GitHub Actions secrets — never log the values.
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      INAT_API_BASE: https://api.inaturalist.org/v1
+      INAT_TAXON_MIN_SCORE: 90
+      COMMONS_API_URL: https://commons.wikimedia.org/w/api.php
+      WIKIMEDIA_USER_AGENT: 'OceanLog/1.0 (https://oceanlog.app; contact@oceanlog.app)'
+      GBIF_MAX_RECORDS: 5000
+      OBIS_MAX_RECORDS: 3000
+      WORMS_MAX_PER_TERM: 200
+      OPENDIVEMAP_MAX_SITES: 5000
+      APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+      DIVENUMBER_API_KEY: ${{ secrets.DIVENUMBER_API_KEY }}
+      TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+      INAT_IMAGE_MAX_SPECIES: 500
+      WIKIMEDIA_MAX_SPECIES: 1000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: etl/package.json
+      - run: pnpm install --frozen-lockfile || pnpm install
+        working-directory: etl
+      - run: pnpm --filter @oceanlog/etl all-data
+        working-directory: etl
+      # After the main pipeline, run a follow-up sync to populate
+      # species image columns that depend on iNaturalist taxon IDs
+      # resolved during the all-data run.
+      - run: pnpm --filter @oceanlog/etl wikimedia:images
+        working-directory: etl
+        if: always()
+      - run: pnpm --filter @oceanlog/etl inaturalist:images
+        working-directory: etl
+        if: always()
