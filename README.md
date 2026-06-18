@@ -15,6 +15,15 @@ Actions (ETL cron) · Stripe (billing) · Resend (transactional email).
 **$0/month launch target** on free tiers; production-grade path
 documented in [`docs/configuration.md`](docs/configuration.md).
 
+### Daily Roster (Today)
+
+The dashboard's default landing page (`/`) is **Today**: the operator's
+daily roster of scheduled trips with boat, guide, dive site, and
+booked / checked-in counts. It is backed by the `operator_today_roster()`
+RPC (migrations 041/042) exposed through the `GET /operators/me/roster`
+API route and consumed by the `useTodayRoster` hook. A date picker lets
+staff look ahead or back; the analytics overview moved to `/overview`.
+
 ---
 
 ## Table of contents
