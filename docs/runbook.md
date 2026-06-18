@@ -147,39 +147,116 @@ stripe webhooks endpoints update we_xxx --new-webhook-secret
 #    3. Redeploy.
 ```
 
-## 8. MEDICAL_ENCRYPTION_MASTER_KEY rotation
+## 8. Medical encryption key derivation & rotation
 
-This key encrypts every medical form submission (GDPR Article 9
-"sensitive personal data"). The key is used to derive a per-operator
-HMAC key inside the `submit_medical_form` RPC. Rotation is
-operator-by-operator — there is no global rotation.
+### 8.0 GUC bootstrap quick-reference
+
+| GUC | Env var | Purpose |
+|-----|---------|---------|
+| `app.medical_master_key` | `MEDICAL_ENCRYPTION_MASTER_KEY` | HMAC key for derivation |
+| `app.medical_key_salt` | `MEDICAL_ENCRYPTION_KEY_SALT` | secret salt mixed into every key |
+
+The key-derivation functions are `STABLE` (migration 040) because they read
+these GUCs; never re-mark them `IMMUTABLE` (the planner could cache a stale
+key across the rotation in §8.3).
+
+Medical form answers (GDPR Article 9 "special category" data) are stored
+as pgcrypto `pgp_sym_encrypt` ciphertext in `medical_form_submissions.answers`.
+The passphrase is derived per scope (per-operator, or per-user for global
+template submissions) by migration 038:
+
+```
+key = HMAC_SHA256(key = app.medical_master_key,
+                  msg = scope || ':' || id || ':' || app.medical_key_salt)
+```
+
+Two runtime GUCs MUST be set (by the API process on boot, sourced from the
+secret store):
+
+- `app.medical_master_key` — the master key (env `MEDICAL_ENCRYPTION_MASTER_KEY`).
+- `app.medical_key_salt`  — a secret salt mixed into every derivation.
+
+The `answers_key_version` column records which derivation produced each row
+(`1` = legacy md5, migration 030; `2` = HMAC-SHA256, migration 038). New
+writes default to `2`.
+
+> **Important:** never run a key-changing migration with the dev placeholder
+> values. If `app.medical_master_key` is unset, migration 038's backfill
+> skips with a NOTICE rather than corrupting data.
+
+### 8.1 Provisioning (one-time, before first prod medical submission)
 
 ```sql
--- 8.1 List operators that have submitted medical forms.
-SELECT DISTINCT operator_id
-FROM medical_form_submissions
-WHERE deleted_at IS NULL;
+-- Set the GUCs at the database level so every session inherits them.
+-- Values come from your secret store, NOT from this file.
+ALTER DATABASE postgres SET app.medical_master_key = '<master-key>';
+ALTER DATABASE postgres SET app.medical_key_salt   = '<secret-salt>';
+-- Reconnect, then verify they are visible:
+SELECT current_setting('app.medical_master_key', true) IS NOT NULL AS master_set,
+       current_setting('app.medical_key_salt', true)   IS NOT NULL AS salt_set;
+```
 
--- 8.2 For each operator, the encryption is the same: the master
---     key + a per-operator HMAC salt. To rotate, you must
---     re-encrypt the rows:
+### 8.2 Backfilling legacy (v1) rows to v2
+
+If the database already has rows written under the md5 scheme
+(`answers_key_version = 1` or NULL), re-run migration 038's backfill with
+the master key available. It is idempotent (a second run is a no-op):
+
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -f supabase/migrations/038_strengthen_medical_key_derivation.sql
+```
+
+Verify:
+
+```sql
+SELECT answers_key_version, count(*)
+FROM medical_form_submissions
+WHERE answers IS NOT NULL
+GROUP BY 1;   -- expect all rows at version 2
+```
+
+### 8.3 Rotating the master key (or salt)
+
+Rotation re-encrypts every row from the OLD derivation to the NEW one.
+Run inside a transaction, with BOTH the old and new secrets available:
+
+```sql
 BEGIN;
--- Re-derive the new key via your secrets manager and inject it
--- into the migration. The migration should:
---   1. Decrypt every row with the OLD key.
---   2. Re-encrypt with the NEW key.
---   3. Update the medical_form_key_version column.
+-- 1. Inject the OLD secrets as locals so the old key can decrypt.
+SET LOCAL app.medical_master_key = '<OLD-master-key>';
+SET LOCAL app.medical_key_salt   = '<OLD-salt>';
+
+-- 2. Decrypt every row into a TEMP table (visible only to this session).
+CREATE TEMP TABLE _mfs_plain ON COMMIT DROP AS
+SELECT id, user_id, operator_id,
+       CASE WHEN operator_id IS NOT NULL
+            THEN decrypt_medical_answers(operator_id, answers)
+            ELSE decrypt_medical_answers_user(user_id, answers)
+       END AS plain
+FROM medical_form_submissions
+WHERE answers IS NOT NULL;
+
+-- 3. Swap to the NEW secrets and re-encrypt.
+SET LOCAL app.medical_master_key = '<NEW-master-key>';
+SET LOCAL app.medical_key_salt   = '<NEW-salt>';
+
+UPDATE medical_form_submissions m
+SET answers = CASE WHEN m.operator_id IS NOT NULL
+                   THEN encrypt_medical_answers(m.operator_id, p.plain)
+                   ELSE encrypt_medical_answers_user(m.user_id, p.plain)
+              END,
+    answers_key_version = 2
+FROM _mfs_plain p
+WHERE p.id = m.id;
+
 COMMIT;
 ```
 
-The migration is non-trivial; the recommended approach is to
-encrypt the OLD key in the migration itself (using a SUPERUSER
-session) and rotate in two phases:
-
-1. Deploy a migration that decrypts with the old key and stores
-   the plaintext temporarily (in a table only SUPERUSER can read).
-2. Manually re-encrypt with the new key.
-3. Deploy a cleanup migration that drops the temporary table.
+4. Update `app.medical_master_key` / `app.medical_key_salt` at the database
+   level (§8.1) and in the API secret store, then redeploy the API.
+5. Confirm decryption round-trips via `GET /v1/users/me/export` for a test
+   account before announcing completion.
 
 ## 9. GDPR erasure request
 

@@ -165,3 +165,25 @@
 **Decision:** Identify species from user photos through the existing NestJS → iNaturalist proxy (`POST /species/identify`). Enrich the catalog via GBIF, OBIS, WoRMS ETL and user sightings—not unauthorized social media scraping.
 
 **Consequences:** Photo ID requires auth and a public image URL (R2 presign upload). Species not yet in the catalog show iNaturalist matches with a manual sighting fallback.
+
+---
+
+## ADR-015: ETL execution order is owned by the code
+
+**Status:** Accepted
+
+**Context:** The full data ETL has hard dependencies between steps, and the documented order had drifted from the executed order, causing confusion during audits.
+
+**Decision:** [`etl/run-all-data.ts`](../etl/run-all-data.ts) is the single source of truth for ordering. README and this ADR are kept in sync with it. The order is:
+
+1. **worms** — canonical taxonomy first, so GBIF/OBIS occurrences link by scientific name.
+2. **dive sites in parallel** — `opendivemap`, `overpass`, `divenumber`, so occurrences can match nearby sites.
+3. **apify:google-maps** — last in the site batch (slowest source).
+4. **occurrences in parallel** — `gbif` and `obis` are independent, so they run concurrently via `Promise.all`.
+5. **reconcile_unmatched_occurrences** — placeholder open-water sites for unmatched sightings (gbif then obis).
+6. **inat:taxon-lookup** — resolves `inat_taxon_id`; MUST run before image backfills.
+7. **image backfills** — `wikimedia` → `inaturalist` → `tavily`, in increasing cost / decreasing quality.
+
+Each top-level step is failure-isolated (logged and skipped on error); the run exits non-zero if any step failed.
+
+**Consequences:** GBIF and OBIS run concurrently, halving that stage's wall-clock time. A flaky upstream no longer aborts the whole nightly run. Any change to ordering must update `run-all-data.ts` first, then this ADR and the README.

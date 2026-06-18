@@ -40,14 +40,10 @@ jobs:
           cache-dependency-path: etl/package.json
       - run: pnpm install --frozen-lockfile || pnpm install
         working-directory: etl
+      # all-data already runs the full chain, including inat:taxon-lookup
+      # followed by wikimedia:images -> inaturalist:images -> tavily:species
+      # in dependency order (see etl/run-all-data.ts, the single source of
+      # truth). The previous duplicate wikimedia/inaturalist steps were
+      # removed: they re-ran the image backfills a second time every week.
       - run: pnpm --filter @oceanlog/etl all-data
         working-directory: etl
-      # After the main pipeline, run a follow-up sync to populate
-      # species image columns that depend on iNaturalist taxon IDs
-      # resolved during the all-data run.
-      - run: pnpm --filter @oceanlog/etl wikimedia:images
-        working-directory: etl
-        if: always()
-      - run: pnpm --filter @oceanlog/etl inaturalist:images
-        working-directory: etl
-        if: always()

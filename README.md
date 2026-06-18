@@ -145,26 +145,25 @@ Docker Compose also runs a Postgres+PostGIS image for direct DB work.
 
 ## ETL pipeline
 
-The ETL pipelines run in a strict order. See
-[`docs/decisions.md`](docs/decisions.md) for the rationale.
+The ETL pipeline runs in dependency order. The executed order lives in
+[`etl/run-all-data.ts`](etl/run-all-data.ts), which is the single source
+of truth; see [`docs/decisions.md`](docs/decisions.md) (ADR-015) for the
+rationale.
 
 ```
-1. worms            ─ canonical taxonomy (English/Italian/Spanish vernaculars)
-2. gbif            ─ GBIF occurrence + taxa match
-3. obis            ─ OBIS occurrence; parses WoRMS AphiaID from URN
-4. opendivemap     ─ OpenDiveMap dive sites
-5. overpass        ─ OSM dive nodes (multi-region)
-6. divenumber      ─ DiveNumber.com embeddings
-7. apify:google-maps  ─ Google Maps (slow; runs last in the site-source batch)
-8. inat:taxon-lookup  ─ Resolve inat_taxon_id for species missing it
-9. wikimedia:images   ─ Hero images from Wikimedia Commons (CC-BY/CC0/PD)
-10. inaturalist:images ─ Fallback for species without a Wikimedia hit
-11. tavily:species   ─ Last-resort image search (most results rejected)
-12. reconcile_unmatched_occurrences  ─ Open-water placeholder sites
+1. worms                              ─ canonical taxonomy (EN/IT/ES vernaculars); first so occurrences can link by scientific name
+2. dive sites (parallel):             ─ opendivemap & overpass & divenumber
+3. apify:google-maps                  ─ Google Maps (slowest; runs last in the site batch)
+4. occurrences (parallel): gbif & obis ─ independent sources; run concurrently
+5. reconcile_unmatched_occurrences    ─ open-water placeholder sites (gbif then obis)
+6. inat:taxon-lookup                  ─ resolve inat_taxon_id; MUST precede the image backfills
+7. images (sequential):               ─ wikimedia:images → inaturalist:images → tavily:species
 ```
 
-The `all-data` script runs the chain in order. Each step is idempotent
-on its `onConflict` key, so re-runs are safe.
+The `all-data` script runs the chain in this order. Each step is
+idempotent on its `onConflict` key, so re-runs are safe. Each top-level
+step is failure-isolated: a single failing source is logged and the
+pipeline continues, exiting non-zero at the end if any step failed.
 
 ## Security model
 
