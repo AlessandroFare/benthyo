@@ -271,6 +271,43 @@ BEGIN
   RESET ROLE;
 END$$;
 
+-- ─── 5b. export_user_data: an operator admin can only export a user who
+--        shares one of the caller's operators (migration 037) ──────────
+DO $$
+DECLARE
+  v_ok BOOLEAN;
+BEGIN
+  SET LOCAL ROLE authenticated;
+
+  -- carol is owner of OpB and shares NO operator with alice (OpA only).
+  -- carol attempting to export alice must be rejected.
+  SET LOCAL request.jwt.claims = '{"sub":"00000000-0000-0000-0000-000000000003"}';
+  BEGIN
+    PERFORM export_user_data('00000000-0000-0000-0000-000000000001');
+    RAISE EXCEPTION 'carol (no shared operator) was able to export alice''s data';
+  EXCEPTION WHEN insufficient_privilege THEN
+    NULL; -- expected (ERRCODE 42501)
+  END;
+
+  -- alice is owner of OpA and bob is staff of OpA: they share an operator,
+  -- so alice exporting bob must succeed.
+  SET LOCAL request.jwt.claims = '{"sub":"00000000-0000-0000-0000-000000000001"}';
+  SELECT (export_user_data('00000000-0000-0000-0000-000000000002') ? 'profile')
+    INTO v_ok;
+  IF NOT v_ok THEN
+    RAISE EXCEPTION 'alice (shares OpA with bob) could not export bob''s data';
+  END IF;
+
+  -- Self-export always works.
+  SELECT (export_user_data('00000000-0000-0000-0000-000000000001') ? 'profile')
+    INTO v_ok;
+  IF NOT v_ok THEN
+    RAISE EXCEPTION 'alice could not export her own data';
+  END IF;
+
+  RESET ROLE;
+END$$;
+
 -- ─── 6. operator_waivers: signed waivers cannot be deleted (DD-1.2) ───
 DO $$
 DECLARE
