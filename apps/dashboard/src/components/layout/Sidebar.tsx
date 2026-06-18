@@ -2,8 +2,8 @@ import { NavLink } from "react-router-dom";
 import {
   Anchor,
   BarChart3,
+  CalendarDays,
   Fish,
-  LayoutDashboard,
   MapPin,
   Package,
   Settings,
@@ -15,16 +15,41 @@ import {
 import { cn } from "@/lib/utils";
 import { useOperator } from "@/hooks/useOperator";
 
-const navItems = [
-  { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
-  { to: "/sites", label: "Sites", icon: MapPin },
-  { to: "/customers", label: "Customers", icon: Users },
-  { to: "/analytics", label: "Analytics", icon: BarChart3 },
-  { to: "/species", label: "Species", icon: Fish },
-  { to: "/corrections", label: "Corrections", icon: ShieldCheck },
-  { to: "/rental-gear", label: "Rental gear", icon: Package },
-  { to: "/marketplace", label: "Marketplace", icon: Store },
-  { to: "/settings", label: "Settings", icon: Settings },
+// Grouped navigation. "Today" is the landing page (the daily operational
+// job-to-be-done); everything else is collapsed into logical sections so a
+// small dive shop isn't faced with a flat list of 9+ items.
+const navGroups: {
+  heading: string | null;
+  items: { to: string; label: string; icon: typeof MapPin; end?: boolean }[];
+}[] = [
+  {
+    heading: null,
+    items: [{ to: "/", label: "Today", icon: CalendarDays, end: true }],
+  },
+  {
+    heading: "Operations",
+    items: [
+      { to: "/customers", label: "Customers", icon: Users },
+      { to: "/rental-gear", label: "Rental gear", icon: Package },
+      { to: "/analytics", label: "Analytics", icon: BarChart3 },
+    ],
+  },
+  {
+    heading: "Catalog",
+    items: [
+      { to: "/sites", label: "Sites", icon: MapPin },
+      { to: "/species", label: "Species", icon: Fish },
+      { to: "/marketplace", label: "Marketplace", icon: Store },
+    ],
+  },
+  {
+    heading: "Compliance",
+    items: [{ to: "/corrections", label: "Corrections", icon: ShieldCheck }],
+  },
+  {
+    heading: null,
+    items: [{ to: "/settings", label: "Settings", icon: Settings }],
+  },
 ];
 
 export function Sidebar() {
@@ -43,24 +68,33 @@ export function Sidebar() {
       </div>
 
       <nav className="flex flex-1 flex-col gap-1 p-3">
-        {navItems.map(({ to, label, icon: Icon, end }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={end}
-            title={label}
-            className={({ isActive }) =>
-              cn(
-                "flex items-center justify-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-colors xl:justify-start",
-                isActive
-                  ? "bg-white/10 text-white shadow-inner"
-                  : "text-white/55 hover:bg-white/5 hover:text-white",
-              )
-            }
-          >
-            <Icon className="h-5 w-5 shrink-0" />
-            <span className="hidden xl:inline">{label}</span>
-          </NavLink>
+        {navGroups.map((group, gi) => (
+          <div key={group.heading ?? `group-${gi}`} className="flex flex-col gap-1">
+            {group.heading && (
+              <p className="mt-3 hidden px-3 text-[10px] font-semibold uppercase tracking-wider text-white/35 xl:block">
+                {group.heading}
+              </p>
+            )}
+            {group.items.map(({ to, label, icon: Icon, end }) => (
+              <NavLink
+                key={to}
+                to={to}
+                end={end}
+                title={label}
+                className={({ isActive }) =>
+                  cn(
+                    "flex items-center justify-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-colors xl:justify-start",
+                    isActive
+                      ? "bg-white/10 text-white shadow-inner"
+                      : "text-white/55 hover:bg-white/5 hover:text-white",
+                  )
+                }
+              >
+                <Icon className="h-5 w-5 shrink-0" />
+                <span className="hidden xl:inline">{label}</span>
+              </NavLink>
+            ))}
+          </div>
         ))}
       </nav>
 
