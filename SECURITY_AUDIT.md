@@ -280,6 +280,16 @@ change. Refer to the diff for details. Highlights:)
 - `prune_inat_identify_cache` SQL function callable from
   `pg_cron` for cleanup.
 
+## Tier enforcement on the compliance write path (sprint)
+
+The Compliance bundle (waivers + medical) is now enforced, not just
+documented. `PUT /v1/waivers/operator/:operatorId` (publish a waiver
+version) requires `@RequireTier('pro')` + `TierGuard` in addition to
+`OperatorRoleGuard` + `@OperatorRoles('owner','admin')`. Diver-facing
+medical/waiver *signing* remains free; only operator-side publishing of a
+compliance document is tier-gated. This closes the gap where the "Pro
+wall" existed in the pricing matrix but no route actually checked the tier.
+
 ## What was NOT changed (and why)
 
 Some items were noted in the audit but intentionally not remediated

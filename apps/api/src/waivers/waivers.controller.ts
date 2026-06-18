@@ -18,6 +18,7 @@ import {
 } from '../common/decorators/current-user.decorator';
 import { OperatorRoleGuard } from '../common/guards/operator-role.guard';
 import { OperatorRoles } from '../common/decorators/operator-roles.decorator';
+import { TierGuard, RequireTier } from '../common/guards/tier.guard';
 import { AuthUser } from '../common/types/auth-user.interface';
 import { SignWaiverDto, UpsertOperatorWaiverDto } from './dto/waiver.dto';
 import { WaiversService } from './waivers.service';
@@ -46,10 +47,15 @@ export class WaiversController {
    * owner or admin of the operator (defense in depth — RLS catches
    * cross-tenant calls but the controller should be explicit).
    */
+  // Compliance bundle (waivers + medical) is a paid capability. Publishing
+  // a waiver version requires the 'pro' tier in addition to owner/admin
+  // role. TierGuard resolves the operator from :operatorId and enforces an
+  // active (or grace-period) subscription.
   @Put('operator/:operatorId')
   @ApiBearerAuth()
-  @UseGuards(OperatorRoleGuard)
+  @UseGuards(OperatorRoleGuard, TierGuard)
   @OperatorRoles('owner', 'admin')
+  @RequireTier('pro')
   @ApiOperation({ summary: 'Publish a new waiver version for an operator' })
   upsert(
     @Param('operatorId', new ParseUUIDPipe()) operatorId: string,

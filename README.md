@@ -198,13 +198,22 @@ remediation are documented in
 
 ## Subscriptions & billing
 
-Three tiers, configured in the `operators` table:
+Three tiers, configured in the `operators` table. The **Compliance bundle**
+(digital waivers + medical questionnaires) is the headline paid hook: it is
+a legal/liability need rather than a nice-to-have, so it anchors the Pro
+tier and is the primary upgrade driver for dive centers.
 
-| Tier    | Sites | Team | Features                                                  |
-|---------|-------|------|-----------------------------------------------------------|
-| Free    | 3     | 1    | Logs, sightings, life list                                |
-| Starter | 10    | 5    | + Analytics, customer CRM                                |
-| Pro     | 100   | 20   | + Marketplace, waivers, medical, rental gear, API keys   |
+| Tier    | Price (target) | Sites | Team | What you get                                                                 |
+|---------|----------------|-------|------|------------------------------------------------------------------------------|
+| Free    | €0            | 3     | 1    | Dive logs, sightings, life list, public site/species pages                   |
+| Starter | €29/mo        | 10    | 5    | + Analytics, customer CRM, daily roster                                      |
+| Pro     | €79/mo        | 100   | 20   | + **Compliance bundle (waivers + medical)**, marketplace, rental gear, API keys |
+
+> **Compliance bundle** = digitally signed, eIDAS-binding waivers
+> (IP + UA + SHA256 capture) and encrypted medical questionnaires
+> (GDPR Art. 9, HMAC-SHA256-derived per-tenant keys). Publishing a waiver
+> version is gated by `@RequireTier('pro')` + `TierGuard`; medical signing
+> by divers stays free.
 
 The `RequireTier()` decorator on a route enforces the minimum tier.
 Subscription state is mutated only by the Stripe webhook
