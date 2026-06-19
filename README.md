@@ -66,6 +66,7 @@ cd apps/mobile && flutter run -d chrome \
 ```
 
 See [`docs/setup.md`](docs/setup.md) for full setup details and
+[`docs/testing.md`](docs/testing.md) for the local test checklist.
 [`docs/configuration.md`](docs/configuration.md) for production env
 vars.
 

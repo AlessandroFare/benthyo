@@ -22,10 +22,38 @@ export interface UddfImportResult {
   generator: string | null;
 }
 
+const MAX_XML_CHARS = 2_000_000;
+const MAX_DIVE_BLOCKS = 500;
+const MAX_PROFILE_SAMPLES = 5_000;
+
 function textBetween(xml: string, tag: string): string | null {
-  const re = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, 'i');
-  const match = xml.match(re);
-  return match?.[1]?.trim() ?? null;
+  const open = `<${tag}`;
+  const start = xml.indexOf(open);
+  if (start === -1) return null;
+  const contentStart = xml.indexOf('>', start);
+  if (contentStart === -1) return null;
+  const close = `</${tag}>`;
+  const end = xml.indexOf(close, contentStart + 1);
+  if (end === -1) return null;
+  return xml.slice(contentStart + 1, end).trim();
+}
+
+function extractBlocks(xml: string, tag: string, maxBlocks: number): string[] {
+  const blocks: string[] = [];
+  const open = `<${tag}`;
+  const close = `</${tag}>`;
+  let searchFrom = 0;
+  while (blocks.length < maxBlocks) {
+    const start = xml.indexOf(open, searchFrom);
+    if (start === -1) break;
+    const contentStart = xml.indexOf('>', start);
+    if (contentStart === -1) break;
+    const end = xml.indexOf(close, contentStart + 1);
+    if (end === -1) break;
+    blocks.push(xml.slice(contentStart + 1, end));
+    searchFrom = end + close.length;
+  }
+  return blocks;
 }
 
 function numeric(text: string | null): number | null {
@@ -81,10 +109,7 @@ function parseDiveBlock(block: string): ParsedUddfDive | null {
     undefined;
 
   const profileSamples: UddfProfileSample[] = [];
-  const sampleRe = /<sample[^>]*>([\s\S]*?)<\/sample>/gi;
-  let sampleMatch: RegExpExecArray | null;
-  while ((sampleMatch = sampleRe.exec(block)) !== null) {
-    const sampleXml = sampleMatch[1];
+  for (const sampleXml of extractBlocks(block, 'sample', MAX_PROFILE_SAMPLES)) {
     const timeSec =
       numeric(textBetween(sampleXml, 'divetime')) ??
       numeric(textBetween(sampleXml, 'time')) ??
@@ -110,20 +135,21 @@ function parseDiveBlock(block: string): ParsedUddfDive | null {
 }
 
 export function parseUddfXml(xml: string): UddfImportResult {
+  if (xml.length > MAX_XML_CHARS) {
+    throw new Error('UDDF file exceeds maximum supported size');
+  }
+
   const generator = textBetween(xml, 'generator');
   const dives: ParsedUddfDive[] = [];
 
-  const divesiteRe = /<divesite[^>]*>([\s\S]*?)<\/divesite>/gi;
-  let match: RegExpExecArray | null;
-  while ((match = divesiteRe.exec(xml)) !== null) {
-    const dive = parseDiveBlock(match[1]);
+  for (const block of extractBlocks(xml, 'divesite', MAX_DIVE_BLOCKS)) {
+    const dive = parseDiveBlock(block);
     if (dive) dives.push(dive);
   }
 
   if (dives.length === 0) {
-    const diveRe = /<dive[^>]*>([\s\S]*?)<\/dive>/gi;
-    while ((match = diveRe.exec(xml)) !== null) {
-      const dive = parseDiveBlock(match[1]);
+    for (const block of extractBlocks(xml, 'dive', MAX_DIVE_BLOCKS)) {
+      const dive = parseDiveBlock(block);
       if (dive) dives.push(dive);
     }
   }

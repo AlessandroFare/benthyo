@@ -13,7 +13,7 @@ export interface ParsedCertCard {
 }
 
 export function parseCertCardText(raw: string): ParsedCertCard {
-  const text = raw.replace(/\s+/g, ' ').trim();
+  const text = raw.slice(0, 8_000).replace(/\s+/g, ' ').trim();
   let agency: string | null = null;
   if (/\bPADI\b/i.test(text)) agency = 'PADI';
   else if (/\bSSI\b/i.test(text)) agency = 'SSI';

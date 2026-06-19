@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { SightingsService } from './sightings.service';
 import { SupabaseService } from '../database/supabase.service';
 
@@ -93,27 +93,29 @@ describe('SightingsService', () => {
     await expect(service.getById(undefined, 'missing')).rejects.toThrow(NotFoundException);
   });
 
-  it('exports verified sightings as Darwin Core XML using service role', async () => {
-    const row = {
-      ...mockSighting,
-      species: { scientific_name: 'Epinephelus marginatus' },
-      dive_sites: { location: 'POINT(13.2 38.7)' },
-    };
-    const builder = chain({ data: [row], error: null });
-    supabase.serviceRole.mockReturnValue({
+  it('rejects self-verification', async () => {
+    const unverified = { ...mockSighting, verified_by: null, verified_at: null };
+    const builder = chain({
+      data: unverified,
+      error: null,
+    });
+    supabase.createClient.mockReturnValue({
       from: jest.fn().mockReturnValue(builder),
     } as never);
 
-    const xml = await service.exportDarwinCore();
-
-    expect(supabase.serviceRole).toHaveBeenCalled();
-    expect(xml).toContain('<?xml version="1.0"');
-    expect(xml).toContain('Epinephelus marginatus');
-    expect(xml).toContain('HumanObservation');
+    await expect(service.verify('token', 'user-1', 'sig-1')).rejects.toThrow(ForbiddenException);
   });
 
   it('verifies a sighting', async () => {
-    const builder = chain({ data: { ...mockSighting, verified_by: 'expert-1' }, error: null });
+    const unverified = { ...mockSighting, verified_by: null, verified_at: null };
+    const verified = { ...unverified, verified_by: 'expert-1', verified_at: '2024-06-02T00:00:00Z' };
+    const builder: Record<string, jest.Mock> = {
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      update: jest.fn().mockReturnThis(),
+      maybeSingle: jest.fn().mockResolvedValue({ data: unverified, error: null }),
+      single: jest.fn().mockResolvedValue({ data: verified, error: null }),
+    };
     supabase.createClient.mockReturnValue({
       from: jest.fn().mockReturnValue(builder),
     } as never);

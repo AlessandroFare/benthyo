@@ -247,46 +247,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ListTile(
             leading: const Icon(Icons.science),
             title: const Text('Darwin Core export'),
-            subtitle: Text(
-              'Downloads verified sightings XML from ${ApiConfig.baseUrl}',
+            subtitle: const Text(
+              'GBIF export runs on a server schedule (not from the app)',
             ),
-            onTap: () async {
-              final messenger = ScaffoldMessenger.of(context);
-              try {
-                final token = ref
-                    .read(supabaseClientProvider)
-                    .auth
-                    .currentSession
-                    ?.accessToken;
-                final res = await http.get(
-                  Uri.parse('${ApiConfig.baseUrl}/sightings/export/darwin-core'),
-                  headers: {
-                    if (token != null) 'Authorization': 'Bearer $token',
-                  },
-                );
-                if (res.statusCode != 200) {
-                  throw Exception('HTTP ${res.statusCode}');
-                }
-                await Clipboard.setData(ClipboardData(text: res.body));
-                if (!context.mounted) return;
-                messenger.showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Darwin Core XML copied (${res.body.length} chars). '
-                      'Paste into a .xml file to upload to GBIF.',
-                    ),
+            onTap: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Verified sightings are exported nightly by the '
+                    'darwin-core-export Edge Function for GBIF. '
+                    'Operators can download CSV from Supabase Functions logs.',
                   ),
-                );
-              } catch (e) {
-                if (!context.mounted) return;
-                messenger.showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Export failed: $e. Ensure the API is running at ${ApiConfig.baseUrl}.',
-                    ),
-                  ),
-                );
-              }
+                  duration: Duration(seconds: 6),
+                ),
+              );
             },
           ),
           ListTile(

@@ -64,3 +64,47 @@ END$$;
 
 GRANT USAGE ON SCHEMA auth TO anon, authenticated, service_role;
 GRANT anon, authenticated, service_role TO postgres;
+
+-- ---------------------------------------------------------------------------
+-- Minimal Supabase `storage` shim (migration 013 inserts into storage.buckets).
+-- ---------------------------------------------------------------------------
+CREATE SCHEMA IF NOT EXISTS storage;
+
+CREATE TABLE IF NOT EXISTS storage.buckets (
+  id                   TEXT PRIMARY KEY,
+  name                 TEXT NOT NULL,
+  owner                UUID,
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+  public               BOOLEAN NOT NULL DEFAULT false,
+  avif_autodetection   BOOLEAN NOT NULL DEFAULT false,
+  file_size_limit      BIGINT,
+  allowed_mime_types   TEXT[]
+);
+
+CREATE TABLE IF NOT EXISTS storage.objects (
+  id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  bucket_id          TEXT REFERENCES storage.buckets(id),
+  name               TEXT,
+  owner              UUID,
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_accessed_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  metadata           JSONB,
+  path_tokens        TEXT[],
+  version            TEXT,
+  user_metadata      JSONB
+);
+
+CREATE OR REPLACE FUNCTION storage.foldername(name TEXT)
+RETURNS TEXT[]
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT string_to_array(name, '/');
+$$;
+
+ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+
+GRANT USAGE ON SCHEMA storage TO anon, authenticated, service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA storage TO anon, authenticated, service_role;

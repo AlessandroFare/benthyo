@@ -118,7 +118,13 @@ async function fetchImageInfo(fileTitle: string): Promise<ParsedImage | null> {
 }
 
 function stripHtml(s: string): string {
-  return s.replace(/<[^>]+>/g, '').trim();
+  let result = s;
+  let previous = '';
+  while (result !== previous) {
+    previous = result;
+    result = result.replace(/<[^>]*>/g, '');
+  }
+  return result.trim();
 }
 
 function isAcceptable(parsed: ParsedImage): boolean {

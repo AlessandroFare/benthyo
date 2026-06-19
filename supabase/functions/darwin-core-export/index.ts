@@ -220,8 +220,9 @@ Deno.serve(async (req) => {
       { headers: { ...CORS_HEADERS, "Content-Type": "application/json" } },
     );
   } catch (err) {
+    console.error('darwin-core-export failed', err);
     return new Response(
-      JSON.stringify({ error: err instanceof Error ? err.message : String(err) }),
+      JSON.stringify({ error: 'Internal server error' }),
       {
         status: 500,
         headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
