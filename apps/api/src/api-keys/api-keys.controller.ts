@@ -1,6 +1,7 @@
-import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser, AccessToken } from '../common/decorators/current-user.decorator';
+import { TierGuard, RequireTier } from '../common/guards/tier.guard';
 import { AuthUser } from '../common/types/auth-user.interface';
 import { CreateApiKeyDto } from '../medical/dto/medical.dto';
 import { ApiKeysService } from './api-keys.service';
@@ -17,7 +18,12 @@ export class ApiKeysController {
     return this.apiKeys.list(token, user.id);
   }
 
+  // Minting API keys is a Pro-tier capability. Listing and revoking
+  // existing keys stay available to any authenticated operator so a
+  // downgraded account can still see and revoke keys it already created.
   @Post()
+  @UseGuards(TierGuard)
+  @RequireTier('pro')
   @ApiOperation({ summary: 'Create a read API key (shown once)' })
   create(
     @CurrentUser() user: AuthUser,

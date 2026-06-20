@@ -43,10 +43,14 @@ export class TierGuard implements CanActivate {
       throw new ForbiddenException('Authentication required');
     }
 
-    // Resolve the operator this request concerns.
+    // Resolve the operator this request concerns. We deliberately do NOT
+    // fall back to a generic `:id` route param: on routes like
+    // PATCH /operators/me/marketplace/:id that `:id` is the *listing* id,
+    // not an operator id, so using it would mis-resolve the tier lookup.
+    // When no explicit operatorId is present we fall through to the
+    // caller's primary operator below.
     const operatorId =
       (request.params?.operatorId as string | undefined) ??
-      (request.params?.id as string | undefined) ??
       (request.body?.operator_id as string | undefined);
 
     const client = this.supabase.createClient(request.accessToken);
