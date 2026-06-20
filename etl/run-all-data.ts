@@ -56,13 +56,39 @@ export async function runAllDataEtl(): Promise<void> {
     }
   }
 
+  /**
+   * Run several independent sources concurrently with per-source failure
+   * isolation. Unlike Promise.all, one source failing does not abort its
+   * siblings — each is recorded individually so the others' work is kept,
+   * matching the README's "a single failing source is logged and the
+   * pipeline continues" guarantee inside a parallel batch.
+   */
+  async function parallelSources(
+    sources: Array<{ name: string; fn: () => Promise<unknown> }>,
+  ): Promise<void> {
+    const results = await Promise.allSettled(sources.map((s) => s.fn()));
+    results.forEach((r, i) => {
+      if (r.status === 'rejected') {
+        const message =
+          r.reason instanceof Error ? r.reason.message : String(r.reason);
+        failures.push(`${sources[i].name}: ${message}`);
+        logger.error(`Source "${sources[i].name}" failed (continuing)`, {
+          error: message,
+        });
+      }
+    });
+  }
+
   // 1. Taxonomy first.
   await step('worms', runWormsEtl);
 
-  // 2. Dive site sources in parallel.
-  await step('dive-sites (opendivemap, overpass, divenumber)', () =>
-    Promise.all([runOpenDiveMapEtl(), runOverpassEtl(), runDiveNumberEtl()]),
-  );
+  // 2. Dive site sources in parallel, each isolated so one source's
+  //    failure does not discard the others' ingested sites.
+  await parallelSources([
+    { name: 'opendivemap', fn: runOpenDiveMapEtl },
+    { name: 'overpass', fn: runOverpassEtl },
+    { name: 'divenumber', fn: runDiveNumberEtl },
+  ]);
 
   // 3. Apify Google Maps crawl. Last in the site batch because it is the slowest.
   await step('apify:google-maps', runApifyGoogleMapsEtl);
@@ -70,7 +96,10 @@ export async function runAllDataEtl(): Promise<void> {
   // 4. GBIF + OBIS occurrences in parallel. They link to species via
   // scientific name and to dive sites via nearby_dive_sites; neither
   // depends on the other, so we run them concurrently.
-  await step('occurrences (gbif, obis)', () => Promise.all([runGbifEtl(), runObisEtl()]));
+  await parallelSources([
+    { name: 'gbif', fn: runGbifEtl },
+    { name: 'obis', fn: runObisEtl },
+  ]);
 
   // 5. Post-import reconciliation: create placeholder sites for any
   // sightings that didn't link to a known site within 30 km.
