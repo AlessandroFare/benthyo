@@ -1,9 +1,17 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { SupabaseService } from '../database/supabase.service';
 import { Operator, OperatorDiveSite, OperatorUser } from '../database/database.types';
 import { assertNoError } from '../common/utils/supabase-error.util';
 import { paginated, PaginatedResult } from '../common/dto/pagination.dto';
 import { toGeoJsonPoint } from '../common/utils/geo.util';
+
+/**
+ * Per-tier resource caps (README "Subscriptions & billing"). Enforced
+ * server-side here; the DB trigger added in migration 045 is the
+ * second line of defense for direct PostgREST writes.
+ */
+const TIER_SITE_LIMIT: Record<string, number> = { free: 3, starter: 10, pro: 100 };
+const TIER_TEAM_LIMIT: Record<string, number> = { free: 1, starter: 5, pro: 20 };
 import {
   CreateOperatorDto,
   LinkDiveSiteDto,
@@ -141,12 +149,57 @@ export class OperatorsService {
     ) as OperatorUser[];
   }
 
+  /**
+   * Enforce a per-tier row cap before an INSERT. Reads the operator's
+   * current tier and the live row count for `table`; throws 403 when the
+   * new row would exceed the cap. RLS already scopes the count to the
+   * caller's operator.
+   */
+  private async assertUnderTierLimit(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    client: any,
+    operatorId: string,
+    table: 'operator_dive_sites' | 'operator_users',
+    limits: Record<string, number>,
+    label: string,
+  ): Promise<void> {
+    const op = assertNoError(
+      await client
+        .from('operators')
+        .select('subscription_tier')
+        .eq('id', operatorId)
+        .maybeSingle(),
+    ) as { subscription_tier: string | null } | null;
+    const tier = (op?.subscription_tier ?? 'free') as string;
+    const cap = limits[tier] ?? limits['free'];
+
+    const { count, error } = await client
+      .from(table)
+      .select('*', { count: 'exact', head: true })
+      .eq('operator_id', operatorId);
+    if (error) assertNoError({ data: null, error });
+
+    if ((count ?? 0) >= cap) {
+      throw new ForbiddenException(
+        `${label} limit reached for the ${tier} tier (${cap}). Upgrade to add more.`,
+      );
+    }
+  }
+
   async inviteMember(
     token: string,
     operatorId: string,
     dto: InviteOperatorUserDto,
   ): Promise<OperatorUser> {
     const client = this.supabase.createClient(token);
+
+    await this.assertUnderTierLimit(
+      client,
+      operatorId,
+      'operator_users',
+      TIER_TEAM_LIMIT,
+      'Team member',
+    );
 
     return assertNoError(
       await client
@@ -202,6 +255,14 @@ export class OperatorsService {
     dto: LinkDiveSiteDto,
   ): Promise<OperatorDiveSite> {
     const client = this.supabase.createClient(token);
+
+    await this.assertUnderTierLimit(
+      client,
+      operatorId,
+      'operator_dive_sites',
+      TIER_SITE_LIMIT,
+      'Dive site',
+    );
 
     return assertNoError(
       await client
