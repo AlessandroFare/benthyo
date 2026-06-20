@@ -223,17 +223,30 @@ export class OperatorsService {
         .eq('operator_id', operatorId)
         .order('added_at', { ascending: false }),
     ) as Array<Record<string, unknown>>;
-    const enriched: Record<string, unknown>[] = [];
-    for (const link of links) {
-      const site = link.dive_sites as Record<string, unknown>;
+    // Batch the per-site sighting counts into a single query instead of
+    // one round-trip per linked site (the previous loop was an N+1; the
+    // SECURITY_AUDIT P-1 "single-query rewrite" had regressed). We sum
+    // sighting_count per dive_site_id in memory after one IN() fetch.
+    const siteIds = links.map((l) => l.dive_site_id as string);
+    const countBySite = new Map<string, number>();
+    if (siteIds.length > 0) {
       const stats = assertNoError(
         await client
           .from('species_dive_site_stats')
-          .select('sighting_count')
-          .eq('dive_site_id', link.dive_site_id as string),
-      ) as Array<{ sighting_count: number }>;
-      const sightingCount = stats.reduce((sum, row) => sum + row.sighting_count, 0);
-      enriched.push({
+          .select('dive_site_id, sighting_count')
+          .in('dive_site_id', siteIds),
+      ) as Array<{ dive_site_id: string; sighting_count: number }>;
+      for (const row of stats) {
+        countBySite.set(
+          row.dive_site_id,
+          (countBySite.get(row.dive_site_id) ?? 0) + row.sighting_count,
+        );
+      }
+    }
+
+    return links.map((link) => {
+      const site = link.dive_sites as Record<string, unknown>;
+      return {
         id: link.dive_site_id,
         dive_site_id: link.dive_site_id,
         name: site.name,
@@ -242,11 +255,10 @@ export class OperatorsService {
         depth_max: site.depth_max,
         difficulty: site.difficulty,
         is_primary: link.is_primary,
-        sighting_count: sightingCount,
+        sighting_count: countBySite.get(link.dive_site_id as string) ?? 0,
         added_at: link.added_at,
-      });
-    }
-    return enriched;
+      };
+    });
   }
 
   async linkSite(
