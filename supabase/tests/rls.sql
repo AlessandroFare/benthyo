@@ -361,6 +361,79 @@ BEGIN
   DELETE FROM dive_sites WHERE id = v_dummy_site;
 END$$;
 
+-- ─── 7. operators: subscription tier cannot be self-upgraded (C-6 / 036) ───
+DO $$
+BEGIN
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claims = '{"sub":"00000000-0000-0000-0000-000000000001"}';
+  BEGIN
+    UPDATE operators SET subscription_tier = 'pro'
+    WHERE id = '00000000-0000-0000-0000-000000000010';
+    RAISE EXCEPTION 'subscription_tier self-upgrade was NOT blocked';
+  EXCEPTION WHEN insufficient_privilege THEN
+    NULL;  -- Expected: prevent_subscription_self_upgrade raises 42501.
+  END;
+  RESET ROLE;
+END$$;
+
+-- ─── 8. sightings: reporter cannot self-verify; non-expert cannot verify ───
+DO $$
+DECLARE
+  v_site UUID := '00000000-0000-0000-0000-000000000023';
+  v_sp   UUID;
+  v_sig  UUID := '00000000-0000-0000-0000-000000000060';
+BEGIN
+  INSERT INTO dive_sites (id, name, slug, location, country_code, depth_min,
+                          depth_max, difficulty, site_type, access_type, created_by)
+  VALUES (v_site, 'SiteV', 'site-v', ST_MakePoint(13, 46)::geography, 'IT',
+          0, 30, 'beginner', 'reef', 'shore',
+          '00000000-0000-0000-0000-000000000001')
+  ON CONFLICT DO NOTHING;
+
+  SELECT id INTO v_sp FROM species LIMIT 1;
+  IF v_sp IS NULL THEN
+    INSERT INTO species (id, scientific_name)
+    VALUES ('00000000-0000-0000-0000-000000000070', 'Testus marinus')
+    ON CONFLICT DO NOTHING;
+    v_sp := '00000000-0000-0000-0000-000000000070';
+  END IF;
+
+  -- Alice reports a sighting.
+  INSERT INTO sightings (id, user_id, dive_site_id, species_id, observed_at, source)
+  VALUES (v_sig, '00000000-0000-0000-0000-000000000001', v_site, v_sp,
+          now(), 'user')
+  ON CONFLICT DO NOTHING;
+
+  -- Alice (the reporter, not an expert) tries to verify her own sighting.
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claims = '{"sub":"00000000-0000-0000-0000-000000000001"}';
+  BEGIN
+    UPDATE sightings
+    SET verified_by = '00000000-0000-0000-0000-000000000001', verified_at = now()
+    WHERE id = v_sig;
+    RAISE EXCEPTION 'reporter self-verify was NOT blocked';
+  EXCEPTION WHEN insufficient_privilege THEN
+    NULL;  -- Expected: prevent_self_verify_columns raises 42501.
+  END;
+  RESET ROLE;
+
+  -- The expert (taxonomy_expert = true, different user) CAN verify it.
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claims = '{"sub":"00000000-0000-0000-0000-000000000004"}';
+  UPDATE sightings
+  SET verified_by = '00000000-0000-0000-0000-000000000004', verified_at = now()
+  WHERE id = v_sig;
+  IF NOT EXISTS (
+    SELECT 1 FROM sightings WHERE id = v_sig AND verified_by IS NOT NULL
+  ) THEN
+    RAISE EXCEPTION 'expert verification did not take effect';
+  END IF;
+  RESET ROLE;
+
+  DELETE FROM sightings WHERE id = v_sig;
+  DELETE FROM dive_sites WHERE id = v_site;
+END$$;
+
 COMMIT;
 
 \echo '✓ All OceanLog RLS tests passed.'
