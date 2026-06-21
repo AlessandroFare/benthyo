@@ -18,6 +18,7 @@ jobs:
       # GitHub Actions secrets — never log the values.
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      ETL_SYSTEM_USER_ID: ${{ secrets.ETL_SYSTEM_USER_ID }}
       INAT_API_BASE: https://api.inaturalist.org/v1
       INAT_TAXON_MIN_SCORE: 90
       COMMONS_API_URL: https://commons.wikimedia.org/w/api.php

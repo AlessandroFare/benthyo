@@ -1,8 +1,8 @@
-name: ETL GBIF
+name: ETL SEAMAP
 
 on:
   schedule:
-    - cron: '0 2 * * *'
+    - cron: '0 4 * * *'
   workflow_dispatch:
 
 permissions:
@@ -18,7 +18,7 @@ jobs:
           node-version: 20
       - run: npm install
         working-directory: etl
-      - run: npx tsx gbif/index.ts
+      - run: npx tsx seamap/index.ts
         working-directory: etl
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
