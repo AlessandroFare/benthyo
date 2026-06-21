@@ -39,6 +39,8 @@ import '../../features/social/chat_screen.dart';
 import '../../features/dive_logs/ble_sync_screen.dart';
 import '../../features/operators/marketplace_screen.dart';
 import '../../features/species/species_quiz_screen.dart';
+import '../../features/onboarding/onboarding_screen.dart';
+import '../../features/onboarding/onboarding_providers.dart';
 import '../supabase/supabase_client.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -51,7 +53,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/',
     refreshListenable: _RouterRefresh(ref),
-    redirect: (context, state) {
+    redirect: (context, state) async {
       final location = state.matchedLocation;
       final isLoading = authState.isLoading;
 
@@ -66,10 +68,19 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           location.startsWith('/check-email');
       final isPublicRoute = location.startsWith('/u/');
       final isSplash = location == '/';
+      final isOnboarding = location == '/onboarding';
       final isProfileSetup = location == '/profile-setup';
 
+      if (isOnboarding) return null;
+
       if (!authenticated) {
-        if (isAuthRoute || isSplash || isPublicRoute) return null;
+        if (isAuthRoute || isSplash || isPublicRoute) {
+          if (isSplash) {
+            final completed = await ref.read(onboardingCompletedProvider.future);
+            if (!completed) return '/onboarding';
+          }
+          return null;
+        }
         return '/login';
       }
 
@@ -84,6 +95,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
+      GoRoute(
+        path: '/onboarding',
+        builder: (context, state) => const OnboardingScreen(),
+      ),
       GoRoute(
         path: '/',
         builder: (context, state) => const SplashScreen(),

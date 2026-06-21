@@ -243,6 +243,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             onTap: () => context.push('/marketplace'),
           ),
           const Divider(),
+          const SectionHeader(title: 'Onboarding'),
+          ListTile(
+            leading: const Icon(Icons.waving_hand),
+            title: const Text('Show onboarding intro'),
+            subtitle: const Text('Replay the welcome cards'),
+            onTap: () => context.push('/onboarding'),
+          ),
+          const Divider(),
           const SectionHeader(title: 'Data export'),
           ListTile(
             leading: const Icon(Icons.science),
