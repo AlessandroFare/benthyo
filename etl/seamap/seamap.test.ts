@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
 const OBIS_API = 'https://api.obis.org/v3';
+const MED = 'POLYGON((-6 30, 36 30, 36 46, -6 46, -6 30))';
 
-describe('SEAMAP API integration', () => {
-  it('OBIS API is reachable with SEAMAP dataset filter', async () => {
+describe('SEAMAP (OBIS megafauna) integration', () => {
+  it('returns real Mediterranean megafauna occurrences for Cetacea', async () => {
     const params = new URLSearchParams({
-      geometry: 'POLYGON((-6 30, 36 30, 36 46, -6 46, -6 30))',
-      datasetid: 'd372cbce-85b8-4c03-a70a-5d9a00c3b792',
+      geometry: MED,
+      scientificname: 'Cetacea',
       size: '5',
       start: '0',
     });
-
     const response = await fetch(`${OBIS_API}/occurrence?${params}`);
     expect(response.ok).toBe(true);
 
@@ -18,32 +18,28 @@ describe('SEAMAP API integration', () => {
       total: number;
       results: Array<{ id: string; scientificName?: string }>;
     };
-    // Don't require non-zero results — SEAMAP dataset may have no occurrences
-    // in the Mediterranean bounding box. The API contract is the test target.
-    expect(data).toHaveProperty('results');
-    expect(Array.isArray(data.results)).toBe(true);
-    if (data.results.length > 0) {
-      expect(data.results[0].id).toBeTypeOf('string');
-    }
+    // Real query — must actually return data (the old single-datasetid filter
+    // returned 0, which is the bug this source fix addresses).
+    expect(data.total).toBeGreaterThan(0);
+    expect(data.results.length).toBeGreaterThan(0);
+    expect(data.results[0].id).toBeTypeOf('string');
   });
 
-  it('includes scientificName on returned occurrences when present', async () => {
+  it('Testudines (sea turtles) query also returns Mediterranean data', async () => {
     const params = new URLSearchParams({
-      geometry: 'POLYGON((-6 30, 36 30, 36 46, -6 46, -6 30))',
-      datasetid: 'd372cbce-85b8-4c03-a70a-5d9a00c3b792',
+      geometry: MED,
+      scientificname: 'Testudines',
       size: '3',
       start: '0',
     });
     const response = await fetch(`${OBIS_API}/occurrence?${params}`);
-    const data = (await response.json()) as { results: Array<{ scientificName?: string }> };
-    for (const occ of data.results) {
-      expect(occ.scientificName).toBeTypeOf('string');
-    }
+    const data = (await response.json()) as { total: number; results: unknown[] };
+    expect(data.total).toBeGreaterThan(0);
   });
 
-  it('constructs SEAMAP external_id from occurrence id', () => {
-    const occId = 'obis:occ:12345';
-    expect(occId).toBeTypeOf('string');
-    expect(occId.split(':').length).toBe(3);
+  it('dedups occurrences by id across taxa', () => {
+    const byId = new Map<string, { id: string }>();
+    [{ id: 'a' }, { id: 'b' }, { id: 'a' }].forEach((o) => byId.set(o.id, o));
+    expect([...byId.values()]).toHaveLength(2);
   });
 });

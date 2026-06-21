@@ -11,16 +11,28 @@ import {
 } from '../shared/occurrence';
 
 /**
- * OBIS-SEAMAP ETL — marine megafauna (turtles, marine mammals, seabirds).
- * SEAMAP data is ingested via the same OBIS v3 API, filtered by the
- * SEAMAP dataset ID. This keeps the pipe consistent with etl/obis/ and
- * lets us deduplicate on source,external_id.
+ * OBIS-SEAMAP ETL — marine megafauna (marine mammals, sea turtles, seabirds).
  *
- * https://seamap.env.duke.edu
+ * OBIS-SEAMAP (Duke, https://seamap.env.duke.edu) contributes its megafauna
+ * observations into OBIS. Rather than filter OBIS by a single dataset id
+ * (SEAMAP spans hundreds of datasets, and there is no one "SEAMAP" id), we
+ * fetch OBIS occurrences in the Mediterranean restricted to the megafauna
+ * higher taxa that define SEAMAP's scope. This is a real, verifiable query:
+ *   GET /v3/occurrence?scientificname=Cetacea&geometry=<med> -> tens of
+ *   thousands of records, many sourced from OBIS-SEAMAP satellite-tracking.
+ * Dedup stays on (source, external_id).
  */
 const OBIS_API = 'https://api.obis.org/v3';
 
-const SEAMAP_DATASET_ID = 'd372cbce-85b8-4c03-a70a-5d9a00c3b792';
+// Higher taxa that constitute OBIS-SEAMAP's marine-megafauna scope.
+const MEGAFAUNA_TAXA = [
+  'Cetacea', // whales & dolphins
+  'Pinnipedia', // seals
+  'Sirenia', // manatees/dugongs
+  'Testudines', // sea turtles
+  'Procellariiformes', // tubenose seabirds
+  'Suliformes', // gannets/cormorants
+] as const;
 
 interface SeamapOccurrence {
   id: string;
@@ -48,10 +60,14 @@ interface ObisSearchResponse {
 const MEDITERRANEAN_WKT = 'POLYGON((-6 30, 36 30, 36 46, -6 46, -6 30))';
 const limiter = new RateLimiter({ minIntervalMs: 300 });
 
-async function fetchSeamapPage(offset: number, limit: number): Promise<SeamapOccurrence[]> {
+async function fetchSeamapPage(
+  taxon: string,
+  offset: number,
+  limit: number,
+): Promise<SeamapOccurrence[]> {
   const params = new URLSearchParams({
     geometry: MEDITERRANEAN_WKT,
-    datasetid: SEAMAP_DATASET_ID,
+    scientificname: taxon,
     size: String(limit),
     start: String(offset),
   });
@@ -62,24 +78,34 @@ async function fetchSeamapPage(offset: number, limit: number): Promise<SeamapOcc
 
 export async function runSeamapEtl(): Promise<void> {
   const startedAt = Date.now();
-  logger.info('Starting SEAMAP Mediterranean occurrence ETL');
+  logger.info('Starting SEAMAP (OBIS megafauna) Mediterranean occurrence ETL');
 
   const maxRecords = Number(process.env.SEAMAP_MAX_RECORDS ?? 1500);
   const pageSize = 200;
+  // Spread the record budget across the megafauna taxa.
+  const perTaxon = Math.max(pageSize, Math.ceil(maxRecords / MEGAFAUNA_TAXA.length));
 
-  const occurrences = await paginate(
-    async (offset, limit) => {
-      const page = await fetchSeamapPage(offset, Math.min(limit, pageSize));
-      if (offset + page.length >= maxRecords) {
-        return page.slice(0, Math.max(0, maxRecords - offset));
-      }
-      return page;
-    },
-    pageSize,
-    Math.ceil(maxRecords / pageSize),
-  );
+  const byId = new Map<string, SeamapOccurrence>();
+  for (const taxon of MEGAFAUNA_TAXA) {
+    const page = await paginate(
+      async (offset, limit) => {
+        const rows = await fetchSeamapPage(taxon, offset, Math.min(limit, pageSize));
+        if (offset + rows.length >= perTaxon) {
+          return rows.slice(0, Math.max(0, perTaxon - offset));
+        }
+        return rows;
+      },
+      pageSize,
+      Math.ceil(perTaxon / pageSize),
+    );
+    for (const occ of page) {
+      if (occ.id) byId.set(occ.id, occ);
+    }
+    logger.info(`SEAMAP ${taxon}: ${page.length} occurrences`);
+  }
+  const occurrences = [...byId.values()];
 
-  logger.info(`Fetched ${occurrences.length} SEAMAP occurrences`);
+  logger.info(`Fetched ${occurrences.length} SEAMAP megafauna occurrences`);
 
   const supabase = getSupabase();
   const systemUserId = process.env.ETL_SYSTEM_USER_ID;
