@@ -106,7 +106,7 @@ export class CorrectionsService {
     return assertNoError(
       await client
         .from('sighting_corrections')
-        .select('*, reporter:users(username, full_name)')
+        .select('*, reporter:users!sighting_corrections_reporter_id_fkey(username, full_name)')
         .eq('sighting_id', sightingId)
         .order('created_at', { ascending: false }),
     );
@@ -125,7 +125,7 @@ export class CorrectionsService {
       await client
         .from('sighting_corrections')
         .select(
-          '*, reporter:users(username, full_name), sighting:sightings(id, species_id, user_id), proposed:species!sighting_corrections_proposed_species_id_fkey(scientific_name, common_name)',
+          '*, reporter:users!sighting_corrections_reporter_id_fkey(username, full_name), sighting:sightings(id, species_id, user_id), proposed:species!sighting_corrections_proposed_species_id_fkey(scientific_name, common_name)',
         )
         .eq('status', 'open')
         .order('created_at', { ascending: true })

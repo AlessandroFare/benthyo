@@ -560,7 +560,7 @@ export class OperatorsService {
     const logs = assertNoError(
       await client
         .from('dive_logs')
-        .select('id, dive_date, users(username)')
+        .select('id, dive_date, users!dive_logs_user_id_fkey(username)')
         .in('dive_site_id', siteIds)
         .order('dive_date', { ascending: false })
         .limit(limit),
