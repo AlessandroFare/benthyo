@@ -70,7 +70,7 @@ class GarminGattParser implements DiveComputerGattParser {
       }
 
       final data = await logChar.read();
-      return _parseGarminPayload(Uint8List.fromList(data));
+      return parseGarminPayload(Uint8List.fromList(data));
     } catch (_) {
       return [];
     }
@@ -88,13 +88,15 @@ class GarminGattParser implements DiveComputerGattParser {
 
     try {
       final data = await summaryChar.read();
-      return _parseGarminPayload(Uint8List.fromList(data));
+      return parseGarminPayload(Uint8List.fromList(data));
     } catch (_) {
       return [];
     }
   }
 
-  List<ParsedBleDive> _parseGarminPayload(Uint8List data) {
+  /// Parse a raw Garmin binary payload into dive records. Package-visible
+  /// for unit testing (test/ble_garmin_parser_test.dart).
+  List<ParsedBleDive> parseGarminPayload(Uint8List data) {
     if (data.length < 16) return [];
 
     final dives = <ParsedBleDive>[];

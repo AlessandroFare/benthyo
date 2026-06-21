@@ -157,14 +157,10 @@ export class BookingsService {
       } catch (err) {
         this.logger.error(`Stripe PI creation failed: ${(err as Error).message}`);
       }
-    } else {
-      // Free slot — confirm immediately
-      await client.rpc('confirm_booking', {
-        p_booking_id: result.booking_id,
-        p_payment_intent_id: null,
-        p_client_secret: null,
-      });
     }
+    // Free slots (price 0) are confirmed inline by book_slot (migration 048);
+    // paid slots are confirmed by the Stripe webhook via confirm_booking,
+    // which is now service-role only. The API never confirms payment itself.
 
     return { booking_id: result.booking_id, price_cents: result.price_cents, stripe: stripePi };
   }
