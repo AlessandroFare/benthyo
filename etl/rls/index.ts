@@ -219,6 +219,19 @@ async function fetchRlsPage(offset: number, limit: number): Promise<RlsObservati
 }
 
 export async function runRlsEtl(): Promise<void> {
+  // RLS (Reef Life Survey) publishes data as CSV/Zenodo/AODN WFS, not a public
+  // REST API. The historical `api.reeflifesurvey.com` does not resolve. To keep
+  // this source honest we only run when RLS_API_URL points at a real, verified
+  // endpoint. Otherwise we exit cleanly (success) so the scheduled ETL workflow
+  // and the parallel pipeline don't go red on a DNS failure every night. This
+  // is a reasoned exclusion, documented in PRODUCTION_PASS_REPORT.md.
+  if (!process.env.RLS_API_URL) {
+    logger.info(
+      'RLS ETL skipped — RLS_API_URL is not set. Reef Life Survey has no public REST API; see PRODUCTION_PASS_REPORT.md.',
+    );
+    return;
+  }
+
   const startedAt = Date.now();
   logger.info('Starting Reef Life Survey occurrence ETL');
 
