@@ -95,15 +95,26 @@ export async function runAllDataEtl(): Promise<void> {
   // 3. Apify Google Maps crawl. Last in the site batch because it is the slowest.
   await step('apify:google-maps', runApifyGoogleMapsEtl);
 
-  // 4. GBIF + OBIS + SEAMAP + RLS occurrences in parallel. They link to
+  // 4. GBIF + OBIS + SEAMAP occurrences in parallel. They link to
   // species via scientific name and to dive sites via nearby_dive_sites;
   // none depends on another, so we run them concurrently.
-  await parallelSources([
+  //
+  // RLS (Reef Life Survey) is intentionally EXCLUDED by default: RLS has no
+  // public/free JSON API (its data is distributed as CSV/Zenodo dumps and via
+  // the AODN WFS, not a REST endpoint). The previous `api.reeflifesurvey.com`
+  // endpoint does not resolve. The source only runs if RLS_API_URL is set to a
+  // real endpoint you have verified. See PRODUCTION_PASS_REPORT.md.
+  const occurrenceSources = [
     { name: 'gbif', fn: runGbifEtl },
     { name: 'obis', fn: runObisEtl },
     { name: 'seamap', fn: runSeamapEtl },
-    { name: 'rls', fn: runRlsEtl },
-  ]);
+  ];
+  if (process.env.RLS_API_URL) {
+    occurrenceSources.push({ name: 'rls', fn: runRlsEtl });
+  } else {
+    logger.info('Skipping RLS source — RLS_API_URL not set (no public RLS API; see report)');
+  }
+  await parallelSources(occurrenceSources);
 
   // 5. Post-import reconciliation: create placeholder sites for any
   // sightings that didn't link to a known site within 30 km.
