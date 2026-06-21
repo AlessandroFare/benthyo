@@ -5,7 +5,6 @@ import {
   Param,
   Post,
   Req,
-  UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
@@ -45,7 +44,7 @@ export class MediaController {
     @Param('filename') filename: string,
     @CurrentUser() user: AuthUser,
     @Req() req: Request,
-    @AccessToken() token: string,
+    @AccessToken() _token: string,
   ) {
     const isAdmin = req.headers['x-admin-key'] === process.env['ADMIN_API_KEY'];
     return this.mediaService.deleteObject(userId, filename, user.id, isAdmin);

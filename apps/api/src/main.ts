@@ -12,7 +12,7 @@ async function bootstrap(): Promise<void> {
     const integrations: any[] = [];
     if (process.env['SENTRY_ENABLE_PROFILING'] === 'true') {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
         const { nodeProfilingIntegration } = require('@sentry/profiling-node');
         integrations.push(nodeProfilingIntegration());
       } catch {

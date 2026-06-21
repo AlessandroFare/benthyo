@@ -101,7 +101,9 @@ export class BookingsService {
 
     if (query.to_date) q = q.lte('trip_date', query.to_date);
     if (query.lat != null && query.lng != null) {
-      const radius = query.radius_km ?? 100;
+      // Location radius filtering requires a PostGIS RPC (ST_DWithin) and is
+      // not yet wired; for now lat/lng only narrows to slots that have a
+      // pinned dive site. radius_km stays on the DTO for forward-compat.
       q = q.not('dive_site_id', 'is', null);
     }
 
