@@ -3,7 +3,9 @@ import {
   Logger,
   BadRequestException,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
 import { SupabaseService } from '../database/supabase.service';
@@ -142,7 +144,13 @@ export class BookingsService {
 
     // Create Stripe PaymentIntent
     let stripePi: { client_secret: string; id: string } | null = null;
-    if (this.stripe && result.price_cents && result.price_cents > 0) {
+    if (result.price_cents && result.price_cents > 0) {
+      if (!this.stripe) {
+        // Paid slot but payments not configured: roll back so we never leave a
+        // pending booking that holds capacity yet can never be paid.
+        await this.rollbackBooking(client, result.booking_id);
+        throw new ServiceUnavailableException('Payments are not configured');
+      }
       try {
         const pi = await this.stripe.paymentIntents.create({
           amount: result.price_cents,
@@ -155,7 +163,14 @@ export class BookingsService {
         });
         stripePi = { client_secret: pi.client_secret!, id: pi.id };
       } catch (err) {
+        // PI creation failed → the booking can never be paid (confirm_booking
+        // is webhook-only). Roll it back to free the slot and surface the error
+        // instead of returning a stranded pending booking with stripe: null.
         this.logger.error(`Stripe PI creation failed: ${(err as Error).message}`);
+        await this.rollbackBooking(client, result.booking_id);
+        throw new ServiceUnavailableException(
+          'Could not initiate payment — booking cancelled, please retry',
+        );
       }
     }
     // Free slots (price 0) are confirmed inline by book_slot (migration 048);
@@ -163,6 +178,26 @@ export class BookingsService {
     // which is now service-role only. The API never confirms payment itself.
 
     return { booking_id: result.booking_id, price_cents: result.price_cents, stripe: stripePi };
+  }
+
+  /**
+   * Cancel a just-created booking when payment initiation fails, so the slot's
+   * capacity is freed and no unpayable pending booking is left behind. Uses the
+   * caller's own token (owner check in cancel_booking passes for auth.uid()).
+   * Best-effort: a failure here is logged, not re-thrown, so the original
+   * payment error still surfaces to the client.
+   */
+  private async rollbackBooking(
+    client: SupabaseClient,
+    bookingId: string | undefined,
+  ): Promise<void> {
+    if (!bookingId) return;
+    const { error } = await client.rpc('cancel_booking', { p_booking_id: bookingId });
+    if (error) {
+      this.logger.error(
+        `Failed to roll back booking ${bookingId} after payment error: ${error.message}`,
+      );
+    }
   }
 
   async listMyBookings(token: string, userId: string) {
