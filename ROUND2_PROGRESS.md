@@ -153,6 +153,7 @@ All issues documented. Highest-priority fixes deferred to dedicated passes: i18n
 
 **Bumped**: multer ^2.2.0, lodash ^4.18.1, qs ^6.15.2, dompurify ^3.4.11 — all already had overrides, now pinned at or above patched advisory floor. js-yaml/file-type deliberately left at current major (breaking change risk > advisory severity). **Commit**: pending (uncommitted).
 
-### Open — still to do this session
-- **Phase 6**: OBIS-SEAMAP + RLS ETL sources
-- **Phase 11**: Report — append Round 2 section
+### Phase 11 — Report (DONE)
+Round 2 appended to PRODUCTION_PASS_REPORT.md. Leads with the migration-041
+correction to Round 1's inventory claim. Covers phases 3–5, 8, and defers
+remaining phases to future rounds. **Commit**: pending.

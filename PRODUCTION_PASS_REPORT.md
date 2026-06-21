@@ -329,3 +329,128 @@ under a public key — is fixed. Billing/tenant correctness, the RLS data-moat,
 and GDPR erasure are now sound. The deferred phases are deferred because the
 environment lacked a DB/browser/devices, not because they were skipped — each
 has a concrete next step above and nothing was faked.
+
+---
+
+## Round 2 (2026-06-21)
+
+### Correction to Round 1 inventory claim — migration 041
+
+**Round 1 stated "46 migrations (001–046), baseline all green." This was
+typecheck-true but not apply-true.** Migration `041_operator_roster_scheduling.sql`
+referenced `users.display_name`, which does not exist in the schema — the
+column is `full_name`. A fresh `supabase db reset` or CI's migration loop
+aborted at 041, meaning **only 36/46 migrations were ever applied from a
+clean database**. Fixed in round 2 to `COALESCE(full_name, username)` (which
+migration 042 already assumed). After the fix, `supabase db reset` applied
+all 001–046 clean and the full RLS suite now passes sections 1–5 against
+real Postgres 17. This is the most important single finding to surface
+honestly: round 1's database verification was incomplete.
+
+### Round 2 phases — built and verified
+
+| Phase | Status | Note |
+|-------|--------|------|
+| 3 Performance | **Measured** | REST latency (8–28ms avg hot endpoints), EXPLAIN ANALYZE on slow RPCs (20–27ms at dev scale), bundle audit (550 KB gzipped — vendor-charts 436 KB, Recharts is the largest single chunk) |
+| 4 UI/UX | **Audited (code-level)** | Dashboard: 16 pages, missing i18n, 2 pages with no error state, a11y gaps, no mobile sidebar toggle. Mobile: 36 screens, no Semantics, silent `[]` error returns, no shimmer, no onboarding. All documented with file:line references. |
+| 5 Onboarding | **Built and committed** | Mobile swipeable 4-card intro (Explore→Log→Sightings→Journey), PageView + dot indicators, SharedPreferences persistence, re-triggerable from Settings. 12 Flutter tests pass. |
+| 8 Deps | **Bumped and verified** | multer ^2.2.0, lodash ^4.18.1, qs ^6.15.2, dompurify ^3.4.11. API 24/24, ETL 4/4, Flutter 12/12 all green. js-yaml/file-type deliberately held at current major (breaking-change risk > advisory severity). |
+| 11 Report | This section | — |
+
+### Phase 3 — Performance detail
+
+**Stack**: All 46 migrations applied to `supabase_db_oceanlog` (Postgres 17),
+Supabase REST/Auth/Storage/Studio health green throughout. Dev data only
+(~200 species, 50 dive sites, 7 operators, 4 users) — no production-scale
+wall-clock numbers.
+
+**REST API latency (PostgREST at 127.0.0.1:54321, warm, 10 calls each):**
+
+| Endpoint | Avg | Notes |
+|---|---|---|
+| `/species?limit=20` | 10.3 ms | Cold start ~122 ms (schema cache) |
+| `/dive_sites?limit=20` | 28.1 ms | Geometry column cost |
+| `/sightings?limit=20` | 7.9 ms | Simple filtered list |
+| `/rpc/operator_kpis` | 9.1 ms | 4-subquery JSON aggregate |
+| `/rpc/site_public_card` | 27.1 ms | 6 subqueries + nested |
+
+Max spike ~118 ms (likely GC/pool refresh on PostgREST). All within
+acceptable range at dev scale.
+
+**SQL EXPLAIN ANALYZE (key RPCs):**
+- `operator_kpis()`: 20 ms, 964 buffers — most expensive found
+- `operator_today_roster()`: 27 ms, 1906 buffers — 4 LEFT JOINs + FILTER aggregates
+- `operator_customer_retention()`: <1 ms, 9 buffers — well-indexed
+- `operator_species_ranked()` / `operator_customers()`: auth-gated, not directly
+  measurable from psql
+
+**Index coverage**: 59 indexes across key tables. No obvious gaps. Low
+hit rates on species (10%), users (10–17%), user_life_list (20%) are
+artifacts of tiny dev data — at production scale these indexes will be used.
+
+**Dashboard bundle**: Vite build 19 s. Total JS ~1.7 MB raw / ~550 KB gzipped.
+Largest chunks: vendor-charts 436 KB (117 KB gzip — Recharts), vendor-react
+318 KB, vendor-supabase 212 KB. Round 1's SECURITY_AUDIT claimed 380 KB
+gzipped — current ~550 KB suggests bundle growth from posthog, additional
+chart dependencies, or code-splitting regression. **Recommendation**: if
+bundle size becomes a launch blocker, eval replacing Recharts with a
+lightweight alternative (uPlot ~50 KB, billboard.js ~100 KB).
+
+### Phase 4 — UI/UX audit summary
+
+**Dashboard (React + Tailwind + Framer Motion):**
+- 16 pages, consistent layout via DashboardLayout + Sidebar + TopBar
+- AnimatedPage (staggered children) used by 3/11 main pages; AnimatePresence
+  on all route transitions; AnimatedNumber in KPI cards; Toast spring animation
+- **Key findings**: No i18n framework; Marketplace.tsx and RentalGear.tsx
+  have no `isError` state (silent failures); icon-only buttons lack aria-labels
+  (Species View, Customers View, Back links); DataTable sortable headers
+  have no `aria-sort`; tables lack `overflow-x-auto` on mobile; embed pages
+  use fixed pixel widths; Today.tsx default export is inconsistent; AnimatedPage
+  adoption is spotty; all formatting defaults to `en-US`.
+
+**Mobile (Flutter + Riverpod + go_router):**
+- 36 screen files, strong theme (M3, light/dark/sunlight), FadeUp page
+  transitions, StaggeredListAnimation reusable widget (underused)
+- **Key findings**: Zero Semantics widgets; 6+ FutureProviders silently
+  return `[]` on HTTP errors (user sees "empty" not "error"); no shimmer
+  loading states; no retry on detail-screen errors; no pull-to-refresh on
+  6 lists; MainNavigationBar rendered per-screen (no ShellRoute); ChatScreen
+  uses raw `_loading` instead of `AsyncValue`; WaiverSignScreen reads API_URL
+  from env directly.
+
+### Phase 5 — Onboarding flow
+
+Implemented as a Flutter feature following the codebase's existing patterns
+(Riverpod + go_router + SharedPreferences). 4 swipeable cards in a PageView:
+Explore Dive Sites → Log Your Dives → Record Sightings → Track Your Journey.
+Each card has a colored background, large icon, title, and descriptive text.
+Dot indicator at bottom, Skip button top-right, Next/Get Started button.
+
+**Persistence**: SharedPreferences key `onboarding_completed`. Router redirect
+checks the flag before the splash screen resolves — first launch redirects to
+`/onboarding`, subsequent launches go to splash → login/map as normal.
+Re-triggerable from Settings > Tools > "Show onboarding intro".
+
+### Deferred to future rounds
+
+- **Phase 9 (Walkthrough)**: requires running API + browser + mobile
+- **Phase 10 (Lint sweep)**: ESLint/knip across 135 + 64 + 113 files;
+  ~1 day of tooling time, low risk to block
+- **Phase 6 (New ETL sources)**: OBIS-SEAMAP + Reef Life Survey are
+  chartered, each needs ~1–2 days of implementation following existing
+  source pattern (`etl/<source>/` + one line in `run-all-data.ts`)
+- **Phase 7 (Large features)**: Bluetooth dive-computer import and
+  booking/scheduling are multiple-session builds, scoped as the next
+  major round
+- **Phase 4 fixes**: i18n, a11y, error-handling — documented with
+  file:line, ready for targeted fix passes
+
+### Commits (Round 2, production-pass, 4 ahead of origin)
+
+```
+73eb1d6 feat(mobile): swipeable onboarding intro for first-launch
+512e326 docs: round 2 progress log
+29ecccf fix(deps): bump overrides to patched floors (multer, lodash, qs, dompurify)
+c0e85c6 fix(db): make migration chain apply cleanly + RLS suite green on real PG
+```
