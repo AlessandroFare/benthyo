@@ -6,6 +6,8 @@ import { runGbifEtl } from './gbif/index';
 import { runInatTaxonLookupEtl } from './inat-taxon-lookup/index';
 import { runInaturalistImageEtl } from './inaturalist-images/index';
 import { runObisEtl } from './obis/index';
+import { runSeamapEtl } from './seamap/index';
+import { runRlsEtl } from './rls/index';
 import { runOpenDiveMapEtl } from './opendivemap/index';
 import { runOverpassEtl } from './overpass/index';
 import { runTavilySpeciesEtl } from './tavily-species/index';
@@ -93,12 +95,14 @@ export async function runAllDataEtl(): Promise<void> {
   // 3. Apify Google Maps crawl. Last in the site batch because it is the slowest.
   await step('apify:google-maps', runApifyGoogleMapsEtl);
 
-  // 4. GBIF + OBIS occurrences in parallel. They link to species via
-  // scientific name and to dive sites via nearby_dive_sites; neither
-  // depends on the other, so we run them concurrently.
+  // 4. GBIF + OBIS + SEAMAP + RLS occurrences in parallel. They link to
+  // species via scientific name and to dive sites via nearby_dive_sites;
+  // none depends on another, so we run them concurrently.
   await parallelSources([
     { name: 'gbif', fn: runGbifEtl },
     { name: 'obis', fn: runObisEtl },
+    { name: 'seamap', fn: runSeamapEtl },
+    { name: 'rls', fn: runRlsEtl },
   ]);
 
   // 5. Post-import reconciliation: create placeholder sites for any
@@ -140,7 +144,7 @@ async function runOpenWaterReconciliation(): Promise<void> {
   const supabase = createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
-  for (const source of ['gbif', 'obis'] as const) {
+  for (const source of ['gbif', 'obis', 'seamap', 'rls'] as const) {
     const { data, error } = await supabase.rpc('reconcile_unmatched_occurrences', {
       p_source: source,
       p_radius_meters: 30000,

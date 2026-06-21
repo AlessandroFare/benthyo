@@ -9,6 +9,8 @@
     "gbif": "tsx gbif/index.ts",
     "gbif:push": "tsx gbif/push-verified.ts",
     "obis": "tsx obis/index.ts",
+    "seamap": "tsx seamap/index.ts",
+    "rls": "tsx rls/index.ts",
     "worms": "tsx worms/index.ts",
     "overpass": "tsx overpass/index.ts",
     "opendivemap": "tsx opendivemap/index.ts",
