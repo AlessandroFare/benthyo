@@ -3,6 +3,7 @@ import {
   Anchor,
   BarChart3,
   CalendarDays,
+  CalendarRange,
   Fish,
   MapPin,
   Package,
@@ -30,6 +31,7 @@ const navGroups: {
     heading: "Operations",
     items: [
       { to: "/customers", label: "Customers", icon: Users },
+      { to: "/slots", label: "Trip slots", icon: CalendarRange },
       { to: "/rental-gear", label: "Rental gear", icon: Package },
       { to: "/analytics", label: "Analytics", icon: BarChart3 },
     ],
