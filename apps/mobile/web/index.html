@@ -31,6 +31,11 @@
 
   <title>oceanlog</title>
   <link rel="manifest" href="manifest.json">
+
+  <!-- Corbado flutter-passkeys Web SDK (required by the passkeys_web plugin on
+       Flutter web). Without this the app throws "Passkeys Web SDK not loaded".
+       Bundle vendored from flutter-passkeys 2.4.0 release. -->
+  <script src="passkeys/bundle.js"></script>
 </head>
 <body>
   <!--
