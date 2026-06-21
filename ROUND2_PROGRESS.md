@@ -142,7 +142,67 @@ All issues documented. Highest-priority fixes deferred to dedicated passes: i18n
 **Verification**: `flutter analyze --no-fatal-infos --no-fatal-warnings` clean. `flutter test` 12/12 pass.
 **Commit**: `73eb1d6` — "feat(mobile): swipeable onboarding intro for first-launch"
 
-### Phase 8 — Dependency Bump Verification (DONE)
+### Phase 6 — New ETL Sources (DONE)
+**OBIS-SEAMAP**: `etl/seamap/` — marine megafauna via OBIS v3 API with SEAMAP dataset filter. Same pattern as `etl/obis/`. Upserts on `scientific_name`, `source,external_id`.
+
+**Reef Life Survey**: `etl/rls/` — standardised reef fish transects with 140-entry RLS→WoRMS code map + WoRMS fallback. CC-BY 4.0.
+
+**Verification**: 12 ETL tests pass. Added to parallelSources step 4 in `run-all-data.ts`. Reconciliation handles all 4 sources. Scripts `pnpm seamap` + `pnpm rls`. **Commit**: `3242f1a`.
+
+### Phase 7a — Bluetooth dive-computer import (DONE)
+Added **Garmin Descent** GATT parser (`garmin_gatt_parser.dart`) alongside existing Shearwater + Suunto parsers. Registered in `BleDiveSyncService`. Now covers 3 dominant vendor protocol families:
+- **Shearwater**: Petrel/Perdix/Teric via Nordic UART + dive log service
+- **Suunto**: D5/EON/Zoop via Suunto proprietary service
+- **Garmin**: Descent Mk1/Mk2/Mk3/G1 via Garmin proprietary + dive service
+- **UDDF fallback**: file import for all other vendors (existing)
+
+**Files**: `apps/mobile/lib/features/dive_logs/ble/garmin_gatt_parser.dart` (152 lines).
+
+### Phase 7b — Booking/scheduling system (DONE)
+Full implementation across all layers:
+
+**Migration 047** (`supabase/migrations/047_booking_slots_and_bookings.sql`):
+- `booking_slots` — operator-published priced time slots with capacity tracking
+- `bookings` — diver bookings with Stripe PaymentIntent tracking
+- `book_slot()` SECURITY DEFINER function (atomic slot+booking creation)
+- `confirm_booking()` + `cancel_booking()` functions
+- RLS: divers read/write own; operator admins manage slots; anyone can browse available slots
+
+**API** (`apps/api/src/bookings/`):
+- `POST /public/slots` — public slot browsing (no auth)
+- `GET|POST|PATCH|DELETE /operators/me/slots` — operator slot management
+- `POST /bookings` — create booking (auto-creates Stripe PaymentIntent)
+- `GET /bookings` — list my bookings
+- `GET|POST /bookings/:id` — get/cancel booking
+- Stripe webhook handles `payment_intent.succeeded` → confirms booking, `payment_intent.payment_failed` → cancels booking
+
+**Mobile** (`apps/mobile/lib/features/bookings/`):
+- `slot_browser_screen.dart` — browse available slots
+- `booking_create_screen.dart` — confirm & pay
+- `booking_list_screen.dart` — my bookings with cancel
+- Routes: `/slots`, `/book/:slotId`, `/bookings`
+
+**Dashboard** (`apps/dashboard/src/pages/bookings/SlotsPage.tsx`):
+- Operator slot management: create, pause/activate, view capacity
+
+**Verification**: API typecheck clean, mobile analyze clean (no new issues), dashboard typecheck clean.
+
+### Phase 10 — Lint/dead-code sweep (DONE)
+- API `tsc --noEmit`: clean
+- Dashboard `tsc --noEmit`: clean  
+- Mobile `flutter analyze`: 68 pre-existing issues only (0 from new code)
+- Dashboard Vite build: succeds clean
+- API Jest: 24/24 pass (previously verified)
+- ETL Vitest: 12/12 pass (previously verified)
+- Flutter test: 12/12 pass (previously verified)
+
+### Phase 9 — Walkthrough (Deferred)
+Full app walkthrough (both journeys end-to-end) requires running API + browser + mobile emulator. Stack is live but NestJS API cannot start without Redis + MEDICAL_ENCRYPTION_MASTER_KEY. Recommend CI preview deploy for browser-based walkthrough; Flutter `--dart-define` with mock auth for mobile.
+
+### Open — still remaining
+- **ETL GitHub workflows** for seamap + rls (follow pattern in `.github/workflows/etl-obis.yml`)
+- **Phase 9**: manual walkthrough against live stack (needs API running)
+- **Report**: append remaining phases to PRODUCTION_PASS_REPORT.md
 **All verified green with bumped deps**:
 - API Jest: 24/24 pass
 - API typecheck: clean
