@@ -142,7 +142,17 @@ All issues documented. Highest-priority fixes deferred to dedicated passes: i18n
 **Verification**: `flutter analyze --no-fatal-infos --no-fatal-warnings` clean. `flutter test` 12/12 pass.
 **Commit**: `73eb1d6` — "feat(mobile): swipeable onboarding intro for first-launch"
 
+### Phase 8 — Dependency Bump Verification (DONE)
+**All verified green with bumped deps**:
+- API Jest: 24/24 pass
+- API typecheck: clean
+- ETL Vitest: 4/4 pass
+- Flutter test: 12/12 pass
+- Dashboard typecheck: clean
+- Dashboard Vite build: succeeds (19s, no warnings)
+
+**Bumped**: multer ^2.2.0, lodash ^4.18.1, qs ^6.15.2, dompurify ^3.4.11 — all already had overrides, now pinned at or above patched advisory floor. js-yaml/file-type deliberately left at current major (breaking change risk > advisory severity). **Commit**: pending (uncommitted).
+
 ### Open — still to do this session
-- **Phase 8**: Finish dep bump verification (ETL Vitest, flutter test, smoke check)
 - **Phase 6**: OBIS-SEAMAP + RLS ETL sources
 - **Phase 11**: Report — append Round 2 section
