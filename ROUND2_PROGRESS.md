@@ -258,3 +258,85 @@ remaining phases to future rounds. **Commit**: `068ed82`.
 ### Remaining
 - **GitHub workflows** for seamap + rls ETL (follow pattern in `etl-obis.yml`)
 - **Phase 9**: manual walkthrough against live stack (needs API running with Redis + medical key)
+
+---
+
+## Session 4 (2026-06-21, Claude Opus) — independent re-verification + runtime bug fixes
+
+User ran the live stack and hit real errors. Verified each, fixed root cause.
+
+### API 500s (operator dashboard) — FIXED
+- **`GET /operators/me/customers` → "structure of query does not match function result type"**
+  Root cause: `users.username` is `CITEXT` (003) but `operator_customers()` (015) declares
+  `RETURNS TABLE(username TEXT, ...)`. Postgres treats citext≠text in record structure check,
+  so any call returning ≥1 row failed (latent since 015; dev DB had 0 matching rows before).
+  Fix: **migration 049** casts `u.username::TEXT`. Applied + verified on live DB.
+- **`GET /operators/me/dashboard/activity` → "Could not embed because more than one relationship
+  was found for 'dive_logs' and 'users'"**
+  Root cause: `dive_logs` has 2 FKs to users (`user_id`, `deleted_by`); PostgREST embed
+  `users(username)` ambiguous. Fix: `users!dive_logs_user_id_fkey(username)` in
+  operators.service.ts.
+- **Same latent ambiguity in `sighting_corrections`** (`reporter_id` + `resolver_id`): fixed
+  both `reporter:users(...)` embeds in corrections.service.ts to
+  `reporter:users!sighting_corrections_reporter_id_fkey(...)`. (Other user-embeds —
+  site_reviews, buddy_messages, social_feed_posts, trips — verified single-FK, safe.)
+- **`error=JWT issued at future`**: clock skew between host (token iat) and DB container.
+  Environmental (WSL2 clock drift), not a code bug. Mitigation: restart Docker/WSL clock sync.
+- `rental-gear`/`corrections/expert/queue` 403: correct behavior (Pro-tier gate /
+  taxonomy_expert role). Not bugs.
+
+### ETL OBIS errors (1125 failed rows) — FIXED
+Root causes:
+- OBIS v3 returns `date_start` as **epoch milliseconds**, inserted raw into `timestamptz`
+  → "date/time field value out of range".
+- `individualCount` can be fractional ("0.17","20.0","1241.24") → `count` integer insert fails.
+- depth can be negative → `sightings_depth_m_check (depth_m >= 0)` fails.
+- `sightings_user_id_fkey`: `ETL_SYSTEM_USER_ID` pointed at a non-existent user → every
+  resolved row failed (good-date rows hit FK, bad-date rows hit date error).
+Fixes: new `etl/shared/occurrence.ts` (`normalizeObservedAt` ms→ISO, `normalizeCount`,
+`normalizeDepth`) applied to obis/seamap/rls; `assertSystemUserExists()` fail-fast;
+`scripts/seed-etl-system-user.sql` (seeds auth.users+public.users; id
+`00000000-0000-0000-0000-0000000e7100`). 9 new normalizer unit tests (ETL 12→21 green).
+
+### ETL source integrity (honest)
+- **SEAMAP**: real OBIS v3 endpoint, but single `datasetid` filter returns 0 rows — filter wrong.
+  Source does not currently ingest data. `source='seamap'` also violated
+  `sightings_source_check` → **migration 050** widens allow-list to seamap/rls.
+- **RLS**: `api.reeflifesurvey.com` does **not resolve** (fabricated by opencode). Returns empty,
+  handled gracefully. `RLS_TO_WORMS` map largely placeholder (aphia 125914 repeated). Non-functional
+  pending a real RLS source (RLS publishes CSV/Zenodo, not a REST API).
+
+### Mobile passkey — FIXED
+`flutter run -d chrome` threw "Passkeys Web SDK not loaded". Vendored corbado flutter-passkeys
+2.4.0 bundle to `apps/mobile/web/passkeys/bundle.js` + `<script>` in web/index.html.
+
+### Dashboard — FIXED
+Settings.tsx controlled→uncontrolled warning: `value={data.operator.email}` /
+`country_code` could be undefined → coalesced `?? ""`. (React key warning at TableCell
+non-reproducible from static read; left.)
+
+### GitHub Actions (was open) — DONE
+Added `etl-seamap.yml` + `etl-rls.yml` (etl-obis.yml pattern, staggered cron 04:00/05:00).
+Injected required `ETL_SYSTEM_USER_ID` secret into etl-obis/gbif/all-data workflows.
+
+### Security re-verification (heaviest scrutiny)
+Independent audit of **all** SECURITY DEFINER functions across migrations 001–048
+(via subagent reading raw SQL). Result: migration 048 booking fixes confirmed correct —
+`confirm_booking` REVOKEd from authenticated / service_role only; `cancel_booking` enforces
+ownership OR `is_operator_admin` (operator-side cancel works); `book_slot` pins user_id to
+auth.uid() and uses slot's operator_id. All other SECURITY DEFINER fns SAFE (caller checks or
+service_role-only grants present). No new authz bug found. opencode's 048 holds up.
+
+### Test status (this session)
+- ETL Vitest: **21/21** (was 12; +9 normalizer)
+- API tsc: clean. Dashboard tsc: clean.
+- Migrations 049, 050 applied clean to live PG (48→50).
+
+### Still open / honest gaps
+- Full `supabase db reset` 001→050 NOT re-run (would wipe user's live test session
+  prova@test.com + operator_users). Migrations 049/050 are additive (CREATE OR REPLACE / ALTER)
+  and applied clean individually.
+- API service edits (activity + corrections embeds) need API restart to take effect.
+- SEAMAP dataset filter + RLS real data source: unresolved (documented above).
+- Performance/Lighthouse/mobile-profiling, full UI/UX screenshot pass: still deferred
+  (no browser/emulator in env) — as in session 2.
