@@ -15,19 +15,58 @@
 BEGIN;
 
 -- Test fixtures (only created if absent).
+--
+-- The user bootstrap must work in BOTH environments:
+--   * CI: the `auth` schema is a bare shim (auth.users has only id+email,
+--     no handle_new_auth_user trigger), so we insert public.users directly.
+--   * Local / real Supabase: auth.users is the full GoTrue table and a
+--     handle_new_auth_user trigger auto-creates public.users from
+--     raw_user_meta_data. Inserting four ids that share the same first 8
+--     chars makes the trigger's default username ('user_'||left(id,8))
+--     collide, so we must supply a distinct `username` in the metadata.
+-- We branch on whether auth.users has a raw_user_meta_data column.
 DO $$
+DECLARE has_meta BOOLEAN;
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM users WHERE id = '00000000-0000-0000-0000-000000000001') THEN
+  SELECT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'auth' AND table_name = 'users'
+      AND column_name = 'raw_user_meta_data'
+  ) INTO has_meta;
+
+  IF has_meta THEN
+    -- Real Supabase: seed auth.users with username metadata; the trigger
+    -- populates public.users with the distinct usernames.
+    INSERT INTO auth.users (id, instance_id, aud, role, email, raw_user_meta_data) VALUES
+      ('00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000000','authenticated','authenticated','alice@test.local','{"username":"alice"}'),
+      ('00000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000000','authenticated','authenticated','bob@test.local','{"username":"bob"}'),
+      ('00000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000000','authenticated','authenticated','carol@test.local','{"username":"carol"}'),
+      ('00000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000000','authenticated','authenticated','expert@test.local','{"username":"expert"}')
+    ON CONFLICT (id) DO NOTHING;
+  ELSE
+    -- CI shim: minimal auth.users + direct public.users.
+    INSERT INTO auth.users (id, email) VALUES
+      ('00000000-0000-0000-0000-000000000001','alice@test.local'),
+      ('00000000-0000-0000-0000-000000000002','bob@test.local'),
+      ('00000000-0000-0000-0000-000000000003','carol@test.local'),
+      ('00000000-0000-0000-0000-000000000004','expert@test.local')
+    ON CONFLICT (id) DO NOTHING;
     INSERT INTO users (id, username) VALUES
       ('00000000-0000-0000-0000-000000000001', 'alice'),
       ('00000000-0000-0000-0000-000000000002', 'bob'),
       ('00000000-0000-0000-0000-000000000003', 'carol'),
-      ('00000000-0000-0000-0000-000000000004', 'expert');
+      ('00000000-0000-0000-0000-000000000004', 'expert')
+    ON CONFLICT (id) DO NOTHING;
   END IF;
+
   IF NOT EXISTS (SELECT 1 FROM operators WHERE id = '00000000-0000-0000-0000-000000000010') THEN
-    INSERT INTO operators (id, name, slug) VALUES
-      ('00000000-0000-0000-0000-000000000010', 'OpA', 'opa'),
-      ('00000000-0000-0000-0000-000000000011', 'OpB', 'opb');
+    -- subscription_tier='starter' so the multi-member / multi-site fixtures
+    -- below fit under the tier caps enforced by migration 045's triggers
+    -- (free caps team at 1; the suite seeds 2 members in OpA). Setting tier
+    -- at INSERT time is fine — the 036 self-upgrade guard is BEFORE UPDATE.
+    INSERT INTO operators (id, name, slug, operator_type, subscription_tier) VALUES
+      ('00000000-0000-0000-0000-000000000010', 'OpA', 'opa', 'dive_center', 'starter'),
+      ('00000000-0000-0000-0000-000000000011', 'OpB', 'opb', 'dive_center', 'starter');
   END IF;
   IF NOT EXISTS (SELECT 1 FROM operator_users WHERE operator_id = '00000000-0000-0000-0000-000000000010') THEN
     INSERT INTO operator_users (operator_id, user_id, role) VALUES
@@ -36,6 +75,13 @@ BEGIN
       ('00000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000000003', 'owner');
   END IF;
   UPDATE users SET taxonomy_expert = true WHERE id = '00000000-0000-0000-0000-000000000004';
+
+  -- Reference-data fixtures (species). species RLS restricts INSERT to
+  -- service_role, so create the test species here in the bootstrap block,
+  -- which runs as the migration owner (RLS-exempt), not under SET ROLE.
+  INSERT INTO species (id, scientific_name)
+  VALUES ('00000000-0000-0000-0000-000000000030', 'Test species')
+  ON CONFLICT DO NOTHING;
 END$$;
 
 -- ─── 1. operator_users self-referential RLS (no recursion after 025) ────
@@ -44,7 +90,7 @@ DECLARE
   v_count INTEGER;
 BEGIN
   SET LOCAL ROLE authenticated;
-  SET LOCAL request.jwt.claims = '{"sub":"00000000-0000-0000-0000-000000000001"}';
+  SET LOCAL request.jwt.claims = '{"sub":"00000000-0000-0000-0000-000000000001","role":"authenticated"}';
   SELECT count(*) INTO v_count
     FROM operator_users
     WHERE operator_id = '00000000-0000-0000-0000-000000000010';
@@ -72,9 +118,11 @@ BEGIN
   -- Use a regular user (alice) to write a submission; then escalate
   -- to bob who is staff of OpA but the submission is for OpB; the
   -- UPDATE should affect 0 rows.
-  SET LOCAL request.jwt.claims = '{"sub":"00000000-0000-0000-0000-000000000003"}';
+  SET LOCAL request.jwt.claims = '{"sub":"00000000-0000-0000-0000-000000000003","role":"authenticated"}';
   SELECT id INTO v_template_id FROM medical_form_templates
     WHERE operator_id IS NULL AND is_active = true LIMIT 1;
+  -- answers is BYTEA since migration 030; encrypt the plaintext with the
+  -- per-operator key (dev fallback in tests) instead of casting jsonb in.
   INSERT INTO medical_form_submissions (
     user_id, operator_id, template_id, answers, signer_name
   )
@@ -82,13 +130,13 @@ BEGIN
     '00000000-0000-0000-0000-000000000003',
     '00000000-0000-0000-0000-000000000011',
     v_template_id,
-    '{"heart": false}'::jsonb,
+    encrypt_medical_answers('00000000-0000-0000-0000-000000000011', '{"heart": false}'::jsonb),
     'Carol'
   );
 
   -- Switch to alice who is NOT a member of OpB. The mutation
   -- should NOT succeed.
-  SET LOCAL request.jwt.claims = '{"sub":"00000000-0000-0000-0000-000000000001"}';
+  SET LOCAL request.jwt.claims = '{"sub":"00000000-0000-0000-0000-000000000001","role":"authenticated"}';
   UPDATE medical_form_submissions
     SET signer_name = 'Alice was here'
     WHERE operator_id = '00000000-0000-0000-0000-000000000011';
@@ -114,6 +162,10 @@ DECLARE
   v_count INTEGER;
 BEGIN
   SET LOCAL ROLE authenticated;
+  -- Act as alice from the start: the dive_sites INSERT policy checks
+  -- auth.uid(), so the JWT claim must be set BEFORE the insert (previously
+  -- it was set only after, leaving auth.uid() NULL → RLS denial).
+  SET LOCAL request.jwt.claims = '{"sub":"00000000-0000-0000-0000-000000000001","role":"authenticated"}';
   -- Create a dive site for alice
   INSERT INTO dive_sites (id, name, slug, location, country_code, depth_min,
                           depth_max, difficulty, site_type, access_type, created_by)
@@ -125,12 +177,11 @@ BEGIN
   ON CONFLICT DO NOTHING
   RETURNING id INTO v_dummy_site;
   v_dummy_site := '00000000-0000-0000-0000-000000000020';
-  INSERT INTO species (id, scientific_name)
-  VALUES ('00000000-0000-0000-0000-000000000030', 'Test species')
-  ON CONFLICT DO NOTHING;
+  -- (Test species pre-created in the bootstrap block; species INSERT is
+  -- service_role-only so it cannot be created here under authenticated.)
 
   -- Alice's sighting.
-  SET LOCAL request.jwt.claims = '{"sub":"00000000-0000-0000-0000-000000000001"}';
+  SET LOCAL request.jwt.claims = '{"sub":"00000000-0000-0000-0000-000000000001","role":"authenticated"}';
   INSERT INTO sightings (id, user_id, dive_site_id, species_id, observed_at,
                         count, source)
   VALUES (
@@ -147,7 +198,7 @@ BEGIN
   v_alice_sighting := '00000000-0000-0000-0000-000000000040';
 
   -- Bob (not the owner, not an expert) suggests a correction.
-  SET LOCAL request.jwt.claims = '{"sub":"00000000-0000-0000-0000-000000000002"}';
+  SET LOCAL request.jwt.claims = '{"sub":"00000000-0000-0000-0000-000000000002","role":"authenticated"}';
   INSERT INTO sighting_corrections (
     sighting_id, reporter_id, proposed_species_id, reason
   )
@@ -161,7 +212,7 @@ BEGIN
 
   -- Random user Carol (not reporter, not owner, not expert) tries to
   -- accept the correction. Should affect 0 rows.
-  SET LOCAL request.jwt.claims = '{"sub":"00000000-0000-0000-0000-000000000003"}';
+  SET LOCAL request.jwt.claims = '{"sub":"00000000-0000-0000-0000-000000000003","role":"authenticated"}';
   UPDATE sighting_corrections
     SET status = 'accepted', resolver_id = '00000000-0000-0000-0000-000000000003'
     WHERE id = v_correction_id;
@@ -171,7 +222,7 @@ BEGIN
   END IF;
 
   -- Alice (the sighting owner) accepts the correction. Should succeed.
-  SET LOCAL request.jwt.claims = '{"sub":"00000000-0000-0000-0000-000000000001"}';
+  SET LOCAL request.jwt.claims = '{"sub":"00000000-0000-0000-0000-000000000001","role":"authenticated"}';
   UPDATE sighting_corrections
     SET status = 'accepted', resolver_id = '00000000-0000-0000-0000-000000000001'
     WHERE id = v_correction_id;
@@ -188,16 +239,17 @@ BEGIN
   DELETE FROM species WHERE id = '00000000-0000-0000-0000-000000000030';
 END$$;
 
--- ─── 4. sightings: self-verify path is blocked (C-3 follow-up) ────────
--- The sightings_admin_verify policy is column-restricted to
--- operator_users. A non-admin user cannot self-verify. We test this
--- by simulating the full service-level flow: try to UPDATE with
--- verified_by = self.
+-- ─── 4. sightings: self-verify is blocked at the RLS layer (C-3 / 044) ──
+-- Migration 044 added the prevent_self_verify_columns trigger so the RLS
+-- layer ALSO forbids a reporter from setting verified_by/verified_at on
+-- their own sighting (previously this was only enforced in the API). This
+-- test asserts the reporter self-verify now raises.
 DO $$
 DECLARE
-  v_sighting_id UUID;
+  v_sighting_id UUID := '00000000-0000-0000-0000-000000000041';
 BEGIN
-  -- We need a dive site for the FK.
+  -- Reference data created as the migration owner (RLS-exempt): dive site
+  -- for the FK + a test species (species INSERT is service_role-only).
   INSERT INTO dive_sites (id, name, slug, location, country_code, depth_min,
                           depth_max, difficulty, site_type, access_type, created_by)
   VALUES (
@@ -211,11 +263,11 @@ BEGIN
   ON CONFLICT DO NOTHING;
 
   SET LOCAL ROLE authenticated;
-  SET LOCAL request.jwt.claims = '{"sub":"00000000-0000-0000-0000-000000000001"}';
+  SET LOCAL request.jwt.claims = '{"sub":"00000000-0000-0000-0000-000000000001","role":"authenticated"}';
   INSERT INTO sightings (id, user_id, dive_site_id, species_id, observed_at,
                         count, source)
   VALUES (
-    '00000000-0000-0000-0000-000000000041',
+    v_sighting_id,
     '00000000-0000-0000-0000-000000000001',
     '00000000-0000-0000-0000-000000000021',
     '00000000-0000-0000-0000-000000000031',
@@ -224,29 +276,27 @@ BEGIN
     'user'
   )
   ON CONFLICT DO NOTHING;
-  v_sighting_id := '00000000-0000-0000-0000-000000000041';
 
-  -- Alice (sighting owner, not a taxonomy expert) tries to
-  -- self-verify. RLS should reject this because:
-  --   1. sightings_update_own matches (user_id = auth.uid), but the
-  --      controller/service ALSO checks verified_by IS NULL.
-  --   2. The fix in the controller rejects self-verify.
-  -- The RLS itself does not forbid a user from updating verified_by on
-  -- their own row (a design decision to keep the controller as the
-  -- gate). This test documents that the RLS layer is permissive; the
-  -- API layer is the enforcement point. To be tightened in a future
-  -- migration.
-  --
-  -- We mark this test as expected-to-pass at the RLS layer:
-  UPDATE sightings
-    SET verified_by = '00000000-0000-0000-0000-000000000001',
-        verified_at = now(),
-        confidence_level = 'certain'
-    WHERE id = v_sighting_id;
-  -- ^ this should succeed at the RLS layer. The fix lives in the
-  -- controller (TaxonomyExpertGuard + sightings.service.verify self-
-  -- check).
+  -- Alice (reporter, not a taxonomy expert) tries to self-verify. The
+  -- prevent_self_verify_columns trigger (migration 044) must reject it.
+  BEGIN
+    UPDATE sightings
+      SET verified_by = '00000000-0000-0000-0000-000000000001',
+          verified_at = now(),
+          confidence_level = 'certain'
+      WHERE id = v_sighting_id;
+    RAISE EXCEPTION 'reporter self-verify was NOT blocked at the RLS layer';
+  EXCEPTION WHEN insufficient_privilege THEN
+    NULL;  -- Expected.
+  END;
   RESET ROLE;
+
+  -- A non-verification update by the reporter still works (confidence only).
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claims = '{"sub":"00000000-0000-0000-0000-000000000001","role":"authenticated"}';
+  UPDATE sightings SET confidence_level = 'certain' WHERE id = v_sighting_id;
+  RESET ROLE;
+
   DELETE FROM sightings WHERE id = v_sighting_id;
   DELETE FROM dive_sites WHERE id = '00000000-0000-0000-0000-000000000021';
   DELETE FROM species WHERE id = '00000000-0000-0000-0000-000000000031';
@@ -256,18 +306,20 @@ END$$;
 -- An operator owner CANNOT change their own subscription_tier. Only
 -- the set_operator_subscription SECURITY DEFINER function can.
 DO $$
-DECLARE
-  v_count INTEGER;
 BEGIN
   SET LOCAL ROLE authenticated;
-  SET LOCAL request.jwt.claims = '{"sub":"00000000-0000-0000-0000-000000000001"}';
-  UPDATE operators
-    SET subscription_tier = 'pro'
-    WHERE id = '00000000-0000-0000-0000-000000000010';
-  GET DIAGNOSTICS v_count = ROW_COUNT;
-  IF v_count <> 0 THEN
-    RAISE EXCEPTION 'operator owner was able to self-upgrade subscription_tier (% rows)', v_count;
-  END IF;
+  SET LOCAL request.jwt.claims = '{"sub":"00000000-0000-0000-0000-000000000001","role":"authenticated"}';
+  -- Migration 036 replaced the no-op WITH CHECK self-reference with a
+  -- BEFORE UPDATE trigger that RAISES, so a direct self-upgrade now errors
+  -- (rather than silently affecting 0 rows).
+  BEGIN
+    UPDATE operators
+      SET subscription_tier = 'pro'
+      WHERE id = '00000000-0000-0000-0000-000000000010';
+    RAISE EXCEPTION 'operator owner was able to self-upgrade subscription_tier';
+  EXCEPTION WHEN insufficient_privilege THEN
+    NULL;  -- Expected: prevent_subscription_self_upgrade raises 42501.
+  END;
   RESET ROLE;
 END$$;
 
@@ -281,7 +333,7 @@ BEGIN
 
   -- carol is owner of OpB and shares NO operator with alice (OpA only).
   -- carol attempting to export alice must be rejected.
-  SET LOCAL request.jwt.claims = '{"sub":"00000000-0000-0000-0000-000000000003"}';
+  SET LOCAL request.jwt.claims = '{"sub":"00000000-0000-0000-0000-000000000003","role":"authenticated"}';
   BEGIN
     PERFORM export_user_data('00000000-0000-0000-0000-000000000001');
     RAISE EXCEPTION 'carol (no shared operator) was able to export alice''s data';
@@ -291,7 +343,7 @@ BEGIN
 
   -- alice is owner of OpA and bob is staff of OpA: they share an operator,
   -- so alice exporting bob must succeed.
-  SET LOCAL request.jwt.claims = '{"sub":"00000000-0000-0000-0000-000000000001"}';
+  SET LOCAL request.jwt.claims = '{"sub":"00000000-0000-0000-0000-000000000001","role":"authenticated"}';
   SELECT (export_user_data('00000000-0000-0000-0000-000000000002') ? 'profile')
     INTO v_ok;
   IF NOT v_ok THEN
@@ -347,7 +399,7 @@ BEGIN
 
   -- Attempt to delete the waiver. The trigger should block it.
   SET LOCAL ROLE authenticated;
-  SET LOCAL request.jwt.claims = '{"sub":"00000000-0000-0000-0000-000000000001"}';
+  SET LOCAL request.jwt.claims = '{"sub":"00000000-0000-0000-0000-000000000001","role":"authenticated"}';
   BEGIN
     DELETE FROM operator_waivers WHERE id = v_waiver_id;
     RAISE EXCEPTION 'DELETE of signed waiver was NOT blocked';
@@ -365,7 +417,7 @@ END$$;
 DO $$
 BEGIN
   SET LOCAL ROLE authenticated;
-  SET LOCAL request.jwt.claims = '{"sub":"00000000-0000-0000-0000-000000000001"}';
+  SET LOCAL request.jwt.claims = '{"sub":"00000000-0000-0000-0000-000000000001","role":"authenticated"}';
   BEGIN
     UPDATE operators SET subscription_tier = 'pro'
     WHERE id = '00000000-0000-0000-0000-000000000010';
@@ -406,7 +458,7 @@ BEGIN
 
   -- Alice (the reporter, not an expert) tries to verify her own sighting.
   SET LOCAL ROLE authenticated;
-  SET LOCAL request.jwt.claims = '{"sub":"00000000-0000-0000-0000-000000000001"}';
+  SET LOCAL request.jwt.claims = '{"sub":"00000000-0000-0000-0000-000000000001","role":"authenticated"}';
   BEGIN
     UPDATE sightings
     SET verified_by = '00000000-0000-0000-0000-000000000001', verified_at = now()
@@ -419,7 +471,7 @@ BEGIN
 
   -- The expert (taxonomy_expert = true, different user) CAN verify it.
   SET LOCAL ROLE authenticated;
-  SET LOCAL request.jwt.claims = '{"sub":"00000000-0000-0000-0000-000000000004"}';
+  SET LOCAL request.jwt.claims = '{"sub":"00000000-0000-0000-0000-000000000004","role":"authenticated"}';
   UPDATE sightings
   SET verified_by = '00000000-0000-0000-0000-000000000004', verified_at = now()
   WHERE id = v_sig;

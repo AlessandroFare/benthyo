@@ -150,7 +150,7 @@ AS $$
     COALESCE(ds.name, t.site_label) AS site_name,
     b.name AS boat_name,
     b.capacity AS boat_capacity,
-    g.display_name AS guide_name,
+    COALESCE(g.full_name, g.username) AS guide_name,
     t.status,
     COUNT(r.id) FILTER (WHERE r.status <> 'cancelled') AS booked_count,
     COUNT(r.id) FILTER (WHERE r.status IN ('checked_in','waiver_ok')) AS checked_in_count
@@ -162,7 +162,7 @@ AS $$
   WHERE t.operator_id = p_operator_id
     AND t.trip_date = p_date
     AND is_operator_member(p_operator_id)  -- authz inside the definer fn
-  GROUP BY t.id, ds.name, b.name, b.capacity, g.display_name
+  GROUP BY t.id, ds.name, b.name, b.capacity, g.full_name, g.username
   ORDER BY t.depart_at NULLS LAST, t.created_at;
 $$;
 
