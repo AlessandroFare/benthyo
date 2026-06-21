@@ -3,6 +3,12 @@ import { logger, logJobSummary } from '../shared/logger';
 import { paginate, RateLimiter } from '../shared/rate-limiter';
 import { getSupabase, upsertBatch } from '../shared/supabase';
 import { isMainModule } from '../shared/cli';
+import {
+  assertSystemUserExists,
+  normalizeCount,
+  normalizeDepth,
+  normalizeObservedAt,
+} from '../shared/occurrence';
 
 /**
  * Reef Life Survey (RLS) ETL.
@@ -234,6 +240,7 @@ export async function runRlsEtl(): Promise<void> {
   const supabase = getSupabase();
   const systemUserId = process.env.ETL_SYSTEM_USER_ID;
   if (!systemUserId) throw new Error('ETL_SYSTEM_USER_ID is required');
+  await assertSystemUserExists(supabase, systemUserId);
 
   const speciesRows: Record<string, unknown>[] = [];
   const sightingRows: Record<string, unknown>[] = [];
@@ -265,13 +272,16 @@ export async function runRlsEtl(): Promise<void> {
     const siteId = nearestSite?.[0]?.id;
     if (!siteId) continue;
 
+    const observedAt = normalizeObservedAt(obs.survey_date);
+    if (!observedAt) continue;
+
     sightingRows.push({
       user_id: systemUserId,
       dive_site_id: siteId,
       species_id: null,
-      observed_at: obs.survey_date,
-      depth_m: obs.depth_m ?? 10,
-      count: obs.abundance ?? 1,
+      observed_at: observedAt,
+      depth_m: normalizeDepth(obs.depth_m) ?? 10,
+      count: normalizeCount(obs.abundance),
       confidence_level: 'verified',
       source: 'rls',
       external_id: obs.id,

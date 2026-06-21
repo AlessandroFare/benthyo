@@ -3,6 +3,12 @@ import { logger, logJobSummary } from '../shared/logger';
 import { paginate, RateLimiter } from '../shared/rate-limiter';
 import { getSupabase, upsertBatch } from '../shared/supabase';
 import { isMainModule } from '../shared/cli';
+import {
+  assertSystemUserExists,
+  normalizeCount,
+  normalizeDepth,
+  normalizeObservedAt,
+} from '../shared/occurrence';
 
 /**
  * OBIS-SEAMAP ETL — marine megafauna (turtles, marine mammals, seabirds).
@@ -80,6 +86,7 @@ export async function runSeamapEtl(): Promise<void> {
   if (!systemUserId) {
     throw new Error('ETL_SYSTEM_USER_ID is required for sighting imports');
   }
+  await assertSystemUserExists(supabase, systemUserId);
 
   const speciesRows: Record<string, unknown>[] = [];
   const sightingRows: Record<string, unknown>[] = [];
@@ -112,15 +119,18 @@ export async function runSeamapEtl(): Promise<void> {
     const siteId = nearestSite?.[0]?.id;
     if (!siteId) continue;
 
-    const depth = occ.minimumDepthInMeters ?? occ.maximumDepthInMeters;
+    const observedAt = normalizeObservedAt(occ.date_start);
+    if (!observedAt) continue;
+
+    const depth = normalizeDepth(occ.minimumDepthInMeters ?? occ.maximumDepthInMeters);
 
     sightingRows.push({
       user_id: systemUserId,
       dive_site_id: siteId,
       species_id: null,
-      observed_at: occ.date_start ?? new Date().toISOString(),
+      observed_at: observedAt,
       depth_m: depth,
-      count: occ.individualCount ?? 1,
+      count: normalizeCount(occ.individualCount),
       confidence_level: 'likely',
       source: 'seamap',
       external_id: occ.id,
