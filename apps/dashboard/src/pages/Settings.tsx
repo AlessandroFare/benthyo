@@ -213,7 +213,7 @@ export function SettingsPage() {
                   <Label htmlFor="email">Email</Label>
                   <Input
                     id="email"
-                    value={data.operator.email}
+                    value={data.operator.email ?? ""}
                     disabled
                   />
                 </div>
@@ -237,7 +237,7 @@ export function SettingsPage() {
               </div>
               <div className="space-y-2">
                 <Label>Country</Label>
-                <Input value={data.operator.country_code} disabled />
+                <Input value={data.operator.country_code ?? ""} disabled />
               </div>
               <Button
                 onClick={handleSaveProfile}
