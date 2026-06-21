@@ -7,6 +7,7 @@ import '../../../core/config/api_config.dart';
 import 'gatt_dive_parser.dart';
 import 'shearwater_gatt_parser.dart';
 import 'suunto_gatt_parser.dart';
+import 'garmin_gatt_parser.dart';
 
 /// Connects to a paired dive computer, parses GATT dive logs, and imports via API.
 class BleDiveSyncService {
@@ -14,8 +15,9 @@ class BleDiveSyncService {
     List<DiveComputerGattParser>? parsers,
   }) : _parsers = parsers ??
             [
-              ShearwaterGattParser(),
-              SuuntoGattParser(),
+            ShearwaterGattParser(),
+            SuuntoGattParser(),
+            GarminGattParser(),
             ];
 
   final List<DiveComputerGattParser> _parsers;

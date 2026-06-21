@@ -35,6 +35,7 @@ import { SocialModule } from './social/social.module';
 import { MarketplaceModule } from './marketplace/marketplace.module';
 import { BleSyncModule } from './ble-sync/ble-sync.module';
 import { AdminModule } from './admin/admin.module';
+import { BookingsModule } from './bookings/bookings.module';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
@@ -84,6 +85,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
     MarketplaceModule,
     BleSyncModule,
     AdminModule,
+    BookingsModule,
   ],
   providers: [
     {

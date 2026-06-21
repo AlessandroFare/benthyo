@@ -108,6 +108,28 @@ export class StripeService {
         await this.applySubscription(admin, sub.id, 'canceled', sub.metadata);
         break;
       }
+      case 'payment_intent.succeeded': {
+        const pi = event.data.object as Stripe.PaymentIntent;
+        const bookingId = pi.metadata?.booking_id;
+        if (bookingId) {
+          await admin.rpc('confirm_booking', {
+            p_booking_id: bookingId,
+            p_payment_intent_id: pi.id,
+            p_client_secret: pi.client_secret ?? null,
+          });
+          this.logger.log(`Booking ${bookingId} confirmed via Stripe PI ${pi.id}`);
+        }
+        break;
+      }
+      case 'payment_intent.payment_failed': {
+        const failedPi = event.data.object as Stripe.PaymentIntent;
+        const failedBookingId = failedPi.metadata?.booking_id;
+        if (failedBookingId) {
+          await admin.rpc('cancel_booking', { p_booking_id: failedBookingId });
+          this.logger.warn(`Booking ${failedBookingId} cancelled due to failed payment`);
+        }
+        break;
+      }
       default:
         this.logger.debug(`Unhandled Stripe event type: ${event.type}`);
     }

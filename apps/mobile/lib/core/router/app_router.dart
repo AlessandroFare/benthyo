@@ -41,6 +41,9 @@ import '../../features/operators/marketplace_screen.dart';
 import '../../features/species/species_quiz_screen.dart';
 import '../../features/onboarding/onboarding_screen.dart';
 import '../../features/onboarding/onboarding_providers.dart';
+import '../../features/bookings/slot_browser_screen.dart';
+import '../../features/bookings/booking_create_screen.dart';
+import '../../features/bookings/booking_list_screen.dart';
 import '../supabase/supabase_client.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -248,6 +251,20 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/cert-card',
         builder: (context, state) => const CertCardScanScreen(),
+      ),
+      GoRoute(
+        path: '/slots',
+        builder: (context, state) => const SlotBrowserScreen(),
+      ),
+      GoRoute(
+        path: '/book/:slotId',
+        builder: (context, state) => BookingCreateScreen(
+          slotId: state.pathParameters['slotId']!,
+        ),
+      ),
+      GoRoute(
+        path: '/bookings',
+        builder: (context, state) => const BookingListScreen(),
       ),
       GoRoute(
         path: '/settings',
