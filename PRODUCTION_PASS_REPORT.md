@@ -454,3 +454,191 @@ Re-triggerable from Settings > Tools > "Show onboarding intro".
 29ecccf fix(deps): bump overrides to patched floors (multer, lodash, qs, dompurify)
 c0e85c6 fix(db): make migration chain apply cleanly + RLS suite green on real PG
 ```
+
+---
+
+## Round 3 (2026-06-22) — live-DB verification, CI bootstrap repair, gaps closed
+
+This round picked up the production-pass where the prior session ran out
+of credits. It corrected the single biggest class of risk in this project
+— **"claimed done but never actually applied"** — in three places, and ran
+the migration chain + RLS suite green on a real Postgres for the first time.
+
+### Environment reality check (corrects the §0 preface)
+
+The §0 preface ("no psql, no Supabase, no live stack") was true for rounds
+1–2. This round Docker was intermittently available: the Supabase stack came
+up for part of the session (used to discover + fix the migration-051 live-DB
+gap), and a throwaway `pgvector/pgvector:pg16` + postgis container was used
+to prove the full migration chain on a fresh DB without disturbing the
+user's live test session. The daemon went flaky again mid-session (WSL2
+backend / a failed Docker updater), so the live API walkthrough + live
+EXPLAIN latency are reported from the session-2 numbers where the stack was
+healthy, not re-captured here. **No number in this report is invented.**
+
+### Findings — the "claimed done, not actually done" class
+
+1. **Migration 051 was recorded-applied but NEVER applied to the live DB.**
+   `supabase migration list` showed 051 (the CLI reads the filesystem), but
+   `supabase_migrations.schema_migrations` had **zero rows** for 051 and
+   `pg_get_functiondef('export_user_data')` returned the stale 046 body
+   (19 keys, missing bookings/cert/photo/device/operator/push). Applied
+   manually → now returns **26 keys**. Exactly the failure mode the brief
+   warned about. Fix `01d064b`.
+
+2. **CI auth bootstrap was missing 3 shims → the `rls` job could never have
+   passed.** Verified by booting a fresh pgvector+postgis container and
+   applying the chain exactly as `ci.yml` does (bootstrap → 001..051 → seed
+   → rls.sql). It stopped cold at:
+   - `supabase_realtime` publication absent (migration 023
+     `ALTER PUBLICATION ... ADD TABLE` fails)
+   - `auth.jwt()` helper absent (migrations 033/034 read `app_metadata`)
+   - `auth.users` missing `instance_id/aud/role/raw_user_meta_data`
+     (migration 003 trigger + rls.sql seed inserts)
+   All three added to `supabase/tests/ci_auth_bootstrap.sql` idempotently
+   (the publication is EMPTY, not FOR ALL TABLES — that rejects ADD TABLE).
+   **After the fix: bootstrap clean → all 51 migrations apply clean →
+   seed → rls.sql "✓ All OceanLog RLS tests passed."** This is the first
+   proven-green end-to-end chain. Fix `77e0b32`.
+
+3. **SEAMAP was the previously-fabricated source (round 1 claimed it
+   worked; round 2's fix used a single-datasetid filter that returned 0
+   rows).** This round's fix queries OBIS v3 by the megafauna higher taxa
+   (Cetacea/Pinnipedia/Sirenia/Testudines/Procellariiformes/Suliformes)
+   in the Mediterranean WKT — **verified live: ETL vitest 21/21, Cetacea
+   + Testudines return real occurrences**. Fix `2304adb`.
+
+4. **RLS (Reef Life Survey) has no public REST API** — `api.reeflifesurvey.com`
+   does not resolve (fabricated by an earlier agent). Data is CSV/Zenodo/AODN
+   WFS. This round makes the exclusion honest and self-consistent: excluded
+   from `run-all-data.ts` by default (opt-in via `RLS_API_URL`, `ae9bb8f`),
+   and `rls/index.ts` now exits 0 with a clear log when the URL is unset so
+   the nightly `etl-rls` workflow doesn't go red (`2155f0d`). Documented as
+   a reasoned exclusion throughout, not a silent gap.
+
+### Migration-048 payment-bypass — re-verified live (the flagged finding)
+
+A new `supabase/tests/booking_rls_check.sql` was written (rls.sql had no
+booking section) and run against the fresh migrated DB. All 5 checks pass:
+operator slot creation ✓; stranger slot creation denied ✓; `book_slot`
+rejects booking as another user (returns `{"error":"Cannot book on behalf
+of another user"}`) ✓; `cancel_booking` denies a stranger ✓; **`confirm_booking`
+denied to `authenticated` — the payment-bypass from migration 047 is
+genuinely closed** ✓. Commit `77e0b32`.
+
+### GDPR export completeness (Art. 15) — now genuinely covers every PII table
+
+Enumerated all 41 user tables. `export_user_data` (migration 051, verified
+returning 26 keys live) now exports every table with a user FK holding the
+subject's personal data, including the four this audit found missing:
+`dive_computer_devices` (device_name+uuid), `operator_users` (role/employment),
+`inaturalist_push_queue` + `gbif_export_batches` (user-attributed logs), plus
+the bookings/cert/photo tables. `prevent_signed_waiver_delete` trigger
+(migration 026) confirmed present. Erasure cascade (gdpr.service.ts) verified:
+soft-delete → iNat residual obs enumeration → R2 prefix delete (partial-failure
+tracked) → auth.admin.deleteUser (FK cascades). Commit `01d064b`.
+
+### Lint was broken in BOTH apps — fixed
+
+`pnpm lint` errored in apps/api AND apps/dashboard: the scripts pointed at
+eslint configs that did not exist in the repo (never committed). CI doesn't
+run lint, so it was invisible. Added `apps/dashboard/.eslintrc.cjs` (matches
+installed @typescript-eslint 7 + react-hooks/react-refresh; react-refresh
+rule off for shadcn primitives) and `apps/api/.eslintrc.cjs` + eslint
+devDeps. Cleaned 12 dead-import/unused-var warnings → 0. Commit `86b2bac`.
+
+### Dependency hygiene
+
+`pnpm audit`: 15 → **13** vulns (2 low / 9 mod / 2 high). Bumped js-yaml
+override `^4.1.0`→`^4.1.1` (**CVE-2025-64718** prototype pollution via merge
+key, transitively via @nestjs/swagger; clean reinstall resolves to 4.2.0).
+Commit `9821c71`. Remaining 13 are documented dev-only or low-real-risk
+runtime (webpack/ajv/vite are build-only; file-type major-bump risk >
+advisory; @nestjs/core advisory path already at patched 10.4.22;
+@opentelemetry W3C-header DoS only at untrusted huge volume). Also capped
+API jest to `--maxWorkers=2` — Node 24's default worker fan-out OOMs on
+Windows; 33/33 with the cap.
+
+### Market research §10 correction — booking + BLE are now built
+
+The §10 analysis was written in round 1 *before* booking + BLE were
+implemented, so it lists both as "roadmap — large." Both are now genuinely
+complete (verified this round):
+- **BLE dive-computer import**: 3 real GATT parsers (Shearwater Nordic
+  UART/OCi, Suunto D5/EON binary, Garmin FIT-based) + UDDF fallback,
+  registered in `BleDiveSyncService`, paired via flutter_blue_plus and POSTed
+  to `/dive-computers/import`. Garmin parser has an 8-case test (date
+  parsing, multi-record, non-dive skip, profile samples). Not a stub.
+- **Booking/scheduling**: schema (migration 047) + authz fix (048) + booking
+  RPCs + API controller (10 routes) + mobile screens (`/slots`, `/book/:id`,
+  `/bookings`, 351 lines) + **dashboard SlotsPage now wired into routes +
+  sidebar** (it was orphaned dead code — fix `c422ee2`). Stripe pay-at-booking
+  with rollback on PI failure (`229e321`).
+
+### Performance — real numbers captured
+
+- **Dashboard bundle (Vite build, this round): 1532 KB raw / ~430 KB
+  gzipped** across 36 chunks. Largest: vendor-charts 426 KB (Recharts),
+  vendor-react 310 KB, vendor-supabase 208 KB, index 202 KB. (The round-2
+  report's "550 KB gzip" and the SECURITY_AUDIT's "380 KB" were both
+  inaccurate; the real prod number is ~430 KB gzip.) Build 16.7s, clean.
+- **REST API latency + EXPLAIN ANALYZE**: captured in round 2 against the
+  healthy live stack (species 10ms, dive_sites 28ms, sightings 8ms,
+  operator_kpis 9ms, site_public_card 27ms; operator_today_roster 27ms/1906
+  buffers; operator_customer_retention <1ms). Not re-captured this round
+  (daemon flaky) — the round-2 numbers stand as the live evidence.
+- **Lighthouse / mobile cold-start / frame profiling**: still not runnable
+  here (no stable browser/emulator). Honest gap, as before.
+
+### Code quality
+
+- typecheck: clean across all 6 workspaces (`pnpm -r typecheck`).
+- ESLint: 0 errors / 0 warnings both apps (was broken before this round).
+- N+1: `OperatorsService.getSites` (77dedd4 fix) verified — single IN()
+  query + in-memory aggregation. No other await-in-loop DB patterns.
+- Indexes: 59 indexes; bookings has user+date, slot_id, operator+date, and
+  a UNIQUE on stripe_payment_intent_id (prevents duplicate webhook
+  processing). booking_slots has operator+date and active+date composites.
+  No gaps for declared key queries.
+
+### Test status (this round)
+
+| Suite | Result |
+|-------|--------|
+| API Jest | **33/33** (was 31; +2 booking rollback cases) |
+| ETL Vitest | **21/21** (SEAMAP real-query tests green live) |
+| Flutter test | **26/26** (from round 2; re-verify deferred — cold build hangs) |
+| `pnpm -r typecheck` | clean |
+| API + dashboard ESLint | clean |
+| Fresh-DB migration chain 001→051 | **clean** (first proven-green) |
+| rls.sql + booking_rls_check.sql | **all pass** |
+
+### Commits (Round 3, production-pass, now 36 ahead of origin)
+
+```
+2155f0d fix(etl): rls source skips cleanly when no real API (no nightly red)
+c422ee2 fix(dashboard): wire SlotsPage into routes + sidebar (was orphaned)
+e748dff docs: session 5 progress
+9821c71 fix(deps): bump js-yaml override ^4.1.1 (CVE-2025-64718)
+77e0b32 fix(ci): complete auth bootstrap so the RLS job actually runs green
+86b2bac chore(lint): add working eslint configs + dead-import cleanup
+01d064b fix(gdpr): export bookings + device/operator/push-log records (Art. 15)
+ae9bb8f fix(etl): exclude RLS from default pipeline (no public API)
+2304adb fix(etl): SEAMAP real megafauna query (was 0-row fabricated filter)
+229e321 fix(api): roll back booking when payment initiation fails
+```
+(+ session-4 commits b203e4d, d3b618c, e154999, 70692f2, 79960df, 06b06de,
+b5aed77, 80fe05c, 497da47, 7703812, 3242f1a)
+
+### Honest exclusions / deferred (with reasoning, not silent gaps)
+
+- **Reef Life Survey ETL**: no public REST API exists; excluded by default,
+  opt-in via `RLS_API_URL`, source self-skips cleanly. Reasoned, documented.
+- **Live API walkthrough + live EXPLAIN re-capture**: Docker daemon went
+  flaky mid-session; session-2 live numbers are cited, not re-invented.
+- **Lighthouse / CWV / mobile cold-start / frame profiling**: no stable
+  browser or emulator in this environment. Documented gap.
+- **Remaining 13 audit advisories**: all dev/build-only or low-real-risk
+  runtime with no safe auto-fix (each enumerated above).
+- **Flutter `flutter test` re-run**: passes 26/26 but cold build hangs on
+  this Windows box; the round-2 result stands.
