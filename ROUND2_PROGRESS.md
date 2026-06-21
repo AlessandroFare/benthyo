@@ -211,9 +211,50 @@ Full app walkthrough (both journeys end-to-end) requires running API + browser +
 - Dashboard typecheck: clean
 - Dashboard Vite build: succeeds (19s, no warnings)
 
-**Bumped**: multer ^2.2.0, lodash ^4.18.1, qs ^6.15.2, dompurify ^3.4.11 — all already had overrides, now pinned at or above patched advisory floor. js-yaml/file-type deliberately left at current major (breaking change risk > advisory severity). **Commit**: pending (uncommitted).
+**Bumped**: multer ^2.2.0, lodash ^4.18.1, qs ^6.15.2, dompurify ^3.4.11 — all already had overrides, now pinned at or above patched advisory floor. js-yaml/file-type deliberately left at current major (breaking change risk > advisory severity). **Commit**: `29ecccf`.
 
 ### Phase 11 — Report (DONE)
 Round 2 appended to PRODUCTION_PASS_REPORT.md. Leads with the migration-041
 correction to Round 1's inventory claim. Covers phases 3–5, 8, and defers
-remaining phases to future rounds. **Commit**: pending.
+remaining phases to future rounds. **Commit**: `068ed82`.
+
+---
+
+## Session 3 (2026-06-21, current)
+
+### Security audit — critical booking RPC bugs found and fixed
+
+**Migration 048** (`supabase/migrations/048_fix_booking_authz_and_confirm.sql`):
+- CRITICAL payment bypass: `confirm_booking()` SECURITY DEFINER + GRANTed to `authenticated` with NO caller check. Any diver could call it via PostgREST to mark unpaid bookings as confirmed/paid. **Fix**: REVOKE from authenticated; GRANT to service_role only.
+- CRITICAL insert broken: `confirm_booking` tried to `INSERT INTO trip_roster_entries` with `trip_id = (SELECT id FROM operator_trip_schedule WHERE id = booking_slot_id)` — two unrelated tables, always NULL, NOT NULL constraint, every paid booking rolled back silently. **Fix**: removed bogus roster insert entirely.
+- HIGH cancel-any-booking: `cancel_booking()` SECURITY DEFINER with no ownership check. **Fix**: now enforces auth.uid() == booking.user_id OR is_operator_admin().
+- MEDIUM book-as-other-user: `book_slot()` trusted caller-supplied `p_user_id`. **Fix**: pins to auth.uid() for non-service_role callers; free slots confirmed inline.
+- Additional fix: `book_slot` used `p_operator_id` from caller instead of `v_slot.operator_id` — could record booking under wrong operator. Fixed to use slot's actual operator_id.
+
+**Live DB verification** (docker exec psql against real Postgres 17 with 48/48 migrations):
+- Free slot booking → `book_slot` returns status `confirmed` + `paid_at` set (auto-confirmed inline)
+- Paid slot booking → status `pending_payment` + `paid_at` null (awaits Stripe webhook)
+- `confirm_booking` called as `authenticated` → **permission denied** (REVOKE works)
+- SQL regression test saved as `scripts/test_booking_rpc.sql`
+
+### Test coverage added
+| Suite | Before | After | New tests |
+|-------|--------|-------|-----------|
+| API Jest | 24 | **31** | Booking service: 7 tests |
+| Flutter | 12 | **26** | BLE Garmin parser: 7 tests, Onboarding flow: 6 tests |
+| ETL Vitest | 12 | 12 | (unchanged) |
+
+### Full test results
+- API `tsc --noEmit`: clean
+- API Jest: 31/31 (9 suites)
+- Dashboard `tsc --noEmit`: clean  
+- ETL Vitest: 12/12
+- Flutter test: 26/26
+- Mobile `flutter analyze`: 68 pre-existing issues only
+
+### Commit
+`80fe05c` — "fix(db): critical payment-bypass in booking RPCs + regression tests"
+
+### Remaining
+- **GitHub workflows** for seamap + rls ETL (follow pattern in `etl-obis.yml`)
+- **Phase 9**: manual walkthrough against live stack (needs API running with Redis + medical key)
