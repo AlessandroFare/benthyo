@@ -340,3 +340,116 @@ service_role-only grants present). No new authz bug found. opencode's 048 holds 
 - SEAMAP dataset filter + RLS real data source: unresolved (documented above).
 - Performance/Lighthouse/mobile-profiling, full UI/UX screenshot pass: still deferred
   (no browser/emulator in env) — as in session 2.
+
+---
+
+## Session 5 (2026-06-22, picking up production-pass from Claude Code)
+
+### Major finding: migration 051 was recorded-applied but NEVER actually applied to live DB
+`supabase migration list` showed 051, but `supabase_migrations.schema_migrations` had
+**zero rows** for 051, and `pg_get_functiondef('export_user_data')` on the live DB
+returned the stale 046 body (19 keys, missing bookings/cert/photo/device/operator/push).
+Applied 051 manually → now returns **26 keys** (bookings, cert_card_records,
+photo_fingerprints, dive_computer_devices, operator_memberships, inaturalist_push_queue,
+gbif_export_batches added). This is exactly the "claimed done, not actually done" class
+the brief warned about. Live DB now consistent.
+
+### CI auth bootstrap had 3 missing shims → RLS job could never have passed
+Verified by booting a fresh `pgvector/pgvector:pg16` container + installing postgis,
+then applying the full chain exactly as ci.yml does (bootstrap → 001..051 → seed → rls.sql).
+Three gaps stopped it cold:
+1. **`supabase_realtime` publication absent** — migration 023 `ALTER PUBLICATION
+   supabase_realtime ADD TABLE buddy_messages` failed ("publication does not exist").
+   Fixed: bootstrap creates an EMPTY publication (not FOR ALL TABLES — that rejects
+   ADD TABLE).
+2. **`auth.jwt()` helper absent** — migrations 033/034 read `app_metadata` from it.
+   Fixed: bootstrap defines `auth.jwt()` reading `request.jwt.claims` (same GUC the
+   RLS suite sets), returning `'{}'` when unset.
+3. **`auth.users` missing columns** `instance_id/aud/role/raw_user_meta_data` —
+   migration 003's `handle_new_auth_user` trigger reads `raw_user_meta_data`, and
+   rls.sql seed inserts all four columns. Fixed: bootstrap creates the full column set.
+
+After the fix: **bootstrap clean → all 51 migrations apply clean → seed → rls.sql
+"✓ All OceanLog RLS tests passed."** This is the first time the chain has been proven
+green end-to-end on a fresh DB.
+
+Commit `77e0b32`.
+
+### Booking RLS/RPC live check (absent from rls.sql) — written + passing
+rls.sql had NO booking section. Added `supabase/tests/booking_rls_check.sql` and ran
+it against the fresh migrated DB. All 5 checks pass:
+1. operator admin creates slot on own operator (RLS) ✓
+2. stranger cannot create slot on another operator (RLS) ✓
+3. `book_slot` rejects booking as another user (caller pinned to auth.uid()) ✓
+   (returns JSON `{"error":"Cannot book on behalf of another user"}` — the API-level
+    confirm is also covered by API jest `bookings.spec.ts`)
+4. `cancel_booking` denies a stranger ✓
+5. **`confirm_booking` denied to `authenticated` — payment-bypass (migration 048) CLOSED** ✓
+
+Commit `77e0b32`.
+
+### In-flight fixes from session 4 — verified + committed individually
+- `229e321` roll back booking when payment initiation fails (was: stranded
+  pending_payment booking holding capacity forever; `confirm_booking` is webhook-only).
+  API jest bookings.spec.ts now 9/9 (added Stripe jest.mock + 2 rollback cases).
+- `2304adb` SEAMAP real megafauna query (old single-datasetid filter returned 0;
+  new query fetches Cetacea/Pinnipedia/Sirenia/Testudines/Procellariiformes/Suliformes
+  in the Med WKT). Verified live: ETL vitest 21/21, Cetacea + Testudines return real data.
+- `ae9bb8f` RLS excluded from default pipeline (opt-in via RLS_API_URL; no public API).
+- `01d064b` migration 051 GDPR export: bookings + cert_card_records + photo_fingerprints
+  + dive_computer_devices + operator_memberships + inaturalist_push_queue + gbif_export_batches.
+
+### GDPR export completeness (Art. 15) — now genuinely covers every user-scoped PII table
+Enumerated all 41 user tables. export_user_data now exports 26 keys covering every table
+with a user FK that holds the subject's personal data. prevent_signed_waiver_delete
+trigger (migration 026) confirmed present. Erasure cascade (gdpr.service.ts) confirmed:
+soft-delete → enumerate iNat residual obs → R2 prefix delete (partial-failure tracked)
+→ auth.admin.deleteUser (FK cascades). All 4 dependencies in gdpr.service.spec.ts (31 API jest).
+
+### Lint was broken in BOTH apps — fixed
+`pnpm lint` errored in apps/api AND apps/dashboard: the scripts pointed at eslint
+configs that did not exist in the repo (never committed). CI doesn't run lint so it
+was invisible. Added `apps/dashboard/.eslintrc.cjs` (matches installed
+@typescript-eslint 7 + react-hooks/react-refresh; react-refresh rule off for shadcn
+primitives that legitimately co-export helpers) and `apps/api/.eslintrc.cjs` +
+eslint devDeps. Cleaned 12 dead-import/unused-var warnings to 0.
+API: eslint clean, tsc clean, jest 33/33. Dashboard: eslint clean. Commit `86b2bac`.
+
+### Code quality — typecheck/lint/N+1/indexes
+- typecheck: clean across all 6 workspaces (`pnpm -r typecheck`).
+- ESLint: 0 errors / 0 warnings both apps.
+- N+1: `OperatorsService.getSites` (the 77dedd4 fix) verified — single IN() query +
+  in-memory aggregation, no per-row await. No other await-in-loop DB patterns found.
+- Indexes: 59 indexes across hot tables; bookings has user+date, slot_id,
+  operator+date, and a UNIQUE on stripe_payment_intent_id (prevents duplicate webhook
+  processing). booking_slots has operator+date and active+date composites (browseSlots
+  hits the latter). No gaps for declared key queries.
+
+### Dependency hygiene
+`pnpm audit`: was 15 (2 low / 11 mod / 2 high). Bumped js-yaml override `^4.1.0`→`^4.1.1`
+(CVE-2025-64718 prototype pollution via merge key; transitively via @nestjs/swagger).
+Clean reinstall resolves js-yaml to 4.2.0. Now **13** (2 low / 9 mod / 2 high).
+Remaining are all dev/build-only or low-real-risk runtime:
+- dev-only (not in prod bundle): webpack (via @nestjs/cli), ajv (via @nestjs/cli),
+  vite + launch-editor (dashboard dev server only).
+- runtime, low risk: file-type (2× via @nestjs/bullmq; prev session kept at major 20
+  deliberately — breaking-change risk > advisory severity), @nestjs/core (the
+  advisory path resolves to the already-patched 10.4.22), @opentelemetry/core (via
+  Sentry; W3C header DoS only at untrusted huge volume). Each documented, none
+  auto-fixable without a major bump that breaks the app.
+Commit `9821c71`. Also capped API jest to `--maxWorkers=2` (Node 24 default fan-out
+OOMs on Windows; 33/33 with the cap).
+
+### Test status (this session)
+- API jest: **33/33** (was 31; +2 booking rollback cases) — `--maxWorkers=2`
+- ETL vitest: **21/21**
+- Flutter test: **26/26**
+- pnpm -r typecheck: clean
+- API eslint: clean. Dashboard eslint: clean.
+- Fresh-DB migration chain 001→051: clean
+- rls.sql + booking_rls_check.sql: all pass
+
+### Docker daemon
+Was down at session start (WSL2 backend / failed updater). Came back mid-session;
+used a separate `pgvector/pgvector:pg16` + postgis container for the clean-chain
+verification so the user's live test session (prova@test.com) was not disturbed.
