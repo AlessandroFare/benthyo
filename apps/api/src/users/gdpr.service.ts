@@ -107,21 +107,20 @@ export class GdprService {
       p_reason: 'gdpr_erasure',
     });
 
-    // 2. iNaturalist observations. OceanLog pushes verified sightings to
-    //    iNat (sightings.inat_observation_id). Deleting them on iNat
-    //    requires the *user's* OAuth token, which we do not store, so the
-    //    platform cannot programmatically delete third-party-owned
-    //    observations. We therefore collect the affected observation ids,
-    //    log them as residual data, and return them so the caller can
-    //    surface "delete these on iNaturalist" guidance. This is an
-    //    honest accounting of what the cascade does and does not cover —
-    //    previously the documented iNat step was entirely absent.
+    // 2. iNaturalist observations. OceanLog pushes verified sightings to iNat
+    //    via the inaturalist_push_queue (migration 021); the iNat observation
+    //    id is recorded on the queue row (status='sent', inat_observation_id
+    //    set), NOT on sightings. Deleting iNat-side requires the *user's*
+    //    OAuth token, which we do not store, so we collect the pushed
+    //    observation ids, log them as residual data, and return them so the
+    //    caller can surface "delete these on iNaturalist" guidance.
     let inatObservations: number[] = [];
     try {
       const { data: obs } = await admin
-        .from('sightings')
+        .from('inaturalist_push_queue')
         .select('inat_observation_id')
         .eq('user_id', targetUserId)
+        .eq('status', 'sent')
         .not('inat_observation_id', 'is', null);
       inatObservations = (obs ?? [])
         .map((r: { inat_observation_id: number | null }) => r.inat_observation_id)

@@ -13,14 +13,16 @@ describe('GdprService.eraseUser', () => {
     authError?: { message: string } | null;
     inatIds?: Array<{ inat_observation_id: number | null }>;
   }) => {
-    const sightingsQuery = {
+    // iNat residual enumeration now reads inaturalist_push_queue with two
+    // chained .eq() filters (user_id, status='sent') then a .not(is null).
+    const pushQueueQuery = {
       select: jest.fn().mockReturnThis(),
       eq: jest.fn().mockReturnThis(),
       not: jest.fn().mockResolvedValue({ data: opts.inatIds ?? [], error: null }),
     };
     const admin = {
       rpc: jest.fn().mockResolvedValue({ data: null, error: null }),
-      from: jest.fn().mockReturnValue(sightingsQuery),
+      from: jest.fn().mockReturnValue(pushQueueQuery),
       auth: {
         admin: {
           deleteUser: jest
