@@ -453,3 +453,169 @@ OOMs on Windows; 33/33 with the cap).
 Was down at session start (WSL2 backend / failed updater). Came back mid-session;
 used a separate `pgvector/pgvector:pg16` + postgis container for the clean-chain
 verification so the user's live test session (prova@test.com) was not disturbed.
+
+---
+
+# Session 4 — 2026-06-22 — Live completion of the final 3 deferred items
+
+Docker reinstalled (fresh, ports 54321 API/storage, 54322 DB). Full stack live:
+Postgres + Supabase (auth/rest/realtime/storage/studio) + NestJS API (:3000) +
+dashboard (:5173) + Redis (:6379). `supabase db reset` rebuilt from migrations
++ seed (51 migrations, clean). The three items the brief flagged as "deferred
+only because Docker was down" are now genuinely done live — one uncovered and
+fixed a real production bug.
+
+## 1. GDPR erasure cascade — LIVE + a real bug FIXED
+
+### Bug found and fixed: migration 053
+**Root cause (live, from GoTrue logs):**
+```
+ERROR: relation "species" does not exist (SQLSTATE 42P01)
+CONTEXT: PL/pgSQL function public.species_search_tsv_update_after_stmt() line 6
+STATEMENT: DELETE FROM "users" AS users WHERE users.id = $1
+```
+`species_search_tsv_update_stmt()` and `species_search_tsv_update_after_stmt()`
+ran `UPDATE species ...` bare (no schema prefix, SECURITY INVOKER, no
+`SET search_path`). GoTrue deletes `auth.users` as role `supabase_auth_admin`,
+whose `search_path` is `auth` only. During the `auth.users` DELETE cascade the
+statement-level triggers fired and resolved bare `species` to `auth.species`
+→ 42P01 → the whole transaction aborted.
+
+**Impact:** identical class to migration 052 (dive_logs_count_update) —
+`auth.admin.deleteUser` (and therefore GDPR Art.17 erasure) failed for every
+user whose deletion cascaded into the sightings/species aggregate path. This
+was NOT caught before because no prior session ever ran the erasure against a
+real user with sightings attached.
+
+**Fix (053):** `CREATE OR REPLACE` both functions with `SET search_path = public`,
+`SECURITY DEFINER`, and `public.`-qualified table/column refs. Same pattern as
+the dive_logs_count_update() fix in 052. Committed.
+
+### Live end-to-end proof (post-fix)
+Created a fully-seeded disposable diver, then triggered the REAL endpoint:
+
+**Pre-erasure inventory (disposable user 87d3d93d-...):**
+```
+dive_logs: 2   sightings: 1   bookings: 1   site_reviews: 1
+gear_items: 1  user_badges: 1  user_life_list: 1
+inaturalist_push_queue: 1 (status=sent, inat_observation_id=8888888)
+sighting_photo_fingerprints: 1
+```
+
+**Request:** `DELETE /api/v1/users/me` with `{confirm:"DELETE MY ACCOUNT"}` + the diver's JWT.
+
+**Response (HTTP 200, 1006ms):**
+```json
+{"ok":true,"auth_deleted":true,"inat_observations":[8888888],"r2_partial_failure":true,"deleted_r2_objects":0}
+```
+
+Every step of the cascade verified:
+- **Soft-delete flag:** set (public.users.deleted_at = 2026-06-22 15:06:07, delete_reason='gdpr_erasure') ✓
+- **iNat residual enumeration:** returned `[8888888]` — the pushed observation
+  id is correctly read from `inaturalist_push_queue` (status=sent), NOT from
+  the non-existent `sightings.inat_observation_id` column (that was the
+  separate gdpr.service.ts fix committed earlier this round).
+- **R2 storage prefix:** `r2_partial_failure:true` — R2 host is
+  `oceanlog..r2.cloudflarestorage.com` (empty account id, no R2 backend in
+  dev); the service correctly catches + tracks the partial failure rather than
+  silently orphaning media. Working as designed.
+- **auth.admin.deleteUser:** `auth_deleted:true`, and `auth.users` row is gone.
+- **FK cascades (verified directly in Postgres post-erasure):**
+  ```
+  auth.users: 0    public.users: 0
+  dive_logs: 0  sightings: 0  bookings: 0  site_reviews: 0
+  gear_items: 0  user_badges: 0  user_life_list: 0
+  inaturalist_push_queue: 0  sighting_photo_fingerprints: 0
+  ```
+- **Unrelated data intact:** 133 sightings, 17 user_life_list, 43
+  species_dive_site_stats — all unchanged. No collateral damage.
+
+Evidence files: `.verify/erase_pre_inventory.txt`, `.verify/erase_response2.txt`.
+
+## 2. Performance — LIVE real numbers
+
+### API latency battery (NestJS :3000, Postgres :54322, avg of 5 warm calls each)
+```
+endpoint                                              p50(ms)
+GET operators/me/dashboard/kpis (op)                  168.6
+GET operators/me/roster (op)                          115.4
+GET operators/{id}/analytics/kpis (op)                118.9
+GET bookings/public/slots (anon)                       13.1
+GET dive-sites/search?q=test (anon)                    29.6
+GET sightings (anon feed)                              29.3
+GET search?q=reef (anon)                               36.0
+GET social/feed (anon)                                 15.7
+GET bookings (diver)                                   98.6
+GET bookings/operators/me/slots (op)                   13.9
+GET users/me (diver)                                  191.7
+```
+Operator RPC-heavy endpoints (kpis 168ms, roster 115ms) are slower than
+simple reads, but EXPLAIN ANALYZE (below) shows the DB layer is fast — the
+gap is NestJS/Supabase-client/RLS stack overhead, not query cost.
+
+### EXPLAIN ANALYZE (after seeding realistic volume: 4000 bookings, 2000 dive_logs, 202 slots)
+- `operator_today_roster`: **0.47ms** — uses `idx_trip_schedule_operator_date`
+  (operator+date composite), all joins index-backed. No optimization needed.
+- `operator_kpis` (4 subqueries):
+  - total_customers: 0.55ms (Hash Join, Seq Scan dive_logs 2002 rows)
+  - dives_in_window: 0.96ms (Nested Loop, idx_dive_logs_date)
+  - top_species: 2.15ms (Nested Loop, species_pkey)
+  - active_sites: 0.027ms (Bitmap Index Scan)
+  - full fn call: 73.3ms (4 subqueries serial)
+- Index coverage on dive_logs: 7 indexes (pkey, active, client_req, date,
+  operator, site, user_date) — covers every key query path.
+
+**Finding:** DB layer is solid at current scale. API p50 latency is dominated
+by NestJS/auth/RLS overhead, not DB query cost. No fix needed.
+
+### Lighthouse — dashboard (live Vite dev server :5173)
+```
+performance: 100   accessibility: 96   best-practices: 100   seo: 91
+  FCP 0.5s   LCP 0.5s   TBT 0ms   CLS 0   SI 0.6s
+```
+Evidence: `.verify/lighthouse/dashboard_full.report.{json,html}`.
+
+### Flutter web — cold-start captured, boot crash diagnosed
+Used headless Chrome CDP (Lighthouse's FCP detection doesn't fire on Flutter
+canvaskit, a known incompatibility — measured manually instead):
+```
+DOMContentLoaded: 417ms   load: 472ms
+main.dart.js: 4.35 MB (119ms to load)   total transfer: 4.4 MB
+flutter bootstrap: flt-glass-pane + canvaskit wasm load OK
+```
+**Boot crash (genuine, diagnosed):** `Error: Null check operator used on a
+null value` at `main.dart.js bPq` (`Cannot read properties of undefined
+(reading 'init')`). The Dart app crashes before first paint. Suspect: a native
+plugin's web path not guarded (DiveMapTileCache IS guarded with `kIsWeb`, so
+the culprit is elsewhere — SentryFlutter.init or a provider init). Resolving
+requires a rebuild with debug symbols.
+
+**`flutter build web` hangs on this Windows box** (flutter config --version
+both timed out at 300s) — genuine environment blocker. The prebuilt
+`apps/mobile/build/web` is stale/crashing. Documented as a real gap after a
+multi-angle attempt (CDP cold-start, swiftshader software GL, console +
+exception trace capture).
+
+## 3. UI/UX screenshots — LIVE (12/12 dashboard pages)
+
+Playwright (playwright-core + chromium-headless-shell) drove the real running
+dashboard: logged in as alice@test.local (operator owner), navigated each
+route, captured full-page screenshots. **12/12 succeeded, 0 failures:**
+
+```
+today.png  overview.png  sites.png  customers.png  analytics.png
+species.png  corrections.png  rental-gear.png  slots.png
+marketplace.png  settings.png  login.png
+```
+
+Each rendered with real data (e.g. overview shows KPI cards: Total Customers /
+Dives / Active Sites + top species list; today shows the roster). Files in
+`.verify/screenshots/dashboard/`, manifest in `dashboard_manifest.json`.
+
+**Mobile:** blocked by the Flutter web boot crash above — no live screens
+capturable until the build is fixed. This is the one remaining honest gap.
+
+## Test status (this session)
+- API jest: **33/33** (incl. the gdpr.service iNat-table fix spec)
+- ETL vitest: **21/21**
+- db reset: 51 migrations clean
