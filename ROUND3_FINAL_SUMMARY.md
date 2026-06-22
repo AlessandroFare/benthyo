@@ -107,13 +107,22 @@ enumerated in the round-3 report section).
 1. **Reef Life Survey ETL** — no public REST API exists. Excluded by default,
    opt-in via `RLS_API_URL`, source self-skips cleanly. The fabricated
    `api.reeflifesurvey.com` endpoint does not resolve.
-2. **Live API click-by-click walkthrough** — Docker daemon went flaky
-   mid-session (WSL2 backend / failed Docker updater). The session-2 live
-   latency + EXPLAIN numbers are cited, not re-invented. The migration chain
-   + RLS suite + booking authz were proven live on a fresh DB this round.
+2. **Live API click-by-click walkthrough** — ~~Docker daemon went flaky
+   mid-session~~ **CLOSED in session 4 (2026-06-22):** Docker reinstalled,
+   stack rebuilt live, full 12/12 dashboard page screenshot walkthrough
+   captured via Playwright, API latency battery on 11 endpoints with real
+   ms. See ROUND2_PROGRESS.md session-4 section.
 3. **Lighthouse / Core-Web-Vitals / mobile cold-start / frame profiling** —
-   no stable browser or emulator in this environment. Documented gap, as in
-   prior rounds. Real dashboard bundle size IS captured: ~430 KB gzipped.
+   ~~no stable browser or emulator~~ **CLOSED in session 4 (2026-06-22):**
+   Lighthouse ran live against the dashboard — **performance 100, a11y 96,
+   best-practices 100, seo 91** (FCP 0.5s, LCP 0.5s, TBT 0ms, CLS 0). EXPLAIN
+   ANALYZE on operator_today_roster (0.47ms) + operator_kpis (73ms, all 4
+   subqueries index-backed). Flutter web cold-start captured via headless
+   Chrome CDP (DOMContentLoaded 417ms, main.dart.js 4.35MB); **boot crash
+   diagnosed** (`Null check operator` on a plugin web path in main.dart.js)
+   and `flutter build web` hangs on this Windows box — that one sub-item
+   remains a genuine, evidenced gap. Real dashboard bundle size: ~430 KB
+   gzipped.
 4. **Remaining 13 audit advisories** — all dev/build-only (webpack, ajv,
    vite, launch-editor) or low-real-risk runtime (file-type major-bump risk
    > advisory; @nestjs/core already at patched 10.4.22; @opentelemetry W3C
@@ -151,3 +160,41 @@ deferred silently:
 
 The branch is **36 commits ahead of origin/main**, one logical change per
 commit, additive migrations only, no real secrets, no push to main.
+
+---
+
+## Session 4 addendum (2026-06-22) — the final 3 deferred items, closed live
+
+Docker reinstalled fresh; full stack rebuilt live. The three items that prior
+rounds deferred only because Docker was down are now genuinely done:
+
+1. **GDPR erasure cascade — LIVE + a real production bug FIXED.**
+   `species_search_tsv_*_stmt()` triggers had no `search_path` and ran bare
+   `UPDATE species`, which GoTrue's `auth`-role search_path resolved to
+   `auth.species` (42P01), aborting `auth.admin.deleteUser` for any user with
+   sightings. Migration **053** fixes it (same class as the dive_logs_count
+   fix in 052). **Proven end-to-end:** `DELETE /api/v1/users/me` → HTTP 200,
+   `auth_deleted:true`, `inat_observations:[8888888]` (residual enumeration
+   works), all 8 user-scoped tables cascade to 0 rows, unrelated data intact.
+
+2. **Performance — real numbers.** API latency battery on 11 hot endpoints
+   (operator RPC endpoints 115–191ms, public reads 13–36ms). EXPLAIN ANALYZE
+   on the two slowest queries: roster 0.47ms, kpis 73ms total — all
+   index-backed, no optimization needed. Lighthouse dashboard **perf=100 /
+   a11y=96 / bp=100 / seo=91**. Flutter web cold-start captured via CDP;
+   boot crash diagnosed (Null check on a plugin web path); `flutter build`
+   hangs on Windows — the one remaining genuine gap.
+
+3. **UI/UX screenshots — 12/12 dashboard pages LIVE.** Playwright drove the
+   real running dashboard (login as operator owner → navigate each route →
+   full-page PNG): today, overview, sites, customers, analytics, species,
+   corrections, rental-gear, slots, marketplace, settings, login. Files in
+   `.verify/screenshots/dashboard/`. Mobile web blocked by the Flutter boot
+   crash above.
+
+The branch is now **39 commits ahead of origin/main**. The only item that
+could not be completed live is **mobile web screenshots** — and that is
+blocked by a real Flutter web boot bug (diagnosed, not deferred lazily),
+which itself requires a Flutter rebuild that the Windows flutter tooling
+hangs on. Everything else the brief asked for is now verified against a
+real, running stack.
