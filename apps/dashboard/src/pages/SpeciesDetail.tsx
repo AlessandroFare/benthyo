@@ -12,6 +12,7 @@ import {
 import { useSpeciesDetail } from "@/hooks/useSpecies";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { PageSkeleton } from "@/components/shared/LoadingSkeleton";
+import { AnimatedPage, AnimatedItem } from "@/components/shared/AnimatedPage";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -60,14 +61,17 @@ export function SpeciesDetailPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <AnimatedPage>
+      <AnimatedItem>
       <Button variant="ghost" size="sm" asChild>
         <Link to="/species">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Species
         </Link>
       </Button>
+      </AnimatedItem>
 
+      <AnimatedItem>
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-1">
           <CardHeader>
@@ -161,7 +165,9 @@ export function SpeciesDetailPage() {
           </CardContent>
         </Card>
       </div>
+      </AnimatedItem>
 
+      <AnimatedItem>
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -202,6 +208,7 @@ export function SpeciesDetailPage() {
           )}
         </CardContent>
       </Card>
-    </div>
+      </AnimatedItem>
+    </AnimatedPage>
   );
 }

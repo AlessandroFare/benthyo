@@ -1,6 +1,7 @@
 import { useExpertCorrectionQueue, useExpertResolveCorrection } from "@/hooks/useCorrections";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AnimatedPage, AnimatedItem } from "@/components/shared/AnimatedPage";
 import { TableSkeleton } from "@/components/shared/LoadingSkeleton";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ShieldCheck, Inbox } from "lucide-react";
@@ -21,14 +22,17 @@ export function CorrectionsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <AnimatedPage>
+      <AnimatedItem>
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Species corrections</h1>
         <p className="text-sm text-muted-foreground">
           Review community-suggested ID fixes (taxonomy expert queue).
         </p>
       </div>
+      </AnimatedItem>
 
+      <AnimatedItem>
       {!data?.length ? (
         <EmptyState
           icon={Inbox}
@@ -72,6 +76,7 @@ export function CorrectionsPage() {
           ))}
         </div>
       )}
-    </div>
+      </AnimatedItem>
+    </AnimatedPage>
   );
 }

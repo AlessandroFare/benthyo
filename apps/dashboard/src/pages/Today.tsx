@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Anchor, CalendarDays, CheckCircle2, MapPin, Users } from "lucide-react";
 import { useTodayRoster, type RosterTrip } from "@/hooks/useRoster";
+import { AnimatedPage, AnimatedItem } from "@/components/shared/AnimatedPage";
 import { Card, CardContent } from "@/components/ui/card";
 
 const STATUS_STYLES: Record<RosterTrip["status"], string> = {
@@ -88,7 +89,8 @@ export default function Today() {
   }, [data]);
 
   return (
-    <div className="space-y-6">
+    <AnimatedPage>
+      <AnimatedItem>
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold text-foreground">
@@ -108,6 +110,7 @@ export default function Today() {
           aria-label="Roster date"
         />
       </header>
+      </AnimatedItem>
 
       {isLoading && (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -143,6 +146,6 @@ export default function Today() {
           ))}
         </div>
       )}
-    </div>
+    </AnimatedPage>
   );
 }

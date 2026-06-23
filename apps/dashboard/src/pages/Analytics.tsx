@@ -16,6 +16,7 @@ import { useAnalytics } from "@/hooks/useAnalytics";
 import { useDashboardCharts, useDashboardKpis } from "@/hooks/useDashboard";
 import { MetricStrip } from "@/components/analytics/MetricStrip";
 import { AnalyticsAreaChart } from "@/components/charts/AnalyticsAreaChart";
+import { AnimatedPage, AnimatedItem } from "@/components/shared/AnimatedPage";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { PageSkeleton } from "@/components/shared/LoadingSkeleton";
 import {
@@ -134,16 +135,21 @@ export function AnalyticsPage() {
     activeMetric === "sites" ? "Dives by site" : "Sightings trend";
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-foreground">Analytics</h1>
-        <p className="text-sm text-muted-foreground">
-          Insights and trends across your operation
-        </p>
-      </div>
+    <AnimatedPage>
+      <AnimatedItem>
+        <div>
+          <h1 className="text-2xl font-semibold text-foreground">Analytics</h1>
+          <p className="text-sm text-muted-foreground">
+            Insights and trends across your operation
+          </p>
+        </div>
+      </AnimatedItem>
 
-      <MetricStrip metrics={metrics} />
+      <AnimatedItem>
+        <MetricStrip metrics={metrics} />
+      </AnimatedItem>
 
+      <AnimatedItem>
       <Card className="border-border bg-card text-foreground">
         <CardHeader>
           <CardTitle className="text-foreground">{chartLabel}</CardTitle>
@@ -180,7 +186,9 @@ export function AnalyticsPage() {
           )}
         </CardContent>
       </Card>
+      </AnimatedItem>
 
+      <AnimatedItem>
       <Card className="border-border bg-card text-foreground">
         <CardHeader>
           <CardTitle className="text-foreground">Activity Heatmap</CardTitle>
@@ -228,7 +236,9 @@ export function AnalyticsPage() {
           )}
         </CardContent>
       </Card>
+      </AnimatedItem>
 
+      <AnimatedItem>
       <div className="grid gap-6 lg:grid-cols-2">
         <Card className="border-border bg-card text-foreground">
           <CardHeader>
@@ -311,7 +321,9 @@ export function AnalyticsPage() {
           </CardContent>
         </Card>
       </div>
+      </AnimatedItem>
 
+      <AnimatedItem>
       <Card className="border-border bg-card text-foreground">
         <CardHeader>
           <CardTitle className="text-foreground">Customer Retention</CardTitle>
@@ -353,6 +365,7 @@ export function AnalyticsPage() {
           )}
         </CardContent>
       </Card>
-    </div>
+      </AnimatedItem>
+    </AnimatedPage>
   );
 }

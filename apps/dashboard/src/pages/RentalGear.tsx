@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TableSkeleton } from "@/components/shared/LoadingSkeleton";
+import { AnimatedPage, AnimatedItem } from "@/components/shared/AnimatedPage";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Package } from "lucide-react";
 
@@ -18,14 +19,17 @@ export function RentalGearPage() {
   if (isLoading) return <TableSkeleton rows={6} />;
 
   return (
-    <div className="space-y-6">
+    <AnimatedPage>
+      <AnimatedItem>
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Rental gear</h1>
         <p className="text-sm text-muted-foreground">
           Register inventory with QR codes for checkout tracking.
         </p>
       </div>
+      </AnimatedItem>
 
+      <AnimatedItem>
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Add gear</CardTitle>
@@ -52,7 +56,9 @@ export function RentalGearPage() {
           </div>
         </CardContent>
       </Card>
+      </AnimatedItem>
 
+      <AnimatedItem>
       {!data?.length ? (
         <EmptyState
           icon={Package}
@@ -89,6 +95,7 @@ export function RentalGearPage() {
           ))}
         </div>
       )}
-    </div>
+      </AnimatedItem>
+    </AnimatedPage>
   );
 }

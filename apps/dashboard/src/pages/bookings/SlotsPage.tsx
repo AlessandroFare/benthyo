@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { PageSkeleton } from '../../components/shared/LoadingSkeleton';
+import { AnimatedPage, AnimatedItem } from '../../components/shared/AnimatedPage';
 import { useToast } from '../../components/shared/Toast';
 
 interface BookingSlot {
@@ -95,7 +96,8 @@ export function SlotsPage() {
   if (isLoading) return <PageSkeleton />;
 
   return (
-    <div className="space-y-6">
+    <AnimatedPage>
+      <AnimatedItem>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Booking Slots</h1>
@@ -105,8 +107,10 @@ export function SlotsPage() {
           {showForm ? 'Cancel' : 'New slot'}
         </Button>
       </div>
+      </AnimatedItem>
 
       {showForm && (
+        <AnimatedItem>
         <Card>
           <CardHeader><CardTitle>Create booking slot</CardTitle></CardHeader>
           <CardContent className="space-y-4">
@@ -127,8 +131,10 @@ export function SlotsPage() {
             <Button onClick={() => createMutation.mutate()}>Publish slot</Button>
           </CardContent>
         </Card>
+        </AnimatedItem>
       )}
 
+      <AnimatedItem>
       {!slots?.length ? (
         <EmptyState
           icon={Calendar}
@@ -168,6 +174,7 @@ export function SlotsPage() {
           ))}
         </div>
       )}
-    </div>
+      </AnimatedItem>
+    </AnimatedPage>
   );
 }

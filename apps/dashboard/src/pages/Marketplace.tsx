@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { TableSkeleton } from "@/components/shared/LoadingSkeleton";
+import { AnimatedPage, AnimatedItem } from "@/components/shared/AnimatedPage";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Store } from "lucide-react";
 
@@ -27,14 +28,17 @@ export function MarketplacePage() {
   if (isLoading) return <TableSkeleton rows={6} />;
 
   return (
-    <div className="space-y-6">
+    <AnimatedPage>
+      <AnimatedItem>
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Marketplace</h1>
         <p className="text-sm text-muted-foreground">
           Publish courses, fun dives, and liveaboards for divers to discover in the app.
         </p>
       </div>
+      </AnimatedItem>
 
+      <AnimatedItem>
       <Card>
         <CardHeader>
           <CardTitle className="text-base">New listing</CardTitle>
@@ -96,7 +100,9 @@ export function MarketplacePage() {
           ) : null}
         </CardContent>
       </Card>
+      </AnimatedItem>
 
+      <AnimatedItem>
       {!data?.length ? (
         <EmptyState
           icon={Store}
@@ -131,6 +137,7 @@ export function MarketplacePage() {
           ))}
         </div>
       )}
-    </div>
+      </AnimatedItem>
+    </AnimatedPage>
   );
 }

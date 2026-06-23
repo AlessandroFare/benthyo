@@ -21,6 +21,7 @@ import {
 } from "@/hooks/useSettings";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { PageSkeleton } from "@/components/shared/LoadingSkeleton";
+import { AnimatedPage } from "@/components/shared/AnimatedPage";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -181,7 +182,7 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <AnimatedPage>
       <Tabs defaultValue="profile">
         <TabsList>
           <TabsTrigger value="profile">Operator Profile</TabsTrigger>
@@ -628,6 +629,6 @@ export function SettingsPage() {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
+    </AnimatedPage>
   );
 }
