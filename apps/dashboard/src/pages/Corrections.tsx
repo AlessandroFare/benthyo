@@ -42,7 +42,7 @@ export function CorrectionsPage() {
       ) : (
         <div className="grid gap-4">
           {data.map((row) => (
-            <Card key={row.id}>
+            <Card key={row.id} className="transition-all hover:shadow-md hover:border-ocean-500/40">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">
                   {row.proposed?.common_name ?? row.proposed?.scientific_name ?? "Species"}

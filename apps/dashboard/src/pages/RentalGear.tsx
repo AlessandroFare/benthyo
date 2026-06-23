@@ -76,7 +76,7 @@ export function RentalGearPage() {
       ) : (
         <div className="grid gap-3">
           {data.map((item) => (
-            <Card key={item.id}>
+            <Card key={item.id} className="transition-all hover:shadow-md hover:border-ocean-500/40">
               <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
                 <div>
                   <p className="font-medium">{item.label}</p>

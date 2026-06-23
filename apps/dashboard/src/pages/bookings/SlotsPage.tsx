@@ -155,7 +155,7 @@ export function SlotsPage() {
       ) : (
         <div className="grid gap-4">
           {slots.map((slot) => (
-            <Card key={slot.id}>
+            <Card key={slot.id} className="transition-all hover:shadow-md hover:border-ocean-500/40">
               <CardContent className="flex items-center justify-between p-4">
                 <div>
                   <div className="font-medium">
