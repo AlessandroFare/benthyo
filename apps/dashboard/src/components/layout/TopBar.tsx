@@ -1,5 +1,5 @@
 import { useLocation } from "react-router-dom";
-import { Bell, LogOut, Search } from "lucide-react";
+import { Bell, LogOut, Menu, Search } from "lucide-react";
 import type { AuthUser } from "@/lib/auth";
 import { signOut } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -23,9 +23,10 @@ function getPageTitle(pathname: string): string {
 
 interface TopBarProps {
   user: AuthUser | null;
+  onOpenMobileNav: () => void;
 }
 
-export function TopBar({ user }: TopBarProps) {
+export function TopBar({ user, onOpenMobileNav }: TopBarProps) {
   const { pathname } = useLocation();
   const title = getPageTitle(pathname);
 
@@ -34,10 +35,23 @@ export function TopBar({ user }: TopBarProps) {
   }
 
   return (
-    <header className="flex h-16 items-center justify-between border-b border-border bg-background px-6">
-      <div>
-        <h1 className="text-xl font-semibold text-foreground">{title}</h1>
-        <p className="text-sm text-muted-foreground">Manage your dive operation insights</p>
+    <header className="flex h-16 items-center justify-between gap-2 border-b border-border bg-background px-4 sm:px-6">
+      <div className="flex min-w-0 items-center gap-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onOpenMobileNav}
+          aria-label="Open navigation menu"
+          className="-ml-2 text-muted-foreground hover:bg-accent hover:text-foreground sm:hidden"
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
+        <div className="min-w-0">
+          <h1 className="truncate text-xl font-semibold text-foreground">{title}</h1>
+          <p className="hidden text-sm text-muted-foreground sm:block">
+            Manage your dive operation insights
+          </p>
+        </div>
       </div>
 
       <div className="flex items-center gap-4">
