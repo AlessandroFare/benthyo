@@ -31,7 +31,7 @@ RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
     SELECT 1 FROM users
     WHERE id = auth.uid()
       AND (
-        username IN ('admin', 'oceanlog_admin', 'root')
+        username IN ('admin', 'benthyo_admin', 'root')
         OR (auth.jwt() ->> 'app_metadata')::jsonb ->> 'is_admin' = 'true'
       )
   )

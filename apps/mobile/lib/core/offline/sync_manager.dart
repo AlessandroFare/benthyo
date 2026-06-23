@@ -110,7 +110,7 @@ class SqliteSyncBackend implements SyncBackend {
   Future<Database> _open() async {
     final dbPath = await getDatabasesPath();
     return openDatabase(
-      join(dbPath, 'oceanlog_sync.db'),
+      join(dbPath, 'benthyo_sync.db'),
       version: 3,
       onCreate: (db, _) async {
         await db.execute('''

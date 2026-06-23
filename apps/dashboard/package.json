@@ -1,5 +1,5 @@
 {
-  "name": "@oceanlog/dashboard",
+  "name": "@benthyo/dashboard",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -46,6 +46,6 @@
     "tailwindcss": "^3.4.7",
     "tailwindcss-animate": "^1.0.7",
     "typescript": "^5.5.4",
-    "vite": "^5.3.5"
+    "vite": "^6.4.3"
   }
 }

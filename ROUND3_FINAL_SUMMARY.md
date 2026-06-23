@@ -1,4 +1,4 @@
-# OceanLog Production-Pass — Final Consolidated Summary
+# Benthyo Production-Pass — Final Consolidated Summary
 
 **Branch:** `production-pass` (36 commits ahead of `origin/main`)
 **Rounds:** 1 (initial 14-phase pass) → 2 (new features: booking, BLE, onboarding,
@@ -18,7 +18,7 @@ confirmation that every item in the brief has been addressed (not deferred).
   database.** Verified by booting a throwaway `pgvector/pgvector:pg16`
   container, installing postgis, and applying the exact CI sequence
   (bootstrap → 001..051 → seed). Zero errors.
-- **`rls.sql` RLS suite passes** on that fresh DB ("✓ All OceanLog RLS tests
+- **`rls.sql` RLS suite passes** on that fresh DB ("✓ All Benthyo RLS tests
   passed"), AND a new `booking_rls_check.sql` passes all 5 booking
   authorization checks (operator slot creation, stranger denial, book_slot
   caller-pinning, cancel_booking owner/operator-admin-only, **confirm_booking

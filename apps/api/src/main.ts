@@ -64,7 +64,7 @@ async function bootstrap(): Promise<void> {
   });
 
   const swaggerConfig = new DocumentBuilder()
-    .setTitle('OceanLog API')
+    .setTitle('Benthyo API')
     .setDescription('Scuba logging, species sightings, and operator analytics')
     .setVersion('1.0')
     .addBearerAuth()

@@ -17,7 +17,7 @@ import { isMainModule } from './shared/cli';
 import { createClient } from '@supabase/supabase-js';
 
 /**
- * Run the full OceanLog data ETL pipeline in dependency order.
+ * Run the full Benthyo data ETL pipeline in dependency order.
  *
  * This file is the SINGLE SOURCE OF TRUTH for ETL ordering. README.md
  * and docs/decisions.md (ADR-015) are kept in sync with it.
@@ -41,7 +41,7 @@ import { createClient } from '@supabase/supabase-js';
  */
 export async function runAllDataEtl(): Promise<void> {
   const startedAt = Date.now();
-  logger.info('Starting full OceanLog data ETL pipeline');
+  logger.info('Starting full Benthyo data ETL pipeline');
 
   const failures: string[] = [];
 

@@ -15,7 +15,7 @@
 - Tier-limit triggers (045): BEFORE INSERT blocks over-limit inserts
 - Self-verify block (044): trigger prevents reporter setting verification columns
 - Subscription self-upgrade (036): trigger blocks direct UPDATE of subscription_tier
-- Stack: docker compose + supabase start running. Use `docker exec supabase_db_oceanlog psql` for raw SQL.
+- Stack: docker compose + supabase start running. Use `docker exec supabase_db_benthyo psql` for raw SQL.
 
 ### Open — remaining phases
 
@@ -370,7 +370,7 @@ Three gaps stopped it cold:
    rls.sql seed inserts all four columns. Fixed: bootstrap creates the full column set.
 
 After the fix: **bootstrap clean → all 51 migrations apply clean → seed → rls.sql
-"✓ All OceanLog RLS tests passed."** This is the first time the chain has been proven
+"✓ All Benthyo RLS tests passed."** This is the first time the chain has been proven
 green end-to-end on a fresh DB.
 
 Commit `77e0b32`.
@@ -516,7 +516,7 @@ Every step of the cascade verified:
   the non-existent `sightings.inat_observation_id` column (that was the
   separate gdpr.service.ts fix committed earlier this round).
 - **R2 storage prefix:** `r2_partial_failure:true` — R2 host is
-  `oceanlog..r2.cloudflarestorage.com` (empty account id, no R2 backend in
+  `benthyo..r2.cloudflarestorage.com` (empty account id, no R2 backend in
   dev); the service correctly catches + tracks the partial failure rather than
   silently orphaning media. Working as designed.
 - **auth.admin.deleteUser:** `auth_deleted:true`, and `auth.users` row is gone.

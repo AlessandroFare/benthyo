@@ -303,7 +303,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     alignment: AttributionAlignment.bottomLeft,
                     attributions: [
                       TextSourceAttribution(
-                        MapConfig.basemap(_basemap).attribution ?? 'OceanLog',
+                        MapConfig.basemap(_basemap).attribution ?? 'Benthyo',
                       ),
                       if (_showContours)
                         const TextSourceAttribution('EMODnet isolines'),

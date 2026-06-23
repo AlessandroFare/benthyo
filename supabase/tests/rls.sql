@@ -1,4 +1,4 @@
--- RLS test suite for OceanLog.
+-- RLS test suite for Benthyo.
 --
 -- This is a comprehensive RLS correctness test. Run with:
 --   psql $DATABASE_URL -v ON_ERROR_STOP=1 -f supabase/tests/rls.sql
@@ -488,4 +488,4 @@ END$$;
 
 COMMIT;
 
-\echo '✓ All OceanLog RLS tests passed.'
+\echo '✓ All Benthyo RLS tests passed.'

@@ -1,7 +1,7 @@
 {
-  "name": "@oceanlog/types",
+  "name": "@benthyo/types",
   "version": "0.1.0",
-  "description": "Shared TypeScript types for OceanLog entities, API DTOs, and Darwin Core",
+  "description": "Shared TypeScript types for Benthyo entities, API DTOs, and Darwin Core",
   "license": "MIT",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",

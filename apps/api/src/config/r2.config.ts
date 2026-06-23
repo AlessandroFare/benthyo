@@ -15,7 +15,7 @@ export default registerAs(
     accountId: process.env['R2_ACCOUNT_ID'] ?? '',
     accessKeyId: process.env['R2_ACCESS_KEY_ID'] ?? '',
     secretAccessKey: process.env['R2_SECRET_ACCESS_KEY'] ?? '',
-    bucketName: process.env['R2_BUCKET_NAME'] ?? 'oceanlog',
+    bucketName: process.env['R2_BUCKET_NAME'] ?? 'benthyo',
     publicUrl: process.env['R2_PUBLIC_URL'] ?? '',
     region: process.env['R2_REGION'] ?? 'auto',
   }),

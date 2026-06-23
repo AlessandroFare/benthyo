@@ -53,7 +53,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             const Icon(Icons.scuba_diving, size: 72, color: AppColors.accent),
             const SizedBox(height: AppSpacing.lg),
             Text(
-              'OceanLog',
+              'Benthyo',
               style: Theme.of(context).textTheme.displaySmall?.copyWith(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,

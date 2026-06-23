@@ -1,13 +1,13 @@
 # API Reference
 
-OceanLog exposes a NestJS REST API and Supabase RPC functions. All responses use the `@oceanlog/types` DTO shapes.
+Benthyo exposes a NestJS REST API and Supabase RPC functions. All responses use the `@benthyo/types` DTO shapes.
 
 ## Base URLs
 
 | Environment | URL |
 |-------------|-----|
 | Local | `http://localhost:3000` |
-| Production | `https://api.oceanlog.app` |
+| Production | `https://api.benthyo.com` |
 
 Supabase RPCs are available at `{SUPABASE_URL}/rest/v1/rpc/{function_name}`.
 
@@ -147,7 +147,7 @@ Query parameters:
 | `verified_only` | `true` | Only expert-verified sightings |
 | `format` | `json` | `json` or `csv` |
 
-Returns `DarwinCoreExportBundle` from `@oceanlog/types`.
+Returns `DarwinCoreExportBundle` from `@benthyo/types`.
 
 ### Weekly digest
 
@@ -171,7 +171,7 @@ Response:
 {
   "data": {
     "upload_url": "https://...",
-    "public_url": "https://photos.oceanlog.app/..."
+    "public_url": "https://photos.benthyo.com/..."
   }
 }
 ```

@@ -87,7 +87,7 @@ DO $$
 DECLARE
   v_master TEXT := COALESCE(
     current_setting('app.medical_master_key', true),
-    'oceanlog-dev-master-key-do-not-use-in-prod'
+    'benthyo-dev-master-key-do-not-use-in-prod'
   );
   v_updated INTEGER;
 BEGIN

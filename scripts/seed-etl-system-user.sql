@@ -5,7 +5,7 @@
 -- auth.users(id), so the system user must exist in BOTH tables. Run this once
 -- against the target database, then set ETL_SYSTEM_USER_ID to the printed id.
 --
---   docker exec -i supabase_db_oceanlog psql -U postgres -d postgres \
+--   docker exec -i supabase_db_benthyo psql -U postgres -d postgres \
 --     < scripts/seed-etl-system-user.sql
 --
 -- Idempotent: safe to re-run.
@@ -20,14 +20,14 @@ BEGIN
     '00000000-0000-0000-0000-000000000000',
     'authenticated',
     'authenticated',
-    'etl-system@oceanlog.internal',
+    'etl-system@benthyo.internal',
     now(),
     now()
   )
   ON CONFLICT (id) DO NOTHING;
 
   INSERT INTO public.users (id, username, full_name)
-  VALUES (v_id, 'etl_system', 'OceanLog Data Import')
+  VALUES (v_id, 'etl_system', 'Benthyo Data Import')
   ON CONFLICT (id) DO NOTHING;
 
   RAISE NOTICE 'ETL system user id: %', v_id;

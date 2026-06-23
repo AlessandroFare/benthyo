@@ -298,7 +298,7 @@ class _InatMatchView extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.md),
               const _InfoCard(
-                title: 'Not in OceanLog yet',
+                title: 'Not in Benthyo yet',
                 body:
                     'This species is not in our catalog yet. You can still log a sighting manually or suggest it to your operator.',
               ),

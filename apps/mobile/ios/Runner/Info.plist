@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>OceanLog</string>
+	<string>Benthyo</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -13,7 +13,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>oceanlog</string>
+	<string>benthyo</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -39,8 +39,8 @@
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>OceanLog uses Bluetooth to sync dives from your dive computer.</string>
+	<string>Benthyo uses Bluetooth to sync dives from your dive computer.</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
-	<string>OceanLog uses Bluetooth to sync dives from your dive computer.</string>
+	<string>Benthyo uses Bluetooth to sync dives from your dive computer.</string>
 </dict>
 </plist>

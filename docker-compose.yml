@@ -1,11 +1,11 @@
 services:
   postgres:
     image: postgis/postgis:16-3.4
-    container_name: oceanlog-postgres
+    container_name: benthyo-postgres
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: oceanlog
+      POSTGRES_DB: benthyo
     ports:
       - '54322:5432'
     volumes:
@@ -18,7 +18,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: oceanlog-redis
+    container_name: benthyo-redis
     ports:
       - '6379:6379'
     volumes:
@@ -26,7 +26,7 @@ services:
 
   mailpit:
     image: axllent/mailpit:latest
-    container_name: oceanlog-mailpit
+    container_name: benthyo-mailpit
     ports:
       - '8025:8025'
       - '1025:1025'

@@ -1,5 +1,5 @@
-name: oceanlog
-repository: https://github.com/oceanlog/oceanlog
+name: benthyo
+repository: https://github.com/benthyo/benthyo
 
 packages:
   - packages/**
@@ -13,10 +13,10 @@ scripts:
     run: melos exec --fail-fast -- flutter test
     description: Run Flutter tests
   types:build:
-    run: melos exec --scope="@oceanlog/types" -- pnpm build
+    run: melos exec --scope="@benthyo/types" -- pnpm build
     description: Build shared TypeScript types package
   ui:build:
-    run: melos exec --scope="@oceanlog/ui" -- pnpm build
+    run: melos exec --scope="@benthyo/ui" -- pnpm build
     description: Build shared React UI package
 
 command:

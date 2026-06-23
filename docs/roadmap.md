@@ -1,4 +1,4 @@
-# OceanLog product roadmap
+# Benthyo product roadmap
 
 Living plan from user research and **Round 2 strategy** (retention, B2B revenue, data moat).
 

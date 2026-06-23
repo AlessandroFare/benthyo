@@ -1,4 +1,4 @@
-# OceanLog — Production-Readiness Pass Report
+# Benthyo — Production-Readiness Pass Report
 
 **Branch:** `production-pass` (one logical change per commit)
 **Date:** 2026-06-20/21
@@ -62,7 +62,7 @@ invariants held**; the drift found and fixed:
 from env but never set the `app.medical_master_key` GUC on the Supabase
 session, and PostgREST runs each `.rpc()` in its own transaction, so the
 key-derivation helpers (`038`/`040`) silently fell back to
-`'oceanlog-dev-master-key-do-not-use-in-prod'`. Production GDPR Art. 9
+`'benthyo-dev-master-key-do-not-use-in-prod'`. Production GDPR Art. 9
 medical answers were effectively encrypted under a publicly-known key.
 **Fix:** migration `043` adds `submit_medical_form_v2` /
 `my_medical_submissions_decrypted_v2` SECURITY DEFINER wrappers that
@@ -216,7 +216,7 @@ performance budget and can't be grounded. **Deferred**; recommend running the
 
 ## 10. Market research — findings
 
-Segments OceanLog spans: **(a) dive-logging consumer apps**, **(b)
+Segments Benthyo spans: **(a) dive-logging consumer apps**, **(b)
 citizen-science marine platforms**, **(c) dive-operator management software**.
 
 **Competitive landscape (analysis from domain knowledge, not a live web
@@ -230,7 +230,7 @@ scrape this session):**
   bookings/roster, customer CRM, **digital waivers + medical** (the legal hook),
   rental/asset tracking, payments.
 
-**OceanLog vs that bar — gaps ranked by value:**
+**Benthyo vs that bar — gaps ranked by value:**
 
 1. **Dive-computer import breadth** (consumer table-stakes). UDDF import
    exists (`dive-log-import`), but Bluetooth/native-computer ingestion is the
@@ -252,7 +252,7 @@ scrape this session):**
 responsibly inside this pass without a live stack; building one half-way would
 violate the brief's "don't start and abandon." They are documented as a
 prioritized roadmap above. The **billing-correctness work (§2,§6) directly
-protects the pricing model** this analysis calls OceanLog's strongest asset —
+protects the pricing model** this analysis calls Benthyo's strongest asset —
 the highest-leverage market-aligned change available here.
 
 ---
@@ -359,7 +359,7 @@ honestly: round 1's database verification was incomplete.
 
 ### Phase 3 — Performance detail
 
-**Stack**: All 46 migrations applied to `supabase_db_oceanlog` (Postgres 17),
+**Stack**: All 46 migrations applied to `supabase_db_benthyo` (Postgres 17),
 Supabase REST/Auth/Storage/Studio health green throughout. Dev data only
 (~200 species, 50 dive sites, 7 operators, 4 users) — no production-scale
 wall-clock numbers.
@@ -498,7 +498,7 @@ healthy, not re-captured here. **No number in this report is invented.**
    All three added to `supabase/tests/ci_auth_bootstrap.sql` idempotently
    (the publication is EMPTY, not FOR ALL TABLES — that rejects ADD TABLE).
    **After the fix: bootstrap clean → all 51 migrations apply clean →
-   seed → rls.sql "✓ All OceanLog RLS tests passed."** This is the first
+   seed → rls.sql "✓ All Benthyo RLS tests passed."** This is the first
    proven-green end-to-end chain. Fix `77e0b32`.
 
 3. **SEAMAP was the previously-fabricated source (round 1 claimed it

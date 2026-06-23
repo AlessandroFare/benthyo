@@ -18,7 +18,7 @@ CREATE OR REPLACE FUNCTION medical_master_key_v2()
 RETURNS TEXT LANGUAGE sql STABLE AS $$
   SELECT COALESCE(
     current_setting('app.medical_master_key', true),
-    'oceanlog-dev-master-key-do-not-use-in-prod'
+    'benthyo-dev-master-key-do-not-use-in-prod'
   )
 $$;
 
@@ -26,7 +26,7 @@ CREATE OR REPLACE FUNCTION medical_key_salt()
 RETURNS TEXT LANGUAGE sql STABLE AS $$
   SELECT COALESCE(
     current_setting('app.medical_key_salt', true),
-    'oceanlog-dev-key-salt-do-not-use-in-prod'
+    'benthyo-dev-key-salt-do-not-use-in-prod'
   )
 $$;
 

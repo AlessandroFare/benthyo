@@ -6,7 +6,7 @@
 --   inside encrypt_medical_answers* / decrypt_medical_answers* via
 --   current_setting('app.medical_master_key', true). When that GUC is
 --   unset the helpers fall back to the hardcoded placeholder
---   'oceanlog-dev-master-key-do-not-use-in-prod' (see migrations 038/040).
+--   'benthyo-dev-master-key-do-not-use-in-prod' (see migrations 038/040).
 --
 --   The API (apps/api/src/medical/medical.service.ts) reads
 --   MEDICAL_ENCRYPTION_MASTER_KEY from the environment but NEVER sets the

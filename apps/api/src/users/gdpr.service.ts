@@ -107,7 +107,7 @@ export class GdprService {
       p_reason: 'gdpr_erasure',
     });
 
-    // 2. iNaturalist observations. OceanLog pushes verified sightings to iNat
+    // 2. iNaturalist observations. Benthyo pushes verified sightings to iNat
     //    via the inaturalist_push_queue (migration 021); the iNat observation
     //    id is recorded on the queue row (status='sent', inat_observation_id
     //    set), NOT on sightings. Deleting iNat-side requires the *user's*

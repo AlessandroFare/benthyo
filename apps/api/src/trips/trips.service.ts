@@ -149,7 +149,7 @@ export class TripsService {
       sites: Array<{ site: { name: string; slug: string } | null }>;
     };
 
-    const uid = `trip-${tripId}@oceanlog.app`;
+    const uid = `trip-${tripId}@benthyo.com`;
     const dtStart = trip.start_date.replace(/-/g, '');
     const dtEnd = trip.end_date.replace(/-/g, '');
     const siteNames = (trip.sites ?? [])
@@ -160,7 +160,7 @@ export class TripsService {
     const lines = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
-      'PRODID:-//OceanLog//Trip Calendar//EN',
+      'PRODID:-//Benthyo//Trip Calendar//EN',
       'CALSCALE:GREGORIAN',
       'METHOD:PUBLISH',
       'BEGIN:VEVENT',

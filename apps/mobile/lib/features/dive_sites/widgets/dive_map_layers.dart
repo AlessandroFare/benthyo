@@ -13,7 +13,7 @@ class DiveMapLayers {
     final preset = MapConfig.basemap(mode);
     return TileLayer(
       urlTemplate: preset.urlTemplate,
-      userAgentPackageName: 'com.oceanlog.mobile',
+      userAgentPackageName: 'com.benthyo.app',
       maxNativeZoom: preset.maxNativeZoom,
       subdomains: preset.subdomains,
       tileProvider: tileProvider,
@@ -25,7 +25,7 @@ class DiveMapLayers {
     final preset = MapConfig.contoursOverlay;
     return TileLayer(
       urlTemplate: preset.urlTemplate,
-      userAgentPackageName: 'com.oceanlog.mobile',
+      userAgentPackageName: 'com.benthyo.app',
       maxNativeZoom: preset.maxNativeZoom,
     );
   }
@@ -35,7 +35,7 @@ class DiveMapLayers {
     final preset = MapConfig.seamarksOverlay;
     return TileLayer(
       urlTemplate: preset.urlTemplate,
-      userAgentPackageName: 'com.oceanlog.mobile',
+      userAgentPackageName: 'com.benthyo.app',
       maxNativeZoom: preset.maxNativeZoom,
     );
   }

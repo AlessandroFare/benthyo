@@ -270,7 +270,7 @@ export function SettingsPage() {
                   <DialogHeader>
                     <DialogTitle>Invite Team Member</DialogTitle>
                     <DialogDescription>
-                      Add an existing OceanLog user by their account ID.
+                      Add an existing Benthyo user by their account ID.
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4">

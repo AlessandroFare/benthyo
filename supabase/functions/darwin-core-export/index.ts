@@ -11,7 +11,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
  *     version used verified_at; they differed).
  *   - Caps the row count at 5000 with a hard server-side LIMIT.
  *   - Only exports sightings whose source IN ('user', 'manual') to avoid
- *     circular GBIF → OceanLog → GBIF propagation.
+ *     circular GBIF → Benthyo → GBIF propagation.
  *   - Returns CSV or JSON based on the format param.
  */
 
@@ -84,7 +84,7 @@ function toDarwinCore(row: SightingExportRow) {
   if (!point || !row.species?.scientific_name) return null;
 
   return {
-    occurrenceID: `https://oceanlog.app/sightings/${row.id}`,
+    occurrenceID: `https://benthyo.com/sightings/${row.id}`,
     basisOfRecord: "HumanObservation",
     occurrenceStatus: "present",
     scientificName: row.species.scientific_name,
@@ -116,11 +116,11 @@ function toDarwinCore(row: SightingExportRow) {
     associatedMedia: row.photo_urls?.length ? row.photo_urls.join("|") : undefined,
     occurrenceRemarks: row.notes ?? undefined,
     license: row.species.image_license ?? "https://creativecommons.org/licenses/by/4.0/",
-    institutionCode: "OCEANLOG",
+    institutionCode: "BENTHYO",
     collectionCode: "SIGHTINGS",
     catalogNumber: row.id,
-    oceanlogSource: row.source,
-    oceanlogExternalId: row.external_id ?? undefined,
+    benthyoSource: row.source,
+    benthyoExternalId: row.external_id ?? undefined,
   };
 }
 
@@ -205,7 +205,7 @@ Deno.serve(async (req) => {
         headers: {
           ...CORS_HEADERS,
           "Content-Type": "text/csv",
-          "Content-Disposition": 'attachment; filename="oceanlog-dwc.csv"',
+          "Content-Disposition": 'attachment; filename="benthyo-dwc.csv"',
         },
       });
     }

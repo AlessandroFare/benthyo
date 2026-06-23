@@ -68,7 +68,7 @@ class MapConfig {
   static bool get usesPmtiles => pmtilesTileUrl.isNotEmpty;
 
   /// FMTC store name for offline basemap tiles.
-  static const tileStoreName = 'oceanlog_dive_tiles';
+  static const tileStoreName = 'benthyo_dive_tiles';
 
   /// Approximate max cached tiles (~15 KB each ≈ 100 MB).
   static const int tileCacheMaxTiles = 6500;
@@ -84,7 +84,7 @@ class MapConfig {
           urlTemplate: tileUrlTemplate,
           maxNativeZoom: usesPmtiles ? 14 : 19,
           attribution: usesPmtiles
-              ? 'OceanLog'
+              ? 'Benthyo'
               : '© OpenStreetMap contributors',
         ),
       DiveMapBasemap.ocean => MapLayerPreset(

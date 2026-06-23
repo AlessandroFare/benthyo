@@ -1,6 +1,6 @@
 {
-    "name": "oceanlog",
-    "short_name": "oceanlog",
+    "name": "benthyo",
+    "short_name": "benthyo",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

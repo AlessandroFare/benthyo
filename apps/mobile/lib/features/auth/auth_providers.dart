@@ -115,7 +115,7 @@ class AuthRepository {
     }
     return const String.fromEnvironment(
       'AUTH_REDIRECT_URL',
-      defaultValue: 'io.oceanlog.app://login-callback',
+      defaultValue: 'io.benthyo.com://login-callback',
     );
   }
 }

@@ -1,8 +1,8 @@
 {
-  "name": "@oceanlog/api",
+  "name": "@benthyo/api",
   "version": "0.1.0",
   "private": true,
-  "description": "OceanLog NestJS API",
+  "description": "Benthyo NestJS API",
   "license": "MIT",
   "scripts": {
     "build": "nest build",

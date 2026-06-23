@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:oceanlog/core/models/species.dart';
-import 'package:oceanlog/features/species/species_providers.dart';
+import 'package:benthyo/core/models/species.dart';
+import 'package:benthyo/features/species/species_providers.dart';
 
 Species _species({
   required String id,

@@ -1,5 +1,5 @@
 /// Supabase client, Riverpod providers, and offline-sync helpers
-/// for the OceanLog mobile app.
+/// for the Benthyo mobile app.
 ///
 /// All features import their Supabase / auth / sync state from this file:
 ///   - `initializeSupabase()`           called once from main()

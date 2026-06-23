@@ -279,11 +279,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const Divider(),
           ListTile(
             leading: const Icon(Icons.info_outline),
-            title: const Text('About OceanLog'),
+            title: const Text('About Benthyo'),
             subtitle: const Text('Version 1.0.0'),
             onTap: () => showAboutDialog(
               context: context,
-              applicationName: 'OceanLog',
+              applicationName: 'Benthyo',
               applicationVersion: '1.0.0',
               applicationLegalese:
                   'B2B-anchored citizen-science platform for scuba diving.\n'
@@ -291,7 +291,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               children: const [
                 SizedBox(height: 12),
                 Text(
-                  'OceanLog lets you log dives, discover sites, and record '
+                  'Benthyo lets you log dives, discover sites, and record '
                   'marine species sightings — data that feeds a GBIF-exportable '
                   'observation layer with contributor attribution.',
                 ),
@@ -361,7 +361,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             children: [
               const Text(
                 'This is permanent. All your dives, sightings, photos, and '
-                'personal data will be removed from OceanLog.',
+                'personal data will be removed from Benthyo.',
               ),
               const SizedBox(height: 12),
               const Text(

@@ -1,4 +1,4 @@
--- OceanLog seed data (idempotent)
+-- Benthyo seed data (idempotent)
 -- 50 Mediterranean dive sites, 200 marine species, 5 Italian operators, 10 badges
 
 BEGIN;
@@ -310,7 +310,7 @@ ON CONFLICT (operator_id, dive_site_id) DO UPDATE SET is_primary = EXCLUDED.is_p
 
 INSERT INTO badges (code, name, description, criteria_type, criteria_value, tier)
 VALUES
-  ('first-dive', 'First Splash', 'Log your first dive in OceanLog', 'dive_count', '{"count":1}'::jsonb, 1),
+  ('first-dive', 'First Splash', 'Log your first dive in Benthyo', 'dive_count', '{"count":1}'::jsonb, 1),
   ('ten-dives', 'Deco Disciple', 'Complete 10 logged dives', 'dive_count', '{"count":10}'::jsonb, 1),
   ('fifty-dives', 'Reef Regular', 'Complete 50 logged dives', 'dive_count', '{"count":50}'::jsonb, 2),
   ('hundred-dives', 'Centurion Diver', 'Complete 100 logged dives', 'dive_count', '{"count":100}'::jsonb, 3),

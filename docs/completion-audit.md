@@ -16,7 +16,7 @@ Generated: 2025-06-13
 | GitHub Actions workflows | ✅ Pass | 8 workflow files |
 | Edge Functions | ✅ Pass | 3 functions in `supabase/functions/` |
 | seed.sql real data | ✅ Pass | 50 Mediterranean sites, 200 species, 5 operators, 10 badges |
-| Shared types coherence | ⚠️ Partial | `@oceanlog/types` + `packages/types/src/{entities,enums,api}.ts`; Flutter models in `core/models/` mirror schema |
+| Shared types coherence | ⚠️ Partial | `@benthyo/types` + `packages/types/src/{entities,enums,api}.ts`; Flutter models in `core/models/` mirror schema |
 | RLS all four ops | ⚠️ Partial | User tables owner-only; species INSERT service-only by design; stats/badge writes via triggers/service role |
 | Dashboard analytics depth data | ✅ Pass | Real data via `operator_depth_histogram` RPC |
 | MapLibre PMTiles on R2 | ✅ Pass | `PMTILES_TILE_URL` dart-define + OSM fallback |

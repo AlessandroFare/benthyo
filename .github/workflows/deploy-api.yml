@@ -21,12 +21,12 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install
-      - run: pnpm --filter @oceanlog/api build
+      - run: pnpm --filter @benthyo/api build
       # Railway: zero-config Node deploy. Set RAILWAY_TOKEN in GitHub Secrets.
       - name: Install Railway CLI
         run: npm i -g @railway/cli
       - name: Deploy to Railway
-        run: railway up --service oceanlog-api
+        run: railway up --service benthyo-api
         working-directory: apps/api
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}

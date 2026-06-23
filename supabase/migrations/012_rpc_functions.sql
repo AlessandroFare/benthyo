@@ -2,7 +2,7 @@
 -- These are RPCs the mobile app and dashboard call via the Supabase
 -- REST interface (`supabase.rpc('function_name', { args })`). They
 -- bypass RLS for SELECT-only reads by virtue of being SECURITY DEFINER
--- and named with the convention oceanlog_public_* so the API surface
+-- and named with the convention benthyo_public_* so the API surface
 -- is obvious.
 
 -- The species seen at a given dive site, with stats.

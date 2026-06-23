@@ -1,6 +1,6 @@
-# OceanLog Mobile
+# Benthyo Mobile
 
-Flutter app for OceanLog — dive logging, species tracking, and site discovery.
+Flutter app for Benthyo — dive logging, species tracking, and site discovery.
 Targets **iOS, Android, and the Web** from a single codebase.
 
 ## Setup

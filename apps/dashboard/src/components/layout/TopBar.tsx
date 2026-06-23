@@ -18,7 +18,7 @@ const pageTitles: Record<string, string> = {
 function getPageTitle(pathname: string): string {
   if (pathname.startsWith("/customers/")) return "Customer Detail";
   if (pathname.startsWith("/species/")) return "Species Detail";
-  return pageTitles[pathname] ?? "OceanLog";
+  return pageTitles[pathname] ?? "Benthyo";
 }
 
 interface TopBarProps {

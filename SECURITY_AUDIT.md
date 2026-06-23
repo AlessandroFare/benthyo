@@ -1,4 +1,4 @@
-# OceanLog — Security Audit & Remediation Log
+# Benthyo — Security Audit & Remediation Log
 
 This document is a living record of every security finding raised during
 the pre-launch audit and the remediation applied.
@@ -73,8 +73,8 @@ and the date of remediation.
   Stripe webhook.
 
 ### C-7 — Production secrets committed to the workspace `.env`
-- **Files:** `oceanlog/.env`, `oceanlog/.gitignore`,
-  `oceanlog/.env.example`, `oceanlog/scripts/sanitize-env.js`
+- **Files:** `benthyo/.env`, `benthyo/.gitignore`,
+  `benthyo/.env.example`, `benthyo/scripts/sanitize-env.js`
 - **Fix:** the real secrets in `.env` were replaced with `__set_me__`
   placeholders via PowerShell. `.gitignore` now explicitly excludes
   `.env`, `.env.local`, and `*.pem`. `.env.example` documents every
@@ -312,18 +312,18 @@ Run the RLS test suite:
 psql $DATABASE_URL -v ON_ERROR_STOP=1 -f supabase/tests/rls.sql
 ```
 
-Expected output: `✓ All OceanLog RLS tests passed.`
+Expected output: `✓ All Benthyo RLS tests passed.`
 
 Run the API unit tests:
 
 ```bash
-pnpm --filter @oceanlog/api test
+pnpm --filter @benthyo/api test
 ```
 
 Run the ETL unit tests:
 
 ```bash
-pnpm --filter @oceanlog/etl test
+pnpm --filter @benthyo/etl test
 ```
 
 Run the Flutter widget + integration tests:

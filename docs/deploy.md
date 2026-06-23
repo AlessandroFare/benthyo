@@ -1,6 +1,6 @@
-# OceanLog — Deploy Guide
+# Benthyo — Deploy Guide
 
-This is the step-by-step recipe for shipping a new release of OceanLog
+This is the step-by-step recipe for shipping a new release of Benthyo
 to production. Read the runbook too — this guide assumes you have
 already rotated the secrets listed in `docs/runbook.md`.
 
@@ -8,10 +8,10 @@ already rotated the secrets listed in `docs/runbook.md`.
 
 - [ ] `git status` is clean on `main`.
 - [ ] All migrations are committed under `supabase/migrations/`.
-- [ ] All ETL scripts have been unit-tested locally with `pnpm --filter @oceanlog/etl test`.
-- [ ] API `pnpm --filter @oceanlog/api test` is green.
+- [ ] All ETL scripts have been unit-tested locally with `pnpm --filter @benthyo/etl test`.
+- [ ] API `pnpm --filter @benthyo/api test` is green.
 - [ ] Flutter `flutter test` is green.
-- [ ] Dashboard `pnpm --filter @oceanlog/dashboard build` is green.
+- [ ] Dashboard `pnpm --filter @benthyo/dashboard build` is green.
 
 ## 1. Supabase (database + edge functions)
 
@@ -78,16 +78,16 @@ railway logs --follow
 
 ```bash
 # 3.1 The dashboard is a Vite SPA. Build it from the dashboard folder.
-pnpm --filter @oceanlog/dashboard build
+pnpm --filter @benthyo/dashboard build
 #    The output goes to apps/dashboard/dist/.
 
 # 3.2 Cloudflare Pages is wired to the GitHub repo; a push to main
 #    triggers a build via the wrangler.toml at the dashboard root.
 #    For a manual deploy:
-pnpm --filter @oceanlog/dashboard exec wrangler pages deploy dist --project-name=oceanlog-dashboard
+pnpm --filter @benthyo/dashboard exec wrangler pages deploy dist --project-name=benthyo-dashboard
 
 # 3.3 Set the dashboard env vars in the Cloudflare Pages dashboard:
-#      VITE_API_URL=https://api.oceanlog.app/api/v1
+#      VITE_API_URL=https://api.benthyo.com/api/v1
 #      VITE_SUPABASE_URL
 #      VITE_SUPABASE_ANON_KEY
 #      VITE_SENTRY_DSN
@@ -102,17 +102,17 @@ pnpm --filter @oceanlog/dashboard exec wrangler pages deploy dist --project-name
 # 4.1 Build the Android App Bundle (Play Store)
 cd apps/mobile
 flutter build appbundle --release \
-  --dart-define=API_URL=https://api.oceanlog.app/api/v1 \
+  --dart-define=API_URL=https://api.benthyo.com/api/v1 \
   --dart-define=SUPABASE_URL=$SUPABASE_URL \
   --dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY
 
 # 4.2 Build the iOS archive (App Store)
 flutter build ipa --release \
-  --dart-define=API_URL=https://api.oceanlog.app/api/v1
+  --dart-define=API_URL=https://api.benthyo.com/api/v1
 
 # 4.3 Build the Web release (Cloudflare Pages)
 flutter build web --release \
-  --dart-define=API_URL=https://api.oceanlog.app/api/v1
+  --dart-define=API_URL=https://api.benthyo.com/api/v1
 #    Output: apps/mobile/build/web/
 
 # 4.4 Tag the release in git.
@@ -124,7 +124,7 @@ git push origin v1.x.y
 
 ```bash
 # 5.1 In the Stripe dashboard, point the webhook to:
-#      https://api.oceanlog.app/api/v1/billing/stripe/webhook
+#      https://api.benthyo.com/api/v1/billing/stripe/webhook
 
 # 5.2 Subscribe to the events:
 #      invoice.paid
@@ -144,16 +144,16 @@ The first time the ETL runs against a fresh database, the order matters:
 
 ```bash
 # 6.1 Taxonomy
-pnpm --filter @oceanlog/etl worms          # ~3 min
-pnpm --filter @oceanlog/etl inat:taxon-lookup   # ~5 min (fills inat_taxon_id)
+pnpm --filter @benthyo/etl worms          # ~3 min
+pnpm --filter @benthyo/etl inat:taxon-lookup   # ~5 min (fills inat_taxon_id)
 
 # 6.2 Dive sites (3 sources in parallel via the run-all-data script)
-pnpm --filter @oceanlog/etl all-data       # ~30 min on first run
+pnpm --filter @benthyo/etl all-data       # ~30 min on first run
 
 # 6.3 Image backfill (heavy)
-pnpm --filter @oceanlog/etl wikimedia:images    # ~1 hour
-pnpm --filter @oceanlog/etl inaturalist:images  # ~30 min
-pnpm --filter @oceanlog/etl tavily:species       # ~10 min
+pnpm --filter @benthyo/etl wikimedia:images    # ~1 hour
+pnpm --filter @benthyo/etl inaturalist:images  # ~30 min
+pnpm --filter @benthyo/etl tavily:species       # ~10 min
 ```
 
 The github workflow at `.github/workflows/etl-all-data.yml` runs
@@ -165,8 +165,8 @@ upserts on `(source, external_id)` for occurrences and on
 
 ```bash
 # 7.1 Health probes (should return 200)
-curl https://api.oceanlog.app/health/live
-curl https://api.oceanlog.app/health/ready
+curl https://api.benthyo.com/health/live
+curl https://api.benthyo.com/health/ready
 
 # 7.2 RLS test suite
 psql $DATABASE_URL -v ON_ERROR_STOP=1 -f supabase/tests/rls.sql

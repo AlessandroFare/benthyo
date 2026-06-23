@@ -1,4 +1,4 @@
-# Regenerates apps/mobile/dart_defines.local.json from oceanlog/.env
+# Regenerates apps/mobile/dart_defines.local.json from benthyo/.env
 # and optionally refreshes keys from `supabase status`.
 param(
   [string]$EnvFile = (Join-Path (Join-Path $PSScriptRoot "..") ".env"),

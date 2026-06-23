@@ -1,5 +1,5 @@
-name: oceanlog
-description: OceanLog mobile dive logbook and species tracker.
+name: benthyo
+description: Benthyo mobile dive logbook and species tracker.
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -40,8 +40,25 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.3
+
+# App icon generation. Run once (and after any logo change) with:
+#   dart run flutter_launcher_icons
+# This regenerates all iOS AppIcon.appiconset entries and Android
+# mipmap-* densities from the brand assets in assets/brand/.
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/brand/icon-1024.png"
+  # Adaptive icon (Android 8+): OS applies its own mask, so the foreground
+  # must keep a ~18% safe-zone margin (already baked into the asset).
+  adaptive_icon_background: "#0F2238"
+  adaptive_icon_foreground: "assets/brand/adaptive-foreground.png"
+  min_sdk_android: 21
+  remove_alpha_ios: true
 
 flutter:
   uses-material-design: true
   assets:
     - assets/models/
+    - assets/brand/

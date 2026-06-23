@@ -17,7 +17,7 @@ import {
  * CC-BY 4.0. The data API returns per-transect species observations
  * that map into our sightings table.
  *
- * Column mapping (RLS → OceanLog):
+ * Column mapping (RLS → Benthyo):
  *   species_name → scientific_name
  *   lat/lon      → dive_site_id (via nearby_dive_sites)
  *   survey_date  → observed_at

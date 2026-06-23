@@ -75,7 +75,7 @@ function SidebarBody({
           <Waves className="h-5 w-5" />
         </div>
         <div className={cn("min-w-0", labelClass)}>
-          <p className="truncate text-sm font-semibold tracking-wide">OceanLog</p>
+          <p className="truncate text-sm font-semibold tracking-wide">Benthyo</p>
           <p className="truncate text-xs text-white/60">Operator</p>
         </div>
       </div>
