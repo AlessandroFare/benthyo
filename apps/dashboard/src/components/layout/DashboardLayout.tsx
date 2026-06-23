@@ -13,11 +13,11 @@ export function DashboardLayout({ user }: DashboardLayoutProps) {
   const location = useLocation();
   return (
     <ToastProvider>
-      <div className="dark flex h-full bg-[#0D1117] text-white">
+      <div className="dark flex h-full bg-background text-foreground">
         <Sidebar />
         <div className="flex flex-1 flex-col overflow-hidden">
           <TopBar user={user} />
-          <main className="flex-1 overflow-y-auto bg-[#0D1117] p-6">
+          <main className="flex-1 overflow-y-auto bg-background p-6">
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
                 key={location.pathname}

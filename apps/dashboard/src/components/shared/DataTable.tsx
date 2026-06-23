@@ -169,11 +169,12 @@ export function DataTable<T extends { id?: Key }>({
     <div className={cn("space-y-3", className)}>
       {searchPlaceholder && (
         <div className="relative w-full sm:max-w-xs">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/40" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder={searchPlaceholder}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            aria-label={searchPlaceholder}
             className="h-9 pl-8 text-sm"
           />
         </div>
@@ -181,25 +182,26 @@ export function DataTable<T extends { id?: Key }>({
 
       {processed.length === 0 ? (
         emptyState ?? (
-          <div className="rounded-lg border border-dashed border-white/10 p-6 text-center text-sm text-white/40">
+          <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
             No data
           </div>
         )
       ) : (
         <Table>
           <TableHeader>
-            <TableRow className="border-white/5 hover:bg-transparent">
+            <TableRow className="border-border hover:bg-transparent">
               {columns.map((c) => {
                 const isSorted = sortKey === c.key && sortDir != null;
                 const align = c.align ?? "left";
                 return (
                   <TableHead
                     key={c.key}
+                    aria-sort={c.sortable ? (isSorted ? (sortDir === "asc" ? "ascending" : "descending") : "none") : undefined}
                     className={cn(
-                      "text-white/45",
+                      "text-muted-foreground",
                       align === "right" && "text-right",
                       align === "center" && "text-center",
-                      c.sortable && "cursor-pointer select-none transition-colors hover:text-white",
+                      c.sortable && "cursor-pointer select-none transition-colors hover:text-foreground",
                       c.className,
                     )}
                     style={c.width ? ({ width: c.width } as CSSProperties) : undefined}
@@ -232,7 +234,7 @@ export function DataTable<T extends { id?: Key }>({
                 initial="hidden"
                 animate="visible"
                 variants={rowVariants}
-                className={cn("border-white/5 transition-colors", rowClassName?.(row))}
+                className={cn("border-border transition-colors", rowClassName?.(row))}
               >
                 {columns.map((c) => {
                   const align = c.align ?? "left";

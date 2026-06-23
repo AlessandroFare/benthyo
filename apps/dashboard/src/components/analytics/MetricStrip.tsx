@@ -19,13 +19,13 @@ export function MetricStrip({ metrics }: MetricStripProps) {
           type="button"
           onClick={metric.onClick}
           className={cn(
-            "rounded-2xl border border-white/5 bg-[#161B22] px-5 py-4 text-left transition-colors",
+            "rounded-2xl border border-border bg-card px-5 py-4 text-left text-card-foreground transition-colors",
             metric.active && "border-ocean-500/50 ring-1 ring-ocean-500/30",
-            metric.onClick && "hover:border-white/10",
+            metric.onClick && "hover:border-ocean-500/40",
           )}
         >
-          <p className="text-sm text-white/45">{metric.label}</p>
-          <p className="mt-2 text-2xl font-semibold text-white">{metric.value}</p>
+          <p className="text-sm text-muted-foreground">{metric.label}</p>
+          <p className="mt-2 text-2xl font-semibold text-foreground">{metric.value}</p>
           {metric.active && (
             <div className="mt-3 h-0.5 rounded-full bg-ocean-500" />
           )}

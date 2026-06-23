@@ -107,7 +107,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 exit={{ opacity: 0, x: 32, scale: 0.96 }}
                 transition={{ type: "spring", stiffness: 320, damping: 26 }}
                 className={cn(
-                  "pointer-events-auto relative flex items-start gap-3 rounded-lg border bg-[#161B22]/95 p-3 pr-8 text-white shadow-lg backdrop-blur",
+                  "pointer-events-auto relative flex items-start gap-3 rounded-lg border bg-popover/95 p-3 pr-8 text-popover-foreground shadow-lg backdrop-blur",
                   VARIANT_BORDER[t.variant],
                 )}
                 role="status"
@@ -116,12 +116,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium leading-snug">{t.title}</p>
                   {t.description && (
-                    <p className="mt-0.5 text-xs text-white/55">{t.description}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{t.description}</p>
                   )}
                 </div>
                 <button
                   onClick={() => dismiss(t.id)}
-                  className="absolute right-1.5 top-1.5 rounded p-1 text-white/40 transition-colors hover:bg-white/5 hover:text-white"
+                  className="absolute right-1.5 top-1.5 rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                   aria-label="Dismiss"
                 >
                   <X className="h-3.5 w-3.5" />

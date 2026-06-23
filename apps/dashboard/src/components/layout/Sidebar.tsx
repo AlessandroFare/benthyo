@@ -58,14 +58,14 @@ export function Sidebar() {
   const { data: operator } = useOperator();
 
   return (
-    <aside className="flex h-full w-[76px] flex-col border-r border-white/5 bg-[#0A2342] text-white xl:w-64">
+    <aside className="flex h-full w-[76px] flex-col border-r border-white/10 bg-[#0A2342] text-white xl:w-64">
       <div className="flex h-16 items-center justify-center border-b border-white/10 px-3 xl:justify-start xl:gap-3 xl:px-5">
         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-ocean-500 shadow-lg shadow-ocean-500/20">
           <Waves className="h-5 w-5" />
         </div>
         <div className="hidden min-w-0 xl:block">
           <p className="truncate text-sm font-semibold tracking-wide">OceanLog</p>
-          <p className="truncate text-xs text-white/50">Operator</p>
+          <p className="truncate text-xs text-white/60">Operator</p>
         </div>
       </div>
 
@@ -73,7 +73,7 @@ export function Sidebar() {
         {navGroups.map((group, gi) => (
           <div key={group.heading ?? `group-${gi}`} className="flex flex-col gap-1">
             {group.heading && (
-              <p className="mt-3 hidden px-3 text-[10px] font-semibold uppercase tracking-wider text-white/35 xl:block">
+              <p className="mt-3 hidden px-3 text-[10px] font-semibold uppercase tracking-wider text-white/60 xl:block">
                 {group.heading}
               </p>
             )}
@@ -88,7 +88,7 @@ export function Sidebar() {
                     "flex items-center justify-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-colors xl:justify-start",
                     isActive
                       ? "bg-white/10 text-white shadow-inner"
-                      : "text-white/55 hover:bg-white/5 hover:text-white",
+                      : "text-white/70 hover:bg-white/5 hover:text-white",
                   )
                 }
               >
@@ -107,7 +107,7 @@ export function Sidebar() {
             <p className="truncate text-xs font-medium">
               {operator?.name ?? "Dive Center"}
             </p>
-            <p className="truncate text-xs text-white/45">B2B Portal</p>
+            <p className="truncate text-xs text-white/60">B2B Portal</p>
           </div>
         </div>
       </div>

@@ -74,11 +74,11 @@ export function KpiCard({
       onClick={onClick}
       className={cn(onClick && "cursor-pointer")}
     >
-      <Card className="border-white/5 bg-[#161B22] text-white">
+      <Card className="border-border bg-card text-card-foreground">
         <CardContent className="p-5">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <div className="text-xs font-medium uppercase tracking-wider text-white/45">
+              <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 {label}
               </div>
               <div className="mt-1.5 flex items-baseline gap-2">
@@ -113,7 +113,7 @@ export function KpiCard({
                 )}
               </div>
               {sub && (
-                <div className="mt-1 text-xs text-white/45">{sub}</div>
+                <div className="mt-1 text-xs text-muted-foreground">{sub}</div>
               )}
             </div>
             <div

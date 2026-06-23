@@ -119,8 +119,8 @@ export function DashboardPage() {
     <AnimatedPage>
       <AnimatedItem className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-white">Dashboard</h1>
-          <p className="text-sm text-white/45">
+          <h1 className="text-2xl font-semibold text-foreground">Dashboard</h1>
+          <p className="text-sm text-muted-foreground">
             Overview of your dive operation performance
           </p>
         </div>
@@ -149,10 +149,10 @@ export function DashboardPage() {
 
       <AnimatedItem>
         <div className="grid gap-6 lg:grid-cols-2">
-          <Card className="border-white/5 bg-[#161B22] text-white">
+          <Card className="border-border bg-card text-foreground">
             <CardHeader>
-              <CardTitle className="text-white">Sightings Trend</CardTitle>
-              <CardDescription className="text-white/45">
+              <CardTitle className="text-foreground">Sightings Trend</CardTitle>
+              <CardDescription className="text-muted-foreground">
                 Monthly sightings over time
               </CardDescription>
             </CardHeader>
@@ -174,7 +174,7 @@ export function DashboardPage() {
                     <YAxis tick={{ fontSize: 12, fill: "rgba(255,255,255,0.45)" }} />
                     <Tooltip
                       contentStyle={{
-                        backgroundColor: "#161B22",
+                        backgroundColor: "hsl(213 22% 12%)",
                         border: "1px solid rgba(255,255,255,0.08)",
                         borderRadius: 12,
                       }}
@@ -193,10 +193,10 @@ export function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-white/5 bg-[#161B22] text-white">
+          <Card className="border-border bg-card text-foreground">
             <CardHeader>
-              <CardTitle className="text-white">Dives by Site</CardTitle>
-              <CardDescription className="text-white/45">
+              <CardTitle className="text-foreground">Dives by Site</CardTitle>
+              <CardDescription className="text-muted-foreground">
                 Top performing dive sites
               </CardDescription>
             </CardHeader>
@@ -218,7 +218,7 @@ export function DashboardPage() {
                     <YAxis tick={{ fontSize: 12, fill: "rgba(255,255,255,0.45)" }} />
                     <Tooltip
                       contentStyle={{
-                        backgroundColor: "#161B22",
+                        backgroundColor: "hsl(213 22% 12%)",
                         border: "1px solid rgba(255,255,255,0.08)",
                         borderRadius: 12,
                       }}
@@ -240,10 +240,10 @@ export function DashboardPage() {
       </AnimatedItem>
 
       <AnimatedItem>
-        <Card className="border-white/5 bg-[#161B22] text-white">
+        <Card className="border-border bg-card text-foreground">
           <CardHeader>
-            <CardTitle className="text-white">Recent Activity</CardTitle>
-            <CardDescription className="text-white/45">
+            <CardTitle className="text-foreground">Recent Activity</CardTitle>
+            <CardDescription className="text-muted-foreground">
               Latest events across your operation
             </CardDescription>
           </CardHeader>
@@ -265,11 +265,11 @@ export function DashboardPage() {
             ) : (
               <Table>
                 <TableHeader>
-                  <TableRow className="border-white/5 hover:bg-transparent">
-                    <TableHead className="text-white/45">Type</TableHead>
-                    <TableHead className="text-white/45">Event</TableHead>
-                    <TableHead className="text-white/45">Details</TableHead>
-                    <TableHead className="text-right text-white/45">When</TableHead>
+                  <TableRow className="border-border hover:bg-transparent">
+                    <TableHead className="text-muted-foreground">Type</TableHead>
+                    <TableHead className="text-muted-foreground">Event</TableHead>
+                    <TableHead className="text-muted-foreground">Details</TableHead>
+                    <TableHead className="text-right text-muted-foreground">When</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -279,16 +279,16 @@ export function DashboardPage() {
                       initial={{ opacity: 0, y: 4 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: i * 0.03, duration: 0.22, ease: "easeOut" }}
-                      className="border-white/5"
+                      className="border-border"
                     >
                       <TableCell>
-                        <Badge variant="secondary" className="bg-white/10 text-white">
+                        <Badge variant="secondary" className="bg-white/10 text-foreground">
                           {activityTypeLabels[item.type] ?? item.type}
                         </Badge>
                       </TableCell>
-                      <TableCell className="font-medium text-white">{item.title}</TableCell>
-                      <TableCell className="text-white/45">{item.description}</TableCell>
-                      <TableCell className="text-right text-white/45">
+                      <TableCell className="font-medium text-foreground">{item.title}</TableCell>
+                      <TableCell className="text-muted-foreground">{item.description}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">
                         {formatDateTime(item.occurred_at)}
                       </TableCell>
                     </motion.tr>

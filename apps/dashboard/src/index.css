@@ -25,6 +25,42 @@
     --ring: 201 96% 32%;
     --radius: 0.5rem;
   }
+
+  /*
+   * Dark theme tokens. The dashboard layout renders with `class="dark"` so
+   * every shadcn/ui component (Card, Badge, Button, Input, ...) that uses
+   * `bg-card` / `text-foreground` / `text-muted-foreground` etc. resolves to
+   * these values. Without this block those utilities fell back to the light
+   * `:root` tokens, producing white cards + light-gray text on the dark
+   * layout background — i.e. the contrast bugs found in the polish pass
+   * (invisible "0 total customers" on Customers.tsx, broken tables on
+   * Today/Corrections/Settings, etc.).
+   *
+   * Palette aligns with the values previously hardcoded across the dark
+   * pages (bg #0D1117, surface #161B22, border #30363D, subtext ~white/70
+   * and white/60), so token-based and hardcoded pages now look identical.
+   */
+  .dark {
+    --background: 215 28% 7%;          /* #0D1117 */
+    --foreground: 210 40% 98%;          /* near-white */
+    --card: 213 22% 12%;                /* #161B22 */
+    --card-foreground: 210 40% 98%;
+    --popover: 213 22% 12%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 201 96% 42%;             /* ocean blue, brighter on dark */
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 215 28% 17%;           /* #21262D */
+    --secondary-foreground: 210 40% 98%;
+    --muted: 215 28% 17%;
+    --muted-foreground: 215 14% 65%;    /* ~#8B949E, 5.6:1 on card — passes AA */
+    --accent: 215 28% 20%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 72% 51%;           /* darker red for dark bg */
+    --destructive-foreground: 210 40% 98%;
+    --border: 215 14% 22%;              /* #30363D */
+    --input: 215 14% 22%;
+    --ring: 201 96% 42%;
+  }
 }
 
 @layer base {

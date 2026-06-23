@@ -22,7 +22,7 @@ const TONE_STYLES: Record<StatusTone, { dot: string; bg: string; text: string }>
   warning: { dot: "bg-amber-400",   bg: "bg-amber-500/10",   text: "text-amber-300" },
   error:   { dot: "bg-rose-400",    bg: "bg-rose-500/10",    text: "text-rose-300" },
   info:    { dot: "bg-sky-400",     bg: "bg-sky-500/10",     text: "text-sky-300" },
-  neutral: { dot: "bg-white/50",    bg: "bg-white/5",        text: "text-white/65" },
+  neutral: { dot: "bg-muted-foreground/60", bg: "bg-muted", text: "text-muted-foreground" },
 };
 
 export function StatusPill({ tone = "neutral", children, pulse = true, className }: StatusPillProps) {

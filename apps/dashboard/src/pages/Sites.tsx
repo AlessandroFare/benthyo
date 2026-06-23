@@ -79,7 +79,7 @@ export function SitesPage() {
       header: "Name",
       cell: (s) => (
         <div className="flex items-center gap-2">
-          <span className="font-medium text-white">{s.name}</span>
+          <span className="font-medium text-foreground">{s.name}</span>
           {s.is_primary && (
             <Badge variant="warning" className="gap-1">
               <Star className="h-3 w-3" />
@@ -123,7 +123,7 @@ export function SitesPage() {
     {
       key: "added_at",
       header: "Added",
-      cell: (s) => <span className="text-white/55">{formatDate(s.added_at)}</span>,
+      cell: (s) => <span className="text-foreground/55">{formatDate(s.added_at)}</span>,
       sortable: true,
       sortValue: (s) => s.added_at,
     },
@@ -152,8 +152,8 @@ export function SitesPage() {
     <AnimatedPage>
       <AnimatedItem className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-white">Operator Dive Sites</h2>
-          <p className="text-sm text-white/45">
+          <h2 className="text-lg font-semibold text-foreground">Operator Dive Sites</h2>
+          <p className="text-sm text-muted-foreground">
             Manage the dive sites linked to your operation
           </p>
         </div>
