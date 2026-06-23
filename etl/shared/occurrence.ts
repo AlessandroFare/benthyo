@@ -87,7 +87,7 @@ export async function assertSystemUserExists(
   }
   if (!data) {
     throw new Error(
-      `ETL_SYSTEM_USER_ID (${systemUserId}) does not exist in public.users — ` +
+      'ETL_SYSTEM_USER_ID does not exist in public.users — ' +
         'seed a system user (see scripts/seed-etl-system-user.sql) before running occurrence imports',
     );
   }
