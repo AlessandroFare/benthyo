@@ -31,54 +31,63 @@ class AsyncValueWidget<T> extends StatelessWidget {
           ),
       error: (err, stack) =>
           error?.call(err, stack) ??
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.error_outline,
-                    size: 48,
-                    color: AppColors.error,
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  Text(
-                    'Something went wrong',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    err.toString(),
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                  ),
-                ],
+          Semantics(
+            // Announced as an alert so TalkBack/VoiceOver reads the error
+            // immediately when it appears.
+            liveRegion: true,
+            label: 'Something went wrong: ${err.toString()}',
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.error_outline,
+                      size: 48,
+                      color: AppColors.error,
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    Text(
+                      'Something went wrong',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      err.toString(),
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
       data: (d) {
         if (isEmpty != null && isEmpty!(d)) {
           return empty ??
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.lg),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.inbox_outlined,
-                        size: 48,
-                        color: Theme.of(context).colorScheme.outline,
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      Text(
-                        'Nothing here yet',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                    ],
+              Semantics(
+                label: 'Nothing here yet',
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.lg),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.inbox_outlined,
+                          size: 48,
+                          color: Theme.of(context).colorScheme.outline,
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        Text(
+                          'Nothing here yet',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               );

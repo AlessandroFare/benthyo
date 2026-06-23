@@ -390,19 +390,25 @@ class _AnimatedConfidenceChipState extends State<AnimatedConfidenceChip>
   Widget build(BuildContext context) {
     return ScaleTransition(
       scale: _scale,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          color: widget.color.withValues(alpha: 0.18),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: widget.color.withValues(alpha: 0.45)),
-        ),
-        child: Text(
-          widget.label,
-          style: TextStyle(
-            color: widget.color,
-            fontWeight: FontWeight.w600,
-            fontSize: 11.5,
+      child: Semantics(
+        // The chip only shows a colored pill with a short word ("High",
+        // "Medium", "Low"); without this the colour meaning is invisible
+        // to screen-reader users.
+        label: '${widget.label} confidence',
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: widget.color.withValues(alpha: 0.18),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: widget.color.withValues(alpha: 0.45)),
+          ),
+          child: Text(
+            widget.label,
+            style: TextStyle(
+              color: widget.color,
+              fontWeight: FontWeight.w600,
+              fontSize: 11.5,
+            ),
           ),
         ),
       ),
