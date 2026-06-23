@@ -15,7 +15,7 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { Store } from "lucide-react";
 
 export function MarketplacePage() {
-  const { data, isLoading } = useOperatorMarketplace();
+  const { data, isLoading, isError, refetch } = useOperatorMarketplace();
   const createListing = useCreateMarketplaceListing();
   const updateListing = useUpdateMarketplaceListing();
 
@@ -103,7 +103,15 @@ export function MarketplacePage() {
       </AnimatedItem>
 
       <AnimatedItem>
-      {!data?.length ? (
+      {isError ? (
+        <EmptyState
+          icon={Store}
+          title="Couldn’t load listings"
+          description="There was a problem fetching your marketplace listings."
+          actionLabel="Retry"
+          onAction={() => refetch()}
+        />
+      ) : !data?.length ? (
         <EmptyState
           icon={Store}
           title="No listings"

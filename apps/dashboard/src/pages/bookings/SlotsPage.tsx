@@ -34,7 +34,7 @@ export function SlotsPage() {
   const [capacity, setCapacity] = useState('8');
   const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
 
-  const { data: slots, isLoading } = useQuery({
+  const { data: slots, isLoading, isError, refetch } = useQuery({
     queryKey: ['operator-slots'],
     queryFn: async () => {
       const token = (await supabase.auth.getSession()).data.session?.access_token;
@@ -94,6 +94,17 @@ export function SlotsPage() {
   });
 
   if (isLoading) return <PageSkeleton />;
+  if (isError) {
+    return (
+      <EmptyState
+        icon={Calendar}
+        title="Couldn’t load booking slots"
+        description="There was a problem fetching your published slots."
+        actionLabel="Retry"
+        onAction={() => refetch()}
+      />
+    );
+  }
 
   return (
     <AnimatedPage>

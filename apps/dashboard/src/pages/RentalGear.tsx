@@ -10,7 +10,7 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { Package } from "lucide-react";
 
 export function RentalGearPage() {
-  const { data, isLoading } = useRentalGear();
+  const { data, isLoading, isError, refetch } = useRentalGear();
   const createGear = useCreateRentalGear();
   const checkin = useCheckinRentalGear();
   const [label, setLabel] = useState("");
@@ -59,7 +59,15 @@ export function RentalGearPage() {
       </AnimatedItem>
 
       <AnimatedItem>
-      {!data?.length ? (
+      {isError ? (
+        <EmptyState
+          icon={Package}
+          title="Couldn’t load rental gear"
+          description="There was a problem fetching your rental inventory."
+          actionLabel="Retry"
+          onAction={() => refetch()}
+        />
+      ) : !data?.length ? (
         <EmptyState
           icon={Package}
           title="No rental gear"
