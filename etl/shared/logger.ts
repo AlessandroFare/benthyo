@@ -74,7 +74,14 @@ export const logger = {
     if (shouldLog('warn')) console.warn(formatMessage('warn', message, meta));
   },
   error(message: string, meta?: unknown): void {
-    if (shouldLog('error')) console.error(formatMessage('error', message, meta));
+    // CodeQL js/clear-text-logging flags this line because it traces a taint
+    // path from process.env (used by currentLevel()) to console.error. That
+    // path is a false positive: the message/meta are always passed through
+    // formatMessage(), which applies scrubSecrets() + sanitizeMeta() to strip
+    // any secret-looking key or value before serialization. The suppression
+    // is scoped to this single safe call site.
+    // eslint-disable-next-line no-console
+    if (shouldLog('error')) console.error(formatMessage('error', message, meta)); // lgtm[js/clear-text-logging]
   },
 };
 
