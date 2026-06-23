@@ -67,3 +67,7 @@ etl/tiles/
 
 # Generated docs
 docs/_generated/
+
+# Local verification artifacts — screenshots, tokens, perf captures,
+# temp SQL. All scratch, never commit (may hold local dev tokens).
+.verify/
