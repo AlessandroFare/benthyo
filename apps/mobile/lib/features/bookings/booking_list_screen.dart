@@ -19,7 +19,9 @@ final myBookingsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) asyn
     Uri.parse('${ApiConfig.baseUrl}/bookings'),
     headers: {'Authorization': 'Bearer $token'},
   );
-  if (res.statusCode != 200) return [];
+  if (res.statusCode != 200) {
+    throw Exception('Failed to load bookings (${res.statusCode})');
+  }
   final body = jsonDecode(res.body) as Map<String, dynamic>?;
   final list = body?['data'] as List<dynamic>? ?? [];
   return list.cast<Map<String, dynamic>>();

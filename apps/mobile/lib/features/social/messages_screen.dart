@@ -21,7 +21,9 @@ final conversationsProvider =
     Uri.parse('${ApiConfig.baseUrl}/conversations'),
     headers: {'Authorization': 'Bearer $token'},
   );
-  if (res.statusCode != 200) return [];
+  if (res.statusCode != 200) {
+    throw Exception('Failed to load conversations (${res.statusCode})');
+  }
   final body = jsonDecode(res.body);
   return body is List
       ? body.cast<Map<String, dynamic>>()

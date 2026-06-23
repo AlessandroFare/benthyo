@@ -36,7 +36,9 @@ final gearServiceDueProvider = FutureProvider<List<GearItem>>((ref) async {
     Uri.parse('${ApiConfig.baseUrl}/gear/service-due'),
     headers: {'Authorization': 'Bearer $token'},
   );
-  if (res.statusCode != 200) return [];
+  if (res.statusCode != 200) {
+    throw Exception('Failed to load service-due gear (${res.statusCode})');
+  }
   final body = jsonDecode(res.body);
   final list = body is List ? body : (body['data'] as List<dynamic>? ?? []);
   return list

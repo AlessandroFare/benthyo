@@ -23,7 +23,9 @@ final availableSlotsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) 
     Uri.parse('${ApiConfig.baseUrl}/public/slots?from_date=$today'),
     headers: headers,
   );
-  if (res.statusCode != 200) return [];
+  if (res.statusCode != 200) {
+    throw Exception('Failed to load slots (${res.statusCode})');
+  }
   final body = jsonDecode(res.body) as Map<String, dynamic>?;
   final list = body?['data'] as List<dynamic>? ?? (body != null ? [body] : []);
   return list.cast<Map<String, dynamic>>();

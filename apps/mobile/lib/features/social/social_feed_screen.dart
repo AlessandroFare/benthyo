@@ -14,7 +14,9 @@ import '../../core/widgets/async_value_widget.dart';
 
 final socialFeedProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final res = await http.get(Uri.parse('${ApiConfig.baseUrl}/feed?limit=40'));
-  if (res.statusCode != 200) return [];
+  if (res.statusCode != 200) {
+    throw Exception('Failed to load feed (${res.statusCode})');
+  }
   final body = jsonDecode(res.body);
   return body is List
       ? body.cast<Map<String, dynamic>>()
