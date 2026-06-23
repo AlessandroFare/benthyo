@@ -619,3 +619,127 @@ capturable until the build is fixed. This is the one remaining honest gap.
 - API jest: **33/33** (incl. the gdpr.service iNat-table fix spec)
 - ETL vitest: **21/21**
 - db reset: 51 migrations clean
+
+---
+
+## Session 6 — Visual polish pass (2026-06-23, 8 commits on `production-pass`)
+
+Scope was **purely visual/UX** — contrast fixes, animation consistency,
+error/empty states, mobile responsiveness, accessibility, affordances.
+No security/ETL/billing/migration re-verification (all confirmed in
+prior sessions). i18n deferred as before.
+
+### Part 1 — Contrast / visibility bugs fixed
+
+Root cause: the dashboard renders with `class="dark"` on its layout,
+but there was **no `.dark` CSS variable block** in `index.css`. So
+every shadcn component using `bg-card` / `text-muted-foreground` /
+`border-border` fell back to the light `:root` tokens — producing
+white cards + near-invisible gray text on the dark background, and
+hardcoded color values scattered across pages that drifted from the
+intended palette.
+
+- **Added `.dark` token block** to `index.css` (bg `#0D1117`, surface
+  `#161B22`, border `#30363D`, muted-foreground `#8B949E` @ 5.6:1 on
+  card — passes WCAG AA). Palette aligns with the values previously
+  hardcoded across dark pages, so token-based and hardcoded pages now
+  look identical.
+- **Replaced hardcoded colors with theme tokens** across layout
+  (DashboardLayout, Sidebar, TopBar), shared components (DataTable,
+  ShimmerButton, StatusPill, Toast, KpiCard, MetricStrip), and pages
+  (Dashboard, Analytics, Sites, Species). Removed every
+  `text-white/45`, `bg-[#161B22]`, `bg-[#0D1117]`, `border-white/5`.
+- **Today.tsx** had a separate family of bugs: `TripCard` used
+  `bg-white` / `border-slate-200` / `text-slate-900` (light-mode-only
+  colors) inside the dark layout → low-contrast/invisible text.
+  Rewrote to use `Card` + `bg-card` + `text-foreground`; status badges
+  now use dark-safe translucent colors (`bg-sky-500/10 text-sky-300`).
+
+### Part 2 — Visual polish, screen by screen
+
+- **Empty states**: Marketplace + RentalGear already had `EmptyState`
+  (confirmed present, not blank). The earlier audit note ("silently
+  show blank") was actually the **swallowed-error** bug, not missing
+  empty states — fixed below.
+- **Error states**:
+  - Dashboard: Marketplace, RentalGear, SlotsPage all had query hooks
+    that throw on HTTP failure, but the pages never read `isError` →
+    a failed fetch rendered as an empty list. Each now shows a real
+    error `EmptyState` (icon + message + Retry).
+  - Mobile: 8 FutureProviders did `if (statusCode != 200) return []`,
+    turning every server/network failure into an indistinguishable
+    empty list. Now they **throw**, so Riverpod surfaces
+    `AsyncValue.error` and the existing `AsyncValueWidget` renders its
+    error UI. Affected: myBookings, availableSlots,
+    conservationAlerts, bleDevices, gearServiceDue,
+    marketplaceListings, conversations, socialFeed. (Auth-null
+    `return []` guards kept — not-signed-in is a legit empty, not an
+    error.)
+- **Mobile dashboard responsiveness**: the dashboard had no nav toggle
+  on phones — the 76px icon rail ate 20% of a 375px screen. Added a
+  hamburger in TopBar (below `sm`) opening a full-width labeled drawer
+  with backdrop overlay. Desktop rail unchanged. Content padding
+  scales (`p-4 sm:p-6`). Table wrapper already had `overflow-auto`.
+- **Accessibility**:
+  - Dashboard: `aria-label` on DataTable search input, `aria-sort` on
+    sortable headers (earlier commit). Icon-only buttons (TopBar bell,
+    new hamburger, Sites trash) all have aria-labels.
+  - Mobile: had **zero Semantics widgets**. Added:
+    `AnimatedFab` (button semantics + label), `AsyncValueWidget`
+    (error = live region, empty = label),
+    `AnimatedConfidenceChip` ("High confidence" not bare word),
+    `DiveProfileChart` (CustomPaint summarised as max/avg depth +
+    duration for screen readers).
+
+### Part 3 — Animation / micro-interactions
+
+- **Extended the existing Framer Motion `AnimatedPage`/`AnimatedItem`
+  pattern** (previously only on Dashboard, Sites, Species — 3/11
+  pages) to all remaining pages: Analytics, Today, Customers,
+  CustomerDetail, Corrections, Marketplace, RentalGear, SlotsPage,
+  SpeciesDetail, Settings. Consistent fade + staggered slide-up
+  everywhere, using the established variants — no new patterns
+  invented.
+- **Hover affordance** on interactive listing cards (Marketplace,
+  RentalGear, SlotsPage, Corrections): `transition-all +
+  hover:shadow-md + hover:border-ocean-500/40`, matching the existing
+  KpiCard `whileHover` lift.
+
+### Part 4 — i18n scope check
+
+No new strings buried in complex JSX interpolation. All new text is
+plain literals inside `EmptyState` props or throw messages — trivial
+to extract in a future i18n pass. i18n itself correctly deferred.
+
+### Performance re-check (post-animation)
+
+- Production build succeeds, **37 chunks**, no new dependencies added.
+  Largest unchanged: Recharts `vendor-charts` 436KB / 117KB gzip.
+  Total bundle flat vs the ~430KB-gzipped baseline — the animation
+  additions are pure `motion.div` wrappers reusing existing
+  `AnimatedPage` variants, zero new runtime cost.
+- Dashboard `tsc --noEmit` clean; mobile `flutter analyze` clean (no
+  new issues, only pre-existing infos/warnings); **flutter test 26/26
+  pass**.
+- Fresh after-screenshots captured for all 11 pages
+  (`.verify/screenshots/after/`, timestamped Jun 23 14:19).
+
+### Commits this session
+```
+352993b fix(dashboard): replace hardcoded colors with theme tokens for contrast
+281ff01 fix(dashboard): Today page — replace hardcoded slate colors with theme tokens
+756aea0 feat(dashboard): wrap all pages in AnimatedPage for consistent transitions
+6e88e7b fix(dashboard): surface HTTP errors instead of silently showing empty lists
+2a052e4 fix(mobile): surface HTTP errors instead of silently returning empty lists
+22a5ee3 feat(dashboard): mobile hamburger sidebar below 640px
+3b55bdf feat(mobile): add Semantics to FAB, async states, confidence chip, dive profile
+fcf5b29 feat(dashboard): hover affordance on interactive listing cards
+```
+
+### Honest gaps (unchanged from prior sessions)
+- **Mobile web boot crash** — Flutter web still crashes before first
+  paint; mobile screenshots remain blocked by this (pre-existing, not
+  introduced here).
+- **i18n** — multi-week gap, correctly deferred.
+- None of the above are regressions from this visual pass.
+
