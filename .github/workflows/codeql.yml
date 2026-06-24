@@ -52,6 +52,7 @@ jobs:
           languages: ${{ matrix.language }}
           # security-and-quality adds best-practice rules on top of security.
           queries: security-and-quality
+          config-file: .github/codeql-config.yml
 
       - name: Autobuild
         uses: github/codeql-action/autobuild@v4

@@ -7,7 +7,6 @@ import {
   normalizeCountryCode,
   normalizeDifficulty,
   normalizeSiteType,
-  slugify,
   uniqueSlug,
   type DiveSiteRow,
 } from '../shared/dive-site-utils';

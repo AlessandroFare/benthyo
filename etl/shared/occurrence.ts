@@ -44,7 +44,7 @@ export function normalizeObservedAt(raw: unknown): string | null {
     return null;
   }
 
-  if (!date || !isValidDate(date)) return null;
+  if (!isValidDate(date)) return null;
   const year = date.getUTCFullYear();
   // Reject implausible years (data glitches that Postgres would reject anyway).
   if (year < 1700 || year > 2100) return null;

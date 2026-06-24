@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { createHash } from 'crypto';
-import { logger, logJobSummary } from '../shared/logger';
+import { logger } from '../shared/logger';
 import { getSupabase } from '../shared/supabase';
 
 /**

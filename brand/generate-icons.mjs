@@ -40,7 +40,6 @@ const RAW = join(__dirname, 'raw');
 const GEN = join(__dirname, 'generated');
 
 const MASTER_SVG = join(RAW, 'logo-master.svg');
-const BG_NAVY = '#0F2238';
 
 // ──────────────────────────────────────────────────────────────────────────
 // Ensure sharp is available. Install it on the fly if missing (see ensureSharp),

@@ -1,0 +1,12 @@
+name: Benthyo CodeQL Config
+
+# Exclude third-party bundles and generated code from analysis.
+paths-ignore:
+  - '**/node_modules/**'
+  - '**/generated/**'
+  - '**/*.bundle.js'
+  - '**/vendor/**'
+  - '**/.icon-tools/**'
+  - '**/build/**'
+  - '**/.dart_tool/**'
+  - '**/pnpm-lock.yaml'

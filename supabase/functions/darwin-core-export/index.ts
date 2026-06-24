@@ -66,7 +66,7 @@ function isAuthorizedCron(req: Request): boolean {
 
 function parsePoint(location: unknown): { lat: number; lng: number } | null {
   if (!location) return null;
-  if (typeof location === "object" && location !== null && "coordinates" in location) {
+  if (typeof location === "object" && "coordinates" in location) {
     const coords = (location as { coordinates: number[] }).coordinates;
     if (Array.isArray(coords) && coords.length >= 2) {
       return { lng: coords[0], lat: coords[1] };
