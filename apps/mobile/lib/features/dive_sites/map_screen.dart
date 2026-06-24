@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -9,7 +11,7 @@ import '../../core/config/map_config.dart';
 import '../../core/map/dive_map_tile_cache.dart';
 import '../../core/models/dive_site.dart';
 import '../../core/models/dive_site_filters.dart';
-import '../../core/models/enums.dart';
+
 import '../../core/models/species.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/async_value_widget.dart';
@@ -45,7 +47,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   final _mapController = MapController();
   final _searchController = TextEditingController();
   String _query = '';
-  SiteType? _typeFilter;
   DiveSite? _selectedSite;
   DiveMapBasemap _basemap = DiveMapBasemap.ocean;
   bool _showContours = true;
@@ -173,7 +174,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         } else {
           setState(() => _showSpeciesHeatmap = value);
         }
-        _persistLayerPrefs();
+        unawaited(_persistLayerPrefs());
       },
       onOfflineCacheChanged: (value) {
         setState(() => _offlineCache = value);
@@ -186,7 +187,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           _heatmapSpecies = picked;
           _showSpeciesHeatmap = true;
         });
-        _persistLayerPrefs();
+        unawaited(_persistLayerPrefs());
       },
     );
   }
@@ -410,7 +411,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                                   const Spacer(),
                                   AnimatedRotation(
                                     duration: const Duration(
-                                        milliseconds: 220),
+                                        milliseconds: 220,),
                                     turns: filters.activeCount > 0 ? 0.25 : 0,
                                     child: const Icon(Icons.chevron_right),
                                   ),
@@ -543,109 +544,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         ],
       ),
       bottomNavigationBar: const MainNavigationBar(currentIndex: 0),
-    );
-  }
-}
-
-class _MapMarker extends ConsumerWidget {
-  const _MapMarker({
-    required this.site,
-    required this.selected,
-  });
-
-  final DiveSite site;
-  final bool selected;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final color = SitePreviewSheet.markerColor(site.siteType);
-    final conditionsAsync = ref.watch(siteConditionsProvider(site.id));
-    final current = conditionsAsync.maybeWhen(
-      data: (c) => c.typicalCurrent,
-      orElse: () => null,
-    );
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (current != null && current != CurrentStrength.none)
-          Icon(
-            _currentIcon(current),
-            size: 16,
-            color: selected ? Colors.amber : Colors.white,
-          ),
-        Container(
-          width: selected ? 48 : 44,
-          height: selected ? 48 : 44,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: selected ? Colors.amber : Colors.white,
-              width: selected ? 3 : 2,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: color.withValues(alpha: 0.45),
-                blurRadius: selected ? 14 : 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Icon(
-            switch (site.siteType) {
-              SiteType.wreck => Icons.directions_boat,
-              SiteType.cave => Icons.landscape,
-              SiteType.wall => Icons.water,
-              _ => Icons.scuba_diving,
-            },
-            color: Colors.white,
-            size: 20,
-          ),
-        ),
-      ],
-    );
-  }
-
-  IconData _currentIcon(CurrentStrength strength) {
-    return switch (strength) {
-      CurrentStrength.light => Icons.arrow_forward,
-      CurrentStrength.moderate => Icons.double_arrow,
-      CurrentStrength.strong => Icons.swipe,
-      CurrentStrength.none => Icons.remove,
-    };
-  }
-}
-
-class _FilterChip extends StatelessWidget {
-  const _FilterChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-    this.color,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-  final Color? color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(right: AppSpacing.sm),
-      child: FilterChip(
-        label: Text(label),
-        selected: selected,
-        onSelected: (_) => onTap(),
-        backgroundColor: Colors.white,
-        selectedColor: (color ?? AppColors.primary).withValues(alpha: 0.15),
-        checkmarkColor: color ?? AppColors.primary,
-        labelStyle: TextStyle(
-          color: selected ? (color ?? AppColors.primary) : AppColors.primary,
-          fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-        ),
-      ),
     );
   }
 }

@@ -83,7 +83,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
     if (res.statusCode == 200 && mounted) {
       final body = jsonDecode(res.body);
-      final list = body is List ? body : (body['data'] as List<dynamic>? ?? []);
+      final list = body is List ? body : ((body as Map<String, dynamic>)['data'] as List<dynamic>? ?? []);
       setState(() {
         _messages = list.cast<Map<String, dynamic>>();
         _loading = false;

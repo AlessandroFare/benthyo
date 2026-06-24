@@ -117,7 +117,7 @@ class ShearwaterGattParser implements DiveComputerGattParser {
         diveDate: diveDate,
         maxDepthM: maxDepthM,
         durationMin: durationMin,
-      ));
+      ),);
 
       offset += 16;
     }

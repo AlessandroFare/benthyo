@@ -13,7 +13,6 @@ import '../../core/widgets/app_scaffold.dart';
 import '../../core/widgets/async_value_widget.dart';
 import '../auth/auth_providers.dart';
 import '../sync/dead_letter_banner.dart';
-import '../sync/dead_letter_providers.dart';
 import 'profile_providers.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {

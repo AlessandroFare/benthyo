@@ -96,7 +96,7 @@ class _ProfilePainter extends CustomPainter {
     final grid = Paint()
       ..color = Colors.grey.withValues(alpha: 0.2)
       ..strokeWidth = 1;
-    canvas.drawLine(Offset(pad, pad), Offset(pad, pad + chartH), grid);
+    canvas.drawLine(const Offset(pad, pad), Offset(pad, pad + chartH), grid);
     canvas.drawLine(Offset(pad, pad + chartH), Offset(pad + chartW, pad + chartH), grid);
 
     final path = Path();

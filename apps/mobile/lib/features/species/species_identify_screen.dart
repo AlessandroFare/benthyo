@@ -288,7 +288,7 @@ class _InatMatchView extends StatelessWidget {
               const SizedBox(height: AppSpacing.md),
               OceanTagRow(
                 tags: [
-                  OceanTag(label: 'iNaturalist AI'),
+                  const OceanTag(label: 'iNaturalist AI'),
                   OceanTag(
                     label: '${(hit.confidence * 100).round()}% confidence',
                     color: AppColors.accent.withValues(alpha: 0.12),

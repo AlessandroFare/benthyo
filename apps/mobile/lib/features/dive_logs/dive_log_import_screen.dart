@@ -48,7 +48,7 @@ class _DiveLogImportScreenState extends ConsumerState<DiveLogImportScreen> {
       _result = null;
     });
 
-    final apiBase = const String.fromEnvironment(
+    const apiBase = String.fromEnvironment(
       'API_URL',
       defaultValue: 'http://localhost:3000/api/v1',
     );
@@ -67,7 +67,9 @@ class _DiveLogImportScreenState extends ConsumerState<DiveLogImportScreen> {
         setState(() => _result = 'Import failed: ${res.body}');
       } else {
         final body = jsonDecode(res.body) as Map<String, dynamic>;
-        final imported = body['imported'] ?? body['data']?['imported'] ?? 0;
+        final imported = (body['imported'] as int?) ??
+            ((body['data'] as Map<String, dynamic>?)?['imported'] as int?) ??
+            0;
         ref.invalidate(diveLogsProvider);
         setState(() => _result = 'Imported $imported dives from dive computer');
       }

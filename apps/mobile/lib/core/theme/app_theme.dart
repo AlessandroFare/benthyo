@@ -281,7 +281,7 @@ class AppTheme {
         indicatorColor: AppColors.primary.withValues(alpha: 0.18),
         labelTextStyle: WidgetStatePropertyAll(
           GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600,
-              color: sunText),
+              color: sunText,),
         ),
       ),
       floatingActionButtonTheme: const FloatingActionButtonThemeData(

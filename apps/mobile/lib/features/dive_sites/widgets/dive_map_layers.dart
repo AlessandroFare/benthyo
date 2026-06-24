@@ -22,7 +22,7 @@ class DiveMapLayers {
 
   static TileLayer? contours({required bool enabled}) {
     if (!enabled) return null;
-    final preset = MapConfig.contoursOverlay;
+    const preset = MapConfig.contoursOverlay;
     return TileLayer(
       urlTemplate: preset.urlTemplate,
       userAgentPackageName: 'com.benthyo.app',
@@ -32,7 +32,7 @@ class DiveMapLayers {
 
   static TileLayer? seamarks({required bool enabled}) {
     if (!enabled) return null;
-    final preset = MapConfig.seamarksOverlay;
+    const preset = MapConfig.seamarksOverlay;
     return TileLayer(
       urlTemplate: preset.urlTemplate,
       userAgentPackageName: 'com.benthyo.app',

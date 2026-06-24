@@ -43,7 +43,7 @@ class SurfaceIntervalStatus {
     final sameDay = logs.where((l) =>
         l.diveDate.year == latest.diveDate.year &&
         l.diveDate.month == latest.diveDate.month &&
-        l.diveDate.day == latest.diveDate.day);
+        l.diveDate.day == latest.diveDate.day,);
     final multi = sameDay.length > 1;
 
     // RSTC-style conservative defaults (not a decompression engine).

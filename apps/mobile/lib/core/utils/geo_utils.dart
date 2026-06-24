@@ -39,7 +39,7 @@ LatLng? parseGeography(dynamic raw) {
       try {
         final bytes = Uint8List.fromList([
           for (var i = 0; i < trimmed.length - 1; i += 2)
-            int.parse(trimmed.substring(i, i + 2), radix: 16)
+            int.parse(trimmed.substring(i, i + 2), radix: 16),
         ]);
         final bd = ByteData.sublistView(bytes);
         if (bytes[0] == 0x01) {

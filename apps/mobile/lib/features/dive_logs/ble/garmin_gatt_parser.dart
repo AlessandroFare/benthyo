@@ -147,7 +147,7 @@ class GarminGattParser implements DiveComputerGattParser {
         maxDepthM: maxDepthM,
         durationMin: durationMin,
         profileSamples: profileSamples,
-      ));
+      ),);
 
       offset += 16;
     }

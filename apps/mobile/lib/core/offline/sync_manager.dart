@@ -463,7 +463,7 @@ class SyncManager {
         return response;
       }
       attempt++;
-      final refreshed = await _refreshToken();
+      final refreshed = _refreshToken();
       if (refreshed == null) {
         return response;
       }

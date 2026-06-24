@@ -11,7 +11,6 @@ import '../../core/widgets/animated_fab.dart';
 import '../../core/widgets/app_scaffold.dart';
 import '../../core/widgets/async_value_widget.dart';
 import '../../core/widgets/main_navigation.dart';
-import '../../core/widgets/staggered_list_animation.dart';
 import '../dive_sites/widgets/species_picker_sheet.dart';
 import 'sightings_providers.dart';
 import 'suggest_correction_sheet.dart';
@@ -443,14 +442,14 @@ class _RemovedSightingCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Icon(Icons.remove_circle_outline,
-                  color: Colors.white38),
+                  color: Colors.white38,),
             ),
             const SizedBox(width: AppSpacing.md),
-            Expanded(
+            const Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
-                children: const [
+                children: [
                   Text(
                     'Sighting removed',
                     style: TextStyle(

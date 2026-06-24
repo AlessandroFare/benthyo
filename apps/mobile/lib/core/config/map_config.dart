@@ -87,21 +87,21 @@ class MapConfig {
               ? 'Benthyo'
               : '© OpenStreetMap contributors',
         ),
-      DiveMapBasemap.ocean => MapLayerPreset(
+      DiveMapBasemap.ocean => const MapLayerPreset(
           id: 'ocean',
           label: 'Ocean',
           urlTemplate: esriOceanBaseUrl,
           maxNativeZoom: 13,
           attribution: 'Esri, GEBCO, NOAA, National Geographic',
         ),
-      DiveMapBasemap.bathymetry => MapLayerPreset(
+      DiveMapBasemap.bathymetry => const MapLayerPreset(
           id: 'bathymetry',
           label: 'Bathymetry',
           urlTemplate: emodnetBathymetryUrl,
           maxNativeZoom: 11,
           attribution: 'EMODnet Bathymetry',
         ),
-      DiveMapBasemap.satellite => MapLayerPreset(
+      DiveMapBasemap.satellite => const MapLayerPreset(
           id: 'satellite',
           label: 'Satellite',
           urlTemplate: esriWorldImageryUrl,

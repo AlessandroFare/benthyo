@@ -6,7 +6,6 @@ import 'package:http/http.dart' as http;
 
 import '../../core/config/api_config.dart';
 import '../../core/supabase/supabase_client.dart';
-import '../../core/theme/app_theme.dart';
 
 Future<void> showSuggestCorrectionSheet(
   BuildContext context,

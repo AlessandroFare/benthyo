@@ -6,7 +6,6 @@ import 'package:intl/intl.dart';
 import '../../core/supabase/supabase_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_scaffold.dart';
-import '../auth/auth_providers.dart';
 import 'dive_logs_providers.dart';
 
 /// Minimal dive log flow — depth, duration, optional site (Apple Watch style).

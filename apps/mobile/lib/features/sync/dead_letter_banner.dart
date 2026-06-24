@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
-import '../../core/offline/sync_manager.dart';
 import 'dead_letter_providers.dart';
 
 /// Banner shown at the top of the Settings screen whenever the local

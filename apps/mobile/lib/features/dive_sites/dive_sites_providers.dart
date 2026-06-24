@@ -39,22 +39,18 @@ class DiveSitesRepository {
   }
 
   Future<SiteConditions> fetchConditions(String siteId) async {
-    final data = await _client.rpc(
+    final data = await _client.rpc<Map<String, dynamic>>(
       'site_dive_conditions',
       params: {'p_site_id': siteId},
     );
-    if (data is Map<String, dynamic>) {
-      return SiteConditions.fromJson(data);
-    }
-    return const SiteConditions(logCount: 0);
+    return SiteConditions.fromJson(data);
   }
 
   Future<List<SpeciesHeatmapRow>> fetchSpeciesHeatmap(String speciesId) async {
-    final data = await _client.rpc(
+    final data = await _client.rpc<List<Map<String, dynamic>>>(
       'species_sighting_heatmap',
       params: {'p_species_id': speciesId},
     );
-    if (data is! List) return const [];
     return data
         .cast<Map<String, dynamic>>()
         .map(SpeciesHeatmapRow.fromJson)
@@ -62,11 +58,10 @@ class DiveSitesRepository {
   }
 
   Future<List<RecentDiver>> fetchRecentDivers(String siteId) async {
-    final data = await _client.rpc(
+    final data = await _client.rpc<List<Map<String, dynamic>>>(
       'recent_divers_at_site',
       params: {'p_site_id': siteId, 'p_days': 90},
     );
-    if (data is! List) return const [];
     return data
         .cast<Map<String, dynamic>>()
         .map(RecentDiver.fromJson)
@@ -162,21 +157,14 @@ class DiveSitesRepository {
     required String speciesId,
     String? siteId,
   }) async {
-    final data = await _client.rpc(
+    final data = await _client.rpc<Map<String, dynamic>>(
       'species_seasonal_forecast',
       params: {
         'p_species_id': speciesId,
         if (siteId != null) 'p_site_id': siteId,
       },
     );
-    if (data is Map<String, dynamic>) {
-      return SeasonalForecast.fromJson(data);
-    }
-    return const SeasonalForecast(
-      bestMonths: [],
-      monthlyCounts: {},
-      totalSightings: 0,
-    );
+    return SeasonalForecast.fromJson(data);
   }
 }
 

@@ -20,7 +20,8 @@ final socialFeedProvider = FutureProvider<List<Map<String, dynamic>>>((ref) asyn
   final body = jsonDecode(res.body);
   return body is List
       ? body.cast<Map<String, dynamic>>()
-      : (body['data'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
+      : ((body as Map<String, dynamic>)['data'] as List<dynamic>? ?? [])
+          .cast<Map<String, dynamic>>();
 });
 
 class SocialFeedScreen extends ConsumerWidget {

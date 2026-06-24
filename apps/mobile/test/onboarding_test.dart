@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../lib/features/onboarding/onboarding_providers.dart';
-import '../lib/features/onboarding/onboarding_screen.dart';
+import 'package:benthyo/features/onboarding/onboarding_providers.dart';
+import 'package:benthyo/features/onboarding/onboarding_screen.dart';
 
 final _router = GoRouter(
   initialLocation: '/onboarding',
@@ -22,7 +22,8 @@ void main() {
       final container = ProviderContainer();
       addTearDown(() => container.dispose());
 
-      final notifier = container.read(onboardingNotifierProvider.notifier);
+      // Read the notifier to trigger initialization; the value is checked below.
+      container.read(onboardingNotifierProvider.notifier);
       expect(container.read(onboardingNotifierProvider), isFalse);
     });
 

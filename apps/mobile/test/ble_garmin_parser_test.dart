@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
-import '../lib/features/dive_logs/ble/garmin_gatt_parser.dart';
+import 'package:benthyo/features/dive_logs/ble/garmin_gatt_parser.dart';
 
 void main() {
   late GarminGattParser parser;

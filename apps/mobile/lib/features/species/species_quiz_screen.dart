@@ -7,7 +7,6 @@ import '../../core/supabase/supabase_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_scaffold.dart';
 import '../../core/widgets/async_value_widget.dart';
-import '../auth/auth_providers.dart';
 
 final quizSpeciesProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final user = ref.watch(currentUserProvider);

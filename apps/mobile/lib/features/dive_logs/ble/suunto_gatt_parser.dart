@@ -81,7 +81,7 @@ class SuuntoGattParser implements DiveComputerGattParser {
         ),
         maxDepthM: maxDepthCm / 100.0,
         durationMin: durationMin.clamp(1, 600),
-      ));
+      ),);
       offset += 12;
     }
     return dives;

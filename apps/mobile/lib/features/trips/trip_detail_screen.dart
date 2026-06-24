@@ -118,7 +118,8 @@ class TripDetailScreen extends ConsumerWidget {
                 style: Theme.of(context).textTheme.titleSmall,
               ),
               ...members.map((m) {
-                final user = m['user'] as Map<String, dynamic>? ?? {};
+                final member = m as Map<String, dynamic>;
+                final user = member['user'] as Map<String, dynamic>? ?? {};
                 return ListTile(
                   contentPadding: EdgeInsets.zero,
                   title: Text(
@@ -127,8 +128,8 @@ class TripDetailScreen extends ConsumerWidget {
                         '?',
                   ),
                   subtitle: Text(
-                    'Waiver: ${m['waiver_signed'] == true ? '✓' : 'pending'} · '
-                    'Medical: ${m['medical_complete'] == true ? '✓' : 'pending'}',
+                    'Waiver: ${member['waiver_signed'] == true ? '✓' : 'pending'} · '
+                    'Medical: ${member['medical_complete'] == true ? '✓' : 'pending'}',
                   ),
                 );
               }),
@@ -138,7 +139,8 @@ class TripDetailScreen extends ConsumerWidget {
                 style: Theme.of(context).textTheme.titleSmall,
               ),
               ...sites.map((s) {
-                final site = s['site'] as Map<String, dynamic>? ?? {};
+                final entry = s as Map<String, dynamic>;
+                final site = entry['site'] as Map<String, dynamic>? ?? {};
                 return ListTile(
                   contentPadding: EdgeInsets.zero,
                   title: Text(site['name'] as String? ?? 'Site'),
