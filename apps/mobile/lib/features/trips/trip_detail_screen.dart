@@ -102,7 +102,9 @@ class TripDetailScreen extends ConsumerWidget {
                           Text(text),
                           const SizedBox(height: AppSpacing.sm),
                           OutlinedButton.icon(
-                            onPressed: () => Share.share(text),
+                            onPressed: () => SharePlus.instance.share(
+                              ShareParams(text: text),
+                            ),
                             icon: const Icon(Icons.share),
                             label: const Text('Share recap'),
                           ),

@@ -23,7 +23,7 @@ class _DiveLogImportScreenState extends ConsumerState<DiveLogImportScreen> {
   String? _result;
 
   Future<void> _pickAndImport() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['uddf', 'xml', 'udcf'],
       withData: true,
