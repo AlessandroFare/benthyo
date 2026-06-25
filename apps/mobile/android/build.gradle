@@ -10,13 +10,18 @@ subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"
 }
 
-// Force compileSdk 36 on every plugin/subproject so that
-// AAR metadata checks never fail (e.g. file_picker, objectbox,
-// passkeys_android, ua_client_hints still ship with < 36).
+// Fix plugins that conditionally skip the Kotlin plugin when AGP >= 9
+// (e.g. file_picker 11.x). Flutter 3.44 does not yet provide Built-in
+// Kotlin, so we must ensure the Kotlin Gradle plugin is applied to every
+// subproject that contains .kt sources.
 subprojects {
     afterEvaluate { project ->
         if (project.hasProperty('android')) {
             project.android.compileSdk = 36
+        }
+        def hasKotlin = project.fileTree('src').include('**/*.kt').files
+        if (!hasKotlin.isEmpty() && !project.plugins.hasPlugin('org.jetbrains.kotlin.android')) {
+            project.apply plugin: 'org.jetbrains.kotlin.android'
         }
     }
 }
