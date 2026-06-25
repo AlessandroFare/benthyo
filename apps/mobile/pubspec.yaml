@@ -34,7 +34,7 @@ dependencies:
   flutter_blue_plus: ^1.35.3
   image: ^4.5.4
   crypto: ^3.0.6
-  tflite_flutter: ^0.11.0
+  tflite_flutter: ^0.12.1
 
 dev_dependencies:
   flutter_test:
