@@ -5,6 +5,8 @@ paths-ignore:
   - '**/node_modules/**'
   - '**/generated/**'
   - '**/*.bundle.js'
+  - '**/bundle.js'
+  - '**/passkeys/**'
   - '**/vendor/**'
   - '**/.icon-tools/**'
   - '**/build/**'
