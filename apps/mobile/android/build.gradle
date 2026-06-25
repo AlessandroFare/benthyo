@@ -13,6 +13,17 @@ subprojects {
     project.evaluationDependsOn(":app")
 }
 
+// Force compileSdk 36 on every plugin/subproject so that
+// AAR metadata checks never fail (e.g. file_picker, objectbox,
+// passkeys_android, ua_client_hints still ship with < 36).
+subprojects {
+    afterEvaluate { project ->
+        if (project.hasProperty('android')) {
+            project.android.compileSdk = 36
+        }
+    }
+}
+
 tasks.register("clean", Delete) {
     delete rootProject.buildDir
 }
