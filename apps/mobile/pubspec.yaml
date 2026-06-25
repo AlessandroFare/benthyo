@@ -4,7 +4,7 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.3.0 <4.0.0'
+  sdk: '>=3.5.0 <4.0.0'
 
 dependencies:
   flutter:
@@ -26,7 +26,7 @@ dependencies:
   shared_preferences: ^2.5.3
   image_picker: ^1.1.2
   file_picker: ^8.1.7
-  sentry_flutter: ^8.14.0
+  sentry_flutter: ^9.16.0
   flutter_map_tile_caching: ^9.1.4
   path_provider: ^2.1.5
   url_launcher: ^6.3.1
