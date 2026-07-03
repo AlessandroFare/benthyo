@@ -224,10 +224,7 @@ class SitePreviewSheet extends ConsumerWidget {
                     accent: true,
                     onTap: () {
                       onClose();
-                      context.push(
-                        '/dive-logs/new',
-                        extra: {'siteId': site.id, 'siteName': site.name},
-                      );
+                      context.push('/dive-logs/create?siteId=${site.id}');
                     },
                   ),
                   const SizedBox(width: AppSpacing.sm),
@@ -372,20 +369,17 @@ class _SheetButton extends StatelessWidget {
     );
 
     if (filled) {
-      return Expanded(
-        flex: 2,
-        child: FilledButton(
-          onPressed: onTap,
-          style: FilledButton.styleFrom(
-            backgroundColor: AppColors.accent,
-            foregroundColor: Colors.black,
-            padding: const EdgeInsets.symmetric(vertical: 13),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
+      return FilledButton(
+        onPressed: onTap,
+        style: FilledButton.styleFrom(
+          backgroundColor: AppColors.accent,
+          foregroundColor: Colors.black,
+          padding: const EdgeInsets.symmetric(vertical: 13),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
           ),
-          child: content,
         ),
+        child: content,
       );
     }
 

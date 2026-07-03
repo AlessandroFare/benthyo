@@ -79,8 +79,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       setState(() => _query = q);
       // Wire the text query into the filter provider so markers update live.
       final filters = ref.read(diveSiteFiltersProvider);
-      ref.read(diveSiteFiltersProvider.notifier).state =
-          filters.copyWith(searchQuery: q.isEmpty ? null : q);
+      ref.read(diveSiteFiltersProvider.notifier).state = q.isEmpty
+          ? filters.copyWith(clearQuery: true)
+          : filters.copyWith(query: q);
     });
   }
 
@@ -399,7 +400,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                               final f = ref.read(diveSiteFiltersProvider);
                               ref
                                   .read(diveSiteFiltersProvider.notifier)
-                                  .state = f.copyWith(searchQuery: null);
+                                  .state = f.copyWith(clearQuery: true);
                             },
                             child: Padding(
                               padding: const EdgeInsets.all(AppSpacing.sm),
