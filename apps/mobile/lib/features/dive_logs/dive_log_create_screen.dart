@@ -102,31 +102,38 @@ class _DiveLogCreateScreenState extends ConsumerState<DiveLogCreateScreen> {
     if (picked != null) setState(() => _diveDate = dateOnly(picked));
   }
 
+  // Sentinel used to distinguish "clear site" from sheet dismissal.
+  static const _kClearSite = '__clear__';
+
   Future<void> _pickSite(List<DiveSite> sites) async {
-    final selected = await showOptionSheet<String?>(
+    // Build a String-typed option list where the first entry is a sentinel
+    // that means "no site". This avoids the null ambiguity between the user
+    // selecting "clear" and simply dismissing the sheet.
+    final options = [_kClearSite, ...sites.map((s) => s.id)];
+    final selected = await showOptionSheet<String>(
       context: context,
       title: 'Dive site',
-      options: [null, ...sites.map((s) => s.id)],
-      selected: _siteId,
+      options: options,
+      selected: _siteId ?? _kClearSite,
       labelBuilder: (id) {
-        if (id == null) return 'No site selected';
+        if (id == _kClearSite) return 'No site selected';
         return sites.firstWhere((s) => s.id == id).name;
       },
     );
-    if (selected == null && _siteId != null) {
+    // selected == null means the sheet was dismissed — do nothing.
+    if (selected == null) return;
+    if (selected == _kClearSite) {
       setState(() {
         _siteId = null;
         _siteName = null;
       });
       return;
     }
-    if (selected != null) {
-      final site = sites.firstWhere((s) => s.id == selected);
-      setState(() {
-        _siteId = selected;
-        _siteName = site.name;
-      });
-    }
+    final site = sites.firstWhere((s) => s.id == selected);
+    setState(() {
+      _siteId = selected;
+      _siteName = site.name;
+    });
   }
 
   Future<void> _submit() async {
@@ -152,6 +159,13 @@ class _DiveLogCreateScreenState extends ConsumerState<DiveLogCreateScreen> {
     });
 
     try {
+      // Prepend the "how it felt" label to any user notes so the value is
+      // persisted even though the schema does not have a dedicated column.
+      final feelNote = 'Feel: ${_feelLabels[_feelLevel - 1]}';
+      final userNotes = _notesController.text.trim();
+      final combinedNotes =
+          userNotes.isEmpty ? feelNote : '$feelNote\n$userNotes';
+
       await ref.read(diveLogsRepositoryProvider).create(
             userId: user.id,
             input: DiveLogCreateInput(
@@ -166,9 +180,7 @@ class _DiveLogCreateScreenState extends ConsumerState<DiveLogCreateScreen> {
               buddyName: _buddyController.text.trim().isEmpty
                   ? null
                   : _buddyController.text.trim(),
-              notes: _notesController.text.trim().isEmpty
-                  ? null
-                  : _notesController.text.trim(),
+              notes: combinedNotes,
               rating: _rating,
             ),
             isOnline: await ref.read(isOnlineProvider.future),

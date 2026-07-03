@@ -106,7 +106,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
               ),
               const SizedBox(height: AppSpacing.md),
               DropdownButtonFormField<CertLevel>(
-                initialValue: _level,
+                value: _level,
                 decoration:
                     const InputDecoration(labelText: 'Certification level'),
                 items: CertLevel.values
@@ -121,7 +121,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
               ),
               const SizedBox(height: AppSpacing.md),
               DropdownButtonFormField<CertAgency>(
-                initialValue: _agency,
+                value: _agency,
                 decoration: const InputDecoration(labelText: 'Agency'),
                 items: CertAgency.values
                     .map(

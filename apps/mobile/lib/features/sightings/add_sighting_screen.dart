@@ -179,7 +179,7 @@ class _AddSightingScreenState extends ConsumerState<AddSightingScreen> {
             AsyncValueWidget(
               value: sitesAsync,
               data: (sites) => DropdownButtonFormField<String>(
-                initialValue: _siteId,
+                value: _siteId,
                 decoration: const InputDecoration(labelText: 'Dive site'),
                 items: sites
                     .map(
@@ -196,7 +196,7 @@ class _AddSightingScreenState extends ConsumerState<AddSightingScreen> {
             AsyncValueWidget(
               value: speciesAsync,
               data: (species) => DropdownButtonFormField<String>(
-                initialValue: _speciesId,
+                value: _speciesId,
                 decoration: const InputDecoration(labelText: 'Species'),
                 items: species
                     .map(
@@ -211,7 +211,7 @@ class _AddSightingScreenState extends ConsumerState<AddSightingScreen> {
             ),
             const SizedBox(height: AppSpacing.md),
             DropdownButtonFormField<ConfidenceLevel>(
-              initialValue: _confidence,
+              value: _confidence,
               decoration: const InputDecoration(labelText: 'Confidence'),
               items: ConfidenceLevel.values
                   .map(

@@ -13,6 +13,30 @@ Living plan from user research and **Round 2 strategy** (retention, B2B revenue,
 
 ---
 
+## Phase 13 — Market-gap opportunities (zero-budget)
+
+Items identified from competitive analysis vs Subsurface, Deepblu, Diveboard.
+
+| # | Feature | Priority | Status |
+|---|---------|----------|--------|
+| 1 | **Citizen science impact counter** — "Your sightings contributed to X databases" badge shown on profile and sharable as a card. Drives organic sharing with zero infra cost; GBIF/iNat sync already in place. | High | 📋 Planned |
+| 2 | **Dive profile UDDF/GPX export** — one-tap share of a dive's depth profile from the log detail screen. The `profile_samples` column already exists in `dive_logs`; just needs serialisation + `Share.shareXFiles`. | High | 📋 Planned |
+| 3 | **Multi-photo per sighting** — competitor research shows this is the #1 requested feature on Deepblu/Diveboard forums. Schema: new `sighting_photos` table (id, sighting_id, storage_path, order_index). UI: horizontal photo strip in add-sighting and sighting detail screens. | High | 📋 Planned |
+| 4 | **Monthly species leaderboard** — "Most species logged this month" ranked list, computed from `user_life_list` + `sightings`. Zero infra cost (no new tables). Shown on the Discovery screen as a section below Buddy Finder. | Medium | 📋 Planned |
+| 5 | **Dive centre embed widget** — a small public HTML snippet using the existing `site_public_card()` RPC so dive centres can paste a live conditions card on their own website. Free B2B lead magnet. Needs a `/embed/site/:id` web route + minimal JS bundle. | Medium | 📋 Planned |
+
+### Competitive positioning summary
+
+| Competitor | Weakness benthyo addresses |
+|------------|---------------------------|
+| Subsurface / MacDive | Desktop-only, no species ID, no community layer |
+| Deepblu | No conservation data, no AI species ID, no B2B tools, no offline support |
+| Diveboard | Web-only, no offline, no dive computer BLE sync |
+
+benthyo's primary moats: **mobile-first offline** + **species life list** + **citizen science integration** + **operator B2B tools**.
+
+---
+
 ## Phase 12 — Integration follow-ups
 
 | Feature | Status |

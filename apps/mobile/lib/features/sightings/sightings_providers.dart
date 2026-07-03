@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/models/citizen_science_impact.dart';
 import '../../core/models/enums.dart';
 import '../../core/models/sighting.dart';
 import '../../core/offline/sync_manager.dart';
@@ -24,6 +25,26 @@ class SightingsRepository {
         .limit(limit);
     final rows = (data as List).cast<Map<String, dynamic>>();
     return rows.map(SightingWithDetails.fromJson).toList();
+  }
+
+  /// Calls the `citizen_science_impact` RPC and returns the parsed result.
+  /// Returns a zeroed-out model if the user has no sightings or is offline.
+  Future<CitizenScienceImpact> fetchImpact(String userId) async {
+    try {
+      final data = await _client.rpc(
+        'citizen_science_impact',
+        params: {'p_user_id': userId},
+      );
+      return CitizenScienceImpact.fromJson(
+          Map<String, dynamic>.from(data as Map));
+    } catch (_) {
+      return const CitizenScienceImpact(
+        totalSightings: 0,
+        inatContributed: 0,
+        gbifContributed: 0,
+        databasesCount: 0,
+      );
+    }
   }
 
   Future<List<SightingWithDetails>> fetchForUser(String userId) async {
@@ -111,4 +132,13 @@ final userSightingsProvider =
   final user = ref.watch(currentUserProvider);
   if (user == null) return [];
   return ref.watch(sightingsRepositoryProvider).fetchForUser(user.id);
+});
+
+/// Fetches the citizen-science contribution counts for the current user
+/// by calling the `citizen_science_impact` Postgres RPC.
+final citizenScienceImpactProvider =
+    FutureProvider<CitizenScienceImpact?>((ref) async {
+  final user = ref.watch(currentUserProvider);
+  if (user == null) return null;
+  return ref.watch(sightingsRepositoryProvider).fetchImpact(user.id);
 });
