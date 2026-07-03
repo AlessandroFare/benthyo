@@ -24,12 +24,6 @@ class MapFilterSheet extends ConsumerStatefulWidget {
       useSafeArea: true,
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withValues(alpha: 0.45),
-      // Subtle spring-like feel.
-      transitionAnimationController: AnimationController(
-        vsync: Navigator.of(context),
-        duration: const Duration(milliseconds: 320),
-        reverseDuration: const Duration(milliseconds: 220),
-      ),
       builder: (ctx) => const MapFilterSheet(),
     );
   }

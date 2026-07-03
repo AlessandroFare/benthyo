@@ -59,7 +59,9 @@ class SightingsFeedScreen extends ConsumerWidget {
                     final s = items[index];
                     return _AnimatedSightingCard(
                       index: index,
-                      onTap: () => context.push('/sightings/${s.id}'),
+                      // Navigate to the species detail page — there is no
+                      // dedicated sighting-detail route yet.
+                      onTap: () => context.push('/species/${s.speciesId}'),
                       onLongPress: currentUser != null && s.userId != currentUser.id
                           ? () async {
                               final species = await SpeciesPickerSheet.pick(context);
