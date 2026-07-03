@@ -44,6 +44,7 @@ import '../../features/onboarding/onboarding_providers.dart';
 import '../../features/bookings/slot_browser_screen.dart';
 import '../../features/bookings/booking_create_screen.dart';
 import '../../features/bookings/booking_list_screen.dart';
+import '../../features/challenges/challenges_screen.dart';
 import '../supabase/supabase_client.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -296,6 +297,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/trips',
         builder: (context, state) => const TripListScreen(),
+      ),
+      GoRoute(
+        path: '/challenges',
+        builder: (context, state) => const ChallengesScreen(),
       ),
     ],
   );

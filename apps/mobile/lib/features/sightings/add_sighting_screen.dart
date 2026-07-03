@@ -132,6 +132,27 @@ class _AddSightingScreenState extends ConsumerState<AddSightingScreen> {
             isOnline: await ref.read(isOnlineProvider.future),
           );
 
+      // Fan uploaded photo URLs out to the normalized `sighting_photos` table.
+      // This runs best-effort: if the insert fails (e.g. offline), the
+      // photo_urls column on the sighting row acts as the fallback source of
+      // truth and the back-fill trigger will catch them on next insert.
+      if (urls.isNotEmpty) {
+        final repo = ref.read(sightingsRepositoryProvider);
+        for (var i = 0; i < urls.length; i++) {
+          try {
+            await repo.addPhoto(
+              sightingId: sighting.id,
+              userId: user.id,
+              storagePath: urls[i],
+              publicUrl: urls[i],
+              sortOrder: i,
+            );
+          } catch (_) {
+            // Non-blocking — sighting is already saved.
+          }
+        }
+      }
+
       final token =
           ref.read(supabaseClientProvider).auth.currentSession?.accessToken;
       if (token != null && urls.isNotEmpty) {
