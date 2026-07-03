@@ -2,7 +2,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:share_plus/share_plus.dart';
 
+import '../../core/models/citizen_science_impact.dart';
 import '../../core/models/dive_log.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_scaffold.dart';
@@ -13,6 +15,7 @@ import '../../core/widgets/ocean_card.dart';
 import '../auth/auth_providers.dart';
 import '../dive_logs/dive_logs_providers.dart';
 import '../life_list/life_list_providers.dart';
+import '../sightings/sightings_providers.dart';
 import 'profile_providers.dart';
 
 // ─── Derived stats provider ───────────────────────────────────────────────────
@@ -102,6 +105,7 @@ class ProfileScreen extends ConsumerWidget {
     final badgesAsync = ref.watch(userBadgesProvider);
     final lifeListAsync = ref.watch(lifeListProvider);
     final statsAsync = ref.watch(_profileDiveStatsProvider);
+    final impactAsync = ref.watch(citizenScienceImpactProvider);
 
     return AppScaffold(
       showBack: false,
@@ -185,6 +189,22 @@ class ProfileScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: AppSpacing.lg),
                     ],
+
+                    // ── Citizen science impact banner ──
+                    impactAsync.whenOrNull(
+                      data: (impact) => impact != null &&
+                              impact.totalSightings > 0
+                          ? Padding(
+                              padding: const EdgeInsets.fromLTRB(
+                                  AppSpacing.md,
+                                  0,
+                                  AppSpacing.md,
+                                  AppSpacing.lg),
+                              child: _CitizenScienceBanner(impact: impact),
+                            )
+                          : null,
+                    ) ??
+                        const SizedBox.shrink(),
 
                     // ── My Activity ──
                     _SectionHeader(
@@ -878,6 +898,304 @@ class _NavItem extends StatelessWidget {
             const SizedBox(width: AppSpacing.xs),
           ],
           Icon(Icons.chevron_right, color: AppColors.textSecondary, size: 20),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Citizen science impact banner ────────────────────────────────────────────
+
+class _CitizenScienceBanner extends StatefulWidget {
+  const _CitizenScienceBanner({required this.impact});
+
+  final CitizenScienceImpact impact;
+
+  @override
+  State<_CitizenScienceBanner> createState() => _CitizenScienceBannerState();
+}
+
+class _CitizenScienceBannerState extends State<_CitizenScienceBanner>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<Offset> _slide;
+  late final Animation<double> _fade;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _slide = Tween<Offset>(
+      begin: const Offset(0, 0.12),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: AppCurves.emphasized));
+    _fade = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
+    // Small delay so it enters after the stats grid settles.
+    Future.delayed(const Duration(milliseconds: 180), () {
+      if (mounted) _ctrl.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _share() {
+    final impact = widget.impact;
+    final parts = <String>[];
+    if (impact.inatContributed > 0) {
+      parts.add('${impact.inatContributed} to iNaturalist');
+    }
+    if (impact.gbifContributed > 0) {
+      parts.add('${impact.gbifContributed} to GBIF');
+    }
+    final dbText = parts.isEmpty
+        ? 'global ocean biodiversity databases'
+        : parts.join(' and ');
+
+    SharePlus.instance.share(
+      ShareParams(
+        text:
+            'I\'ve logged ${impact.totalSightings} marine sightings on benthyo, '
+            'contributing $dbText. '
+            'Help protect the ocean \u2014 track your dives at benthyo.com',
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final impact = widget.impact;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return FadeTransition(
+      opacity: _fade,
+      child: SlideTransition(
+        position: _slide,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: isDark
+                  ? [
+                      AppColors.oceanMid.withValues(alpha: 0.45),
+                      AppColors.oceanDeep.withValues(alpha: 0.75),
+                    ]
+                  : [
+                      AppColors.oceanShallow.withValues(alpha: 0.12),
+                      AppColors.oceanMid.withValues(alpha: 0.22),
+                    ],
+            ),
+            border: Border.all(
+              color: isDark
+                  ? AppColors.accent.withValues(alpha: 0.22)
+                  : AppColors.oceanMid.withValues(alpha: 0.35),
+            ),
+          ),
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Header row ──
+              Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: AppColors.accent.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                          color: AppColors.accent.withValues(alpha: 0.35)),
+                    ),
+                    child: const Icon(
+                      Icons.public,
+                      size: 18,
+                      color: AppColors.accent,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Your science impact',
+                          style:
+                              Theme.of(context).textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    color: isDark
+                                        ? Colors.white
+                                        : AppColors.oceanDeep,
+                                  ),
+                        ),
+                        Text(
+                          'Contributing to global ocean research',
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: isDark
+                                        ? Colors.white60
+                                        : AppColors.textSecondary,
+                                  ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: AppSpacing.md),
+
+              // ── Animated headline count ──
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  TweenAnimationBuilder<int>(
+                    tween: IntTween(begin: 0, end: impact.totalSightings),
+                    duration: AppDurations.slow +
+                        const Duration(milliseconds: 200),
+                    curve: AppCurves.emphasized,
+                    builder: (_, v, __) => Text(
+                      '$v',
+                      style: Theme.of(context)
+                          .textTheme
+                          .displaySmall
+                          ?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color:
+                                isDark ? AppColors.accent : AppColors.oceanMid,
+                            height: 1,
+                          ),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text(
+                      'marine sightings logged',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: isDark
+                                ? Colors.white70
+                                : AppColors.oceanDeep,
+                            fontWeight: FontWeight.w500,
+                          ),
+                    ),
+                  ),
+                ],
+              ),
+
+              // ── Platform chips ──
+              if (impact.hasContributed) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.xs,
+                  children: [
+                    if (impact.inatContributed > 0)
+                      _ImpactChip(
+                        label: 'iNaturalist',
+                        count: impact.inatContributed,
+                        color: const Color(0xFF74AC00),
+                      ),
+                    if (impact.gbifContributed > 0)
+                      _ImpactChip(
+                        label: 'GBIF',
+                        count: impact.gbifContributed,
+                        color: const Color(0xFFE1932C),
+                      ),
+                  ],
+                ),
+              ] else ...[
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  'Enable data sharing in Settings to contribute to '
+                  'iNaturalist and GBIF.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: isDark
+                            ? Colors.white54
+                            : AppColors.textSecondary,
+                        fontStyle: FontStyle.italic,
+                      ),
+                ),
+              ],
+
+              const SizedBox(height: AppSpacing.md),
+
+              // ── Share button ──
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _share,
+                  icon: const Icon(Icons.share_outlined, size: 16),
+                  label: const Text('Share your impact'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor:
+                        isDark ? AppColors.accent : AppColors.oceanMid,
+                    side: BorderSide(
+                      color: isDark
+                          ? AppColors.accent.withValues(alpha: 0.5)
+                          : AppColors.oceanMid.withValues(alpha: 0.5),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    textStyle: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A small pill chip showing a platform name and how many sightings were
+/// contributed to that platform.
+class _ImpactChip extends StatelessWidget {
+  const _ImpactChip({
+    required this.label,
+    required this.count,
+    required this.color,
+  });
+
+  final String label;
+  final int count;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(AppRadius.full),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 7,
+            height: 7,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            '$count to $label',
+            style: TextStyle(
+              color: color,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );
