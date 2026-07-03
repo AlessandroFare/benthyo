@@ -121,8 +121,8 @@ export function DashboardPage() {
     <AnimatedPage>
       <AnimatedItem className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Dashboard</h1>
+          <p className="mt-0.5 text-sm text-muted-foreground">
             Overview of your dive operation performance
           </p>
         </div>
@@ -269,7 +269,7 @@ export function DashboardPage() {
                       initial={{ opacity: 0, y: 4 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: i * 0.03, duration: 0.22, ease: "easeOut" }}
-                      className="border-border"
+                      className={`border-border transition-colors hover:bg-accent/40 ${i % 2 === 0 ? "" : "bg-muted/30"}`}
                     >
                       <TableCell>
                         <Badge variant="secondary" className="text-foreground">

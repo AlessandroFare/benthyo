@@ -3,6 +3,7 @@ import { logger } from './shared/logger';
 import { runApifyGoogleMapsEtl } from './apify-google-maps/index';
 import { runDiveNumberEtl } from './divenumber/index';
 import { runGbifEtl } from './gbif/index';
+import { runInatObservationsEtl } from './inat-observations/index';
 import { runInatTaxonLookupEtl } from './inat-taxon-lookup/index';
 import { runInaturalistImageEtl } from './inaturalist-images/index';
 import { runObisEtl } from './obis/index';
@@ -95,9 +96,14 @@ export async function runAllDataEtl(): Promise<void> {
   // 3. Apify Google Maps crawl. Last in the site batch because it is the slowest.
   await step('apify:google-maps', runApifyGoogleMapsEtl);
 
-  // 4. GBIF + OBIS + SEAMAP occurrences in parallel. They link to
-  // species via scientific name and to dive sites via nearby_dive_sites;
-  // none depends on another, so we run them concurrently.
+  // 4. GBIF + OBIS + SEAMAP + iNaturalist research-grade observations in
+  // parallel. All are independent occurrence sources that link to species
+  // via scientific name and to dive sites via nearby_dive_sites.
+  //
+  // iNaturalist (quality_grade=research) is included here because it is
+  // community-verified, GPS-accurate, and complements GBIF/OBIS with
+  // richer photo data and finer species-level IDs for Mediterranean marine
+  // megafauna. Source tag = 'inat' keeps dedup distinct from gbif/obis.
   //
   // RLS (Reef Life Survey) is intentionally EXCLUDED by default: RLS has no
   // public/free JSON API (its data is distributed as CSV/Zenodo dumps and via
@@ -108,6 +114,7 @@ export async function runAllDataEtl(): Promise<void> {
     { name: 'gbif', fn: runGbifEtl },
     { name: 'obis', fn: runObisEtl },
     { name: 'seamap', fn: runSeamapEtl },
+    { name: 'inat:observations', fn: runInatObservationsEtl },
   ];
   if (process.env.RLS_API_URL) {
     occurrenceSources.push({ name: 'rls', fn: runRlsEtl });
@@ -155,7 +162,7 @@ async function runOpenWaterReconciliation(): Promise<void> {
   const supabase = createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
-  for (const source of ['gbif', 'obis', 'seamap', 'rls'] as const) {
+  for (const source of ['gbif', 'obis', 'seamap', 'inat', 'rls'] as const) {
     const { data, error } = await supabase.rpc('reconcile_unmatched_occurrences', {
       p_source: source,
       p_radius_meters: 30000,

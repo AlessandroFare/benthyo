@@ -19,6 +19,7 @@
     "inaturalist:images": "tsx inaturalist-images/index.ts",
     "tavily:species": "tsx tavily-species/index.ts",
     "wikimedia:images": "tsx wikimedia-images/index.ts",
+    "inat:observations": "tsx inat-observations/index.ts",
     "inat:taxon-lookup": "tsx inat-taxon-lookup/index.ts",
     "all-data": "tsx run-all-data.ts",
     "test": "vitest run",

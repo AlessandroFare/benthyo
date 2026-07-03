@@ -124,30 +124,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       // Logo mark
                       Center(
                         child: Container(
-                          width: 64,
-                          height: 64,
+                          width: 72,
+                          height: 72,
                           decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                AppColors.accent,
-                                AppColors.oceanShallow,
-                              ],
-                            ),
+                            borderRadius: BorderRadius.circular(AppRadius.xl),
                             boxShadow: [
                               BoxShadow(
-                                color: AppColors.accent.withValues(alpha: 0.35),
-                                blurRadius: 20,
-                                spreadRadius: 2,
+                                color: AppColors.accent.withValues(alpha: 0.40),
+                                blurRadius: 28,
+                                spreadRadius: 4,
                               ),
                             ],
                           ),
-                          child: const Icon(
-                            Icons.scuba_diving,
-                            color: Colors.white,
-                            size: 30,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(AppRadius.xl),
+                            child: Image.asset(
+                              'assets/brand/icon-1024.png',
+                              width: 72,
+                              height: 72,
+                              fit: BoxFit.cover,
+                            ),
                           ),
                         ),
                       ),

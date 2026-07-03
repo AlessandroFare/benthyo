@@ -1,11 +1,11 @@
 {
-    "name": "benthyo",
-    "short_name": "benthyo",
+    "name": "Benthyo",
+    "short_name": "Benthyo",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#0F2238",
+    "theme_color": "#0F2238",
+    "description": "Dive deeper. Track species, explore sites, and log your underwater encounters with Benthyo.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

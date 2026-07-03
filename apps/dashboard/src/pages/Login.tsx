@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Fish, Waves } from "lucide-react";
+import { Fish } from "lucide-react";
 import { resendSignupConfirmation, signInWithEmail, signInWithGoogle } from "@/lib/auth";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -116,9 +116,13 @@ export function LoginPage() {
                 stiffness: 200,
                 damping: 12,
               }}
-              className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-ocean-500 text-white"
+              className="mx-auto"
             >
-              <Waves className="h-7 w-7" />
+              <img
+                src="/logo-mark.svg"
+                alt="Benthyo"
+                className="h-14 w-14 rounded-xl"
+              />
             </motion.div>
             <div>
               <CardTitle className="text-2xl">Benthyo</CardTitle>

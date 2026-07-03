@@ -11,7 +11,6 @@ import {
   ShieldCheck,
   Store,
   Users,
-  Waves,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -66,9 +65,11 @@ function SidebarBody({
     <>
       {/* Brand header */}
       <div className="flex h-16 items-center justify-center border-b border-white/10 px-3 xl:justify-start xl:gap-3 xl:px-5">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-ocean-500 shadow-lg shadow-ocean-500/20">
-          <Waves className="h-5 w-5" />
-        </div>
+        <img
+          src="/logo-mark.svg"
+          alt="Benthyo logo"
+          className="h-10 w-10 shrink-0 rounded-xl"
+        />
         <div className={cn("min-w-0", labelClass)}>
           <p className="truncate text-sm font-semibold tracking-wide">Benthyo</p>
           <p className="truncate text-xs text-white/60">Operator</p>
@@ -76,7 +77,7 @@ function SidebarBody({
       </div>
 
       {/* Nav items */}
-      <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3" aria-label="Primary navigation">
+      <nav className="relative flex flex-1 flex-col gap-1 overflow-y-auto p-3" aria-label="Primary navigation">
         {navGroups.map((group, gi) => (
           <div key={group.heading ?? `group-${gi}`} className="flex flex-col gap-0.5">
             {group.heading && (
@@ -101,7 +102,7 @@ function SidebarBody({
                     "group relative flex items-center justify-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150 xl:justify-start",
                     isActive
                       ? "text-white"
-                      : "text-white/65 hover:text-white",
+                      : "text-white/60 hover:text-white",
                   )
                 }
               >
@@ -112,7 +113,7 @@ function SidebarBody({
                       {isActive && (
                         <motion.span
                           layoutId="sidebar-active-pill"
-                          className="absolute inset-0 rounded-xl bg-white/10"
+                          className="absolute inset-0 rounded-xl bg-white/[0.12] ring-1 ring-white/10"
                           initial={false}
                           transition={{ type: "spring", stiffness: 500, damping: 40 }}
                         />
@@ -120,7 +121,7 @@ function SidebarBody({
                     </AnimatePresence>
                     {/* Hover background (only when not active) */}
                     {!isActive && (
-                      <span className="absolute inset-0 rounded-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100 bg-white/5" />
+                      <span className="absolute inset-0 rounded-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100 bg-white/[0.06]" />
                     )}
                     <Icon
                       className={cn(

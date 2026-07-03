@@ -52,6 +52,12 @@ export function TopBar({ user, onOpenMobileNav }: TopBarProps) {
         >
           <Menu className="h-5 w-5" />
         </Button>
+        {/* Brand logo mark — visible only on small screens where the sidebar is hidden */}
+        <img
+          src="/logo-mark.svg"
+          alt="Benthyo"
+          className="h-7 w-7 shrink-0 rounded-lg sm:hidden"
+        />
         <div className="min-w-0">
           {/* Title transitions when navigating */}
           <AnimatePresence mode="wait" initial={false}>
