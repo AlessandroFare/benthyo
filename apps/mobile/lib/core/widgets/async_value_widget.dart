@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../theme/app_theme.dart';
+import 'empty_state.dart';
 
 class AsyncValueWidget<T> extends StatelessWidget {
   const AsyncValueWidget({
@@ -62,25 +63,10 @@ class AsyncValueWidget<T> extends StatelessWidget {
       data: (d) {
         if (isEmpty != null && isEmpty!(d)) {
           return empty ??
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.lg),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.inbox_outlined,
-                        size: 48,
-                        color: Theme.of(context).colorScheme.outline,
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      Text(
-                        'Nothing here yet',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                    ],
-                  ),
-                ),
+              const EmptyState(
+                icon: Icons.inbox_outlined,
+                title: 'Nothing here yet',
+                subtitle: 'When there is something to show, it will appear here.',
               );
         }
         return data(d);
