@@ -40,12 +40,20 @@ function countryFromTags(tags: Record<string, string>): string {
 }
 
 function inferSiteTypeFromTags(tags: Record<string, string>): string {
-  const hint = `${tags.name ?? ''} ${tags.description ?? ''}`.toLowerCase();
-  if (hint.includes('wreck')) return 'wreck';
-  if (hint.includes('wall')) return 'wall';
-  if (hint.includes('cave')) return 'cave';
-  if (hint.includes('pinnacle')) return 'pinnacle';
-  if (hint.includes('muck')) return 'muck';
+  // Check structured OSM tags first (more reliable than name/description heuristics)
+  const seamarkType = tags['seamark:type'] ?? '';
+  if (seamarkType === 'wreck' || tags.historic === 'wreck') return 'wreck';
+  if (seamarkType === 'rock' || seamarkType === 'underwater_rock') return 'pinnacle';
+
+  const sport = tags.sport ?? '';
+  if (sport === 'freediving') return 'other'; // open water / blue water
+
+  const hint = `${tags.name ?? ''} ${tags.description ?? ''} ${tags['description:en'] ?? ''}`.toLowerCase();
+  if (hint.includes('wreck') || hint.includes('relitto') || hint.includes('epave')) return 'wreck';
+  if (hint.includes('wall') || hint.includes('drop-off') || hint.includes('paroi')) return 'wall';
+  if (hint.includes('cave') || hint.includes('grotta') || hint.includes('caverne')) return 'cave';
+  if (hint.includes('pinnacle') || hint.includes('seamount') || hint.includes('pinnacolo')) return 'pinnacle';
+  if (hint.includes('muck') || hint.includes('sand') || hint.includes('sabbia')) return 'muck';
   return 'reef';
 }
 
@@ -65,8 +73,12 @@ function mapElement(
   const baseSlug = slugify(name);
   const slug = uniqueSlug(baseSlug, String(el.id), seenSlugs);
   const hint = `${tags.description ?? ''} ${tags['description:en'] ?? ''}`;
-  const depthMax = Number(tags.depth ?? tags.max_depth ?? 30);
-  const depthMin = Number(tags.min_depth ?? 0);
+  // OSM wreck nodes use seamark:depth for the depth to the keel / deck
+  const rawDepth = tags['seamark:depth'] ?? tags.depth ?? tags.max_depth;
+  const depthMax = Number.isFinite(Number(rawDepth)) && Number(rawDepth) > 0
+    ? Number(rawDepth)
+    : 30;
+  const depthMin = Number(tags.min_depth ?? tags['seamark:depth:minimum'] ?? 0);
 
   return {
     name,

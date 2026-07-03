@@ -25,13 +25,17 @@ import {
 const OBIS_API = 'https://api.obis.org/v3';
 
 // Higher taxa that constitute OBIS-SEAMAP's marine-megafauna scope.
+// Elasmobranchii (sharks + rays) added because Mediterranean populations
+// of Prionace glauca, Carcharhinidae, Rhinobatidae etc. are well-tracked
+// in OBIS and highly relevant for dive sightings.
 const MEGAFAUNA_TAXA = [
-  'Cetacea', // whales & dolphins
-  'Pinnipedia', // seals
-  'Sirenia', // manatees/dugongs
-  'Testudines', // sea turtles
-  'Procellariiformes', // tubenose seabirds
-  'Suliformes', // gannets/cormorants
+  'Cetacea',          // whales & dolphins
+  'Pinnipedia',       // seals
+  'Sirenia',          // manatees/dugongs
+  'Testudines',       // sea turtles
+  'Procellariiformes',// tubenose seabirds
+  'Suliformes',       // gannets/cormorants
+  'Elasmobranchii',   // sharks, rays, skates
 ] as const;
 
 interface SeamapOccurrence {
@@ -139,7 +143,7 @@ export async function runSeamapEtl(): Promise<void> {
     const { data: nearestSite } = await supabase.rpc('nearby_dive_sites', {
       p_lat: occ.decimalLatitude,
       p_lng: occ.decimalLongitude,
-      p_radius_km: 50,
+      p_radius_km: 30, // megafauna can be observed far from any specific site; 30 km is appropriate
     });
 
     const siteId = nearestSite?.[0]?.id;

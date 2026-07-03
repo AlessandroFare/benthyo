@@ -69,7 +69,7 @@ export function LoginPage() {
   }
 
   return (
-    <div className="relative flex min-h-full items-center justify-center overflow-hidden bg-gradient-to-br from-navy via-navy-light to-ocean-900 p-4">
+    <div className="relative flex min-h-full items-center justify-center overflow-hidden bg-gradient-to-br from-[#061629] via-[#0A2342] to-[#0c4a6e] p-4">
       {/* Animated background bubbles. Pure CSS, no canvas, no
           perf hit. Each bubble is a different size + delay so the
           loop doesn't look mechanical. */}

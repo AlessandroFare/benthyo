@@ -13,6 +13,7 @@ import {
   YAxis,
 } from "recharts";
 import { useAnalytics } from "@/hooks/useAnalytics";
+import { useChartTheme } from "@/hooks/useChartTheme";
 import { useDashboardCharts, useDashboardKpis } from "@/hooks/useDashboard";
 import { MetricStrip } from "@/components/analytics/MetricStrip";
 import { AnalyticsAreaChart } from "@/components/charts/AnalyticsAreaChart";
@@ -63,6 +64,7 @@ export function AnalyticsPage() {
   const kpisQuery = useDashboardKpis();
   const chartsQuery = useDashboardCharts();
   const { data, isLoading, isError, refetch } = useAnalytics();
+  const chart = useChartTheme();
 
   if (isLoading || kpisQuery.isLoading || chartsQuery.isLoading) {
     return <PageSkeleton />;
@@ -168,16 +170,10 @@ export function AnalyticsPage() {
           ) : activeMetric === "sites" ? (
             <ResponsiveContainer width="100%" height={320}>
               <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                <XAxis dataKey="label" tick={{ fontSize: 11, fill: "rgba(255,255,255,0.45)" }} />
-                <YAxis tick={{ fontSize: 12, fill: "rgba(255,255,255,0.45)" }} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(213 22% 12%)",
-                    border: "1px solid rgba(255,255,255,0.08)",
-                    borderRadius: 12,
-                  }}
-                />
+                <CartesianGrid strokeDasharray="3 3" stroke={chart.gridStroke} />
+                <XAxis dataKey="label" tick={{ fontSize: 11, fill: chart.tickFill }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 12, fill: chart.tickFill }} axisLine={false} tickLine={false} />
+                <Tooltip contentStyle={chart.tooltipStyle} labelStyle={chart.tooltipLabelStyle} />
                 <Bar dataKey="value" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -273,13 +269,7 @@ export function AnalyticsPage() {
                       <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(213 22% 12%)",
-                      border: "1px solid rgba(255,255,255,0.08)",
-                      borderRadius: 12,
-                    }}
-                  />
+                  <Tooltip contentStyle={chart.tooltipStyle} labelStyle={chart.tooltipLabelStyle} />
                 </PieChart>
               </ResponsiveContainer>
             )}
@@ -304,16 +294,10 @@ export function AnalyticsPage() {
             ) : (
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={data.depth_histogram}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                  <XAxis dataKey="depth_range" tick={{ fontSize: 11, fill: "rgba(255,255,255,0.45)" }} />
-                  <YAxis tick={{ fontSize: 12, fill: "rgba(255,255,255,0.45)" }} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(213 22% 12%)",
-                      border: "1px solid rgba(255,255,255,0.08)",
-                      borderRadius: 12,
-                    }}
-                  />
+                  <CartesianGrid strokeDasharray="3 3" stroke={chart.gridStroke} />
+                  <XAxis dataKey="depth_range" tick={{ fontSize: 11, fill: chart.tickFill }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 12, fill: chart.tickFill }} axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={chart.tooltipStyle} labelStyle={chart.tooltipLabelStyle} />
                   <Bar dataKey="count" fill="#38bdf8" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>

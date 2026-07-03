@@ -13,12 +13,10 @@ import {
   Users,
   Waves,
 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useOperator } from "@/hooks/useOperator";
 
-// Grouped navigation. "Today" is the landing page (the daily operational
-// job-to-be-done); everything else is collapsed into logical sections so a
-// small dive shop isn't faced with a flat list of 9+ items.
 const navGroups: {
   heading: string | null;
   items: { to: string; label: string; icon: typeof MapPin; end?: boolean }[];
@@ -54,10 +52,6 @@ const navGroups: {
   },
 ];
 
-/** Brand + nav + operator footer. Labels are hidden below xl (the rail is
- *  icon-only) and revealed from xl up. The mobile drawer reuses this same
- *  markup but its parent forces `w-72`, so labels show via xl: classes too —
- *  to get labels in the drawer we pass `forceLabels`. */
 function SidebarBody({
   forceLabels = false,
   onNavigate,
@@ -70,6 +64,7 @@ function SidebarBody({
 
   return (
     <>
+      {/* Brand header */}
       <div className="flex h-16 items-center justify-center border-b border-white/10 px-3 xl:justify-start xl:gap-3 xl:px-5">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-ocean-500 shadow-lg shadow-ocean-500/20">
           <Waves className="h-5 w-5" />
@@ -80,13 +75,14 @@ function SidebarBody({
         </div>
       </div>
 
-      <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
+      {/* Nav items */}
+      <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3" aria-label="Primary navigation">
         {navGroups.map((group, gi) => (
-          <div key={group.heading ?? `group-${gi}`} className="flex flex-col gap-1">
+          <div key={group.heading ?? `group-${gi}`} className="flex flex-col gap-0.5">
             {group.heading && (
               <p
                 className={cn(
-                  "mt-3 px-3 text-[10px] font-semibold uppercase tracking-wider text-white/60",
+                  "mt-3 px-3 text-[10px] font-semibold uppercase tracking-wider text-white/50",
                   labelClass,
                 )}
               >
@@ -102,29 +98,68 @@ function SidebarBody({
                 onClick={onNavigate}
                 className={({ isActive }) =>
                   cn(
-                    "flex items-center justify-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-colors xl:justify-start",
+                    "group relative flex items-center justify-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150 xl:justify-start",
                     isActive
-                      ? "bg-white/10 text-white shadow-inner"
-                      : "text-white/70 hover:bg-white/5 hover:text-white",
+                      ? "text-white"
+                      : "text-white/65 hover:text-white",
                   )
                 }
               >
-                <Icon className="h-5 w-5 shrink-0" />
-                <span className={cn("truncate", labelClass)}>{label}</span>
+                {({ isActive }) => (
+                  <>
+                    {/* Animated background pill with layoutId */}
+                    <AnimatePresence>
+                      {isActive && (
+                        <motion.span
+                          layoutId="sidebar-active-pill"
+                          className="absolute inset-0 rounded-xl bg-white/10"
+                          initial={false}
+                          transition={{ type: "spring", stiffness: 500, damping: 40 }}
+                        />
+                      )}
+                    </AnimatePresence>
+                    {/* Hover background (only when not active) */}
+                    {!isActive && (
+                      <span className="absolute inset-0 rounded-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100 bg-white/5" />
+                    )}
+                    <Icon
+                      className={cn(
+                        "relative z-10 h-5 w-5 shrink-0 transition-colors",
+                        isActive ? "text-white" : "text-white/65 group-hover:text-white",
+                      )}
+                    />
+                    <span className={cn("relative z-10 truncate", labelClass)}>
+                      {label}
+                    </span>
+                    {isActive && (
+                      <motion.span
+                        layoutId="sidebar-active-dot"
+                        className={cn(
+                          "relative z-10 ml-auto hidden h-1.5 w-1.5 rounded-full bg-ocean-400",
+                          forceLabels ? "block" : "hidden xl:block",
+                        )}
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ delay: 0.1 }}
+                      />
+                    )}
+                  </>
+                )}
               </NavLink>
             ))}
           </div>
         ))}
       </nav>
 
+      {/* Operator footer */}
       <div className="border-t border-white/10 p-3">
-        <div className="flex items-center justify-center gap-3 rounded-xl bg-white/5 px-3 py-3 xl:justify-start">
+        <div className="flex items-center justify-center gap-3 rounded-xl bg-white/5 px-3 py-2.5 xl:justify-start">
           <Anchor className="h-4 w-4 shrink-0 text-ocean-300" />
           <div className={cn("hidden min-w-0", labelClass)}>
-            <p className="truncate text-xs font-medium">
+            <p className="truncate text-xs font-medium text-white">
               {operator?.name ?? "Dive Center"}
             </p>
-            <p className="truncate text-xs text-white/60">B2B Portal</p>
+            <p className="truncate text-[10px] text-white/50">B2B Portal</p>
           </div>
         </div>
       </div>
@@ -133,7 +168,6 @@ function SidebarBody({
 }
 
 interface SidebarProps {
-  /** Mobile drawer open state (only affects the < sm slide-over). */
   mobileOpen: boolean;
   onNavigate?: () => void;
 }
@@ -141,14 +175,12 @@ interface SidebarProps {
 export function Sidebar({ mobileOpen, onNavigate }: SidebarProps) {
   return (
     <>
-      {/* Desktop rail: hidden below sm, icon-only (76px) up to xl, full
-          labeled sidebar (256px) from xl up. Single element; label
-          visibility is purely CSS (hidden ... xl:block). */}
+      {/* Desktop rail */}
       <aside className="hidden h-full w-[76px] shrink-0 flex-col border-r border-white/10 bg-[#0A2342] text-white sm:flex xl:w-64">
         <SidebarBody onNavigate={onNavigate} />
       </aside>
 
-      {/* Mobile slide-over drawer (< sm only): full-width labeled sidebar. */}
+      {/* Mobile backdrop */}
       <div
         className={cn(
           "fixed inset-0 z-40 bg-black/60 backdrop-blur-sm transition-opacity duration-300 sm:hidden",
@@ -157,6 +189,8 @@ export function Sidebar({ mobileOpen, onNavigate }: SidebarProps) {
         onClick={onNavigate}
         aria-hidden="true"
       />
+
+      {/* Mobile drawer */}
       <aside
         className={cn(
           "fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col border-r border-white/10 bg-[#0A2342] text-white shadow-2xl transition-transform duration-300 ease-out sm:hidden",

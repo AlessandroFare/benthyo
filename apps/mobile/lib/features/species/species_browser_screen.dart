@@ -9,7 +9,11 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_scaffold.dart';
 import '../../core/widgets/async_value_widget.dart';
+import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/main_navigation.dart';
+import '../../core/widgets/ocean_card.dart';
+import '../../core/widgets/shimmer_skeleton.dart';
+import '../../core/widgets/staggered_list_animation.dart';
 import 'species_providers.dart';
 
 class SpeciesBrowserScreen extends ConsumerStatefulWidget {
@@ -81,21 +85,29 @@ class _SpeciesBrowserScreenState extends ConsumerState<SpeciesBrowserScreen> {
       actions: [
         IconButton(
           icon: const Icon(Icons.photo_camera_outlined),
+          tooltip: 'Identify from camera',
           onPressed: _identifyFromPhoto,
         ),
         IconButton(
           icon: const Icon(Icons.photo_library_outlined),
+          tooltip: 'Identify from gallery',
           onPressed: _identifyFromGallery,
         ),
       ],
       body: Column(
         children: [
+          // Search bar
           Padding(
-            padding: const EdgeInsets.all(AppSpacing.md),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.md,
+              AppSpacing.md,
+              AppSpacing.xs,
+            ),
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                hintText: 'Identify species...',
+                hintText: 'Search or identify species...',
                 prefixIcon: const Icon(Icons.search),
                 suffixIcon: _query.isNotEmpty
                     ? IconButton(
@@ -114,60 +126,42 @@ class _SpeciesBrowserScreenState extends ConsumerState<SpeciesBrowserScreen> {
           Expanded(
             child: AsyncValueWidget(
               value: speciesAsync,
-              isEmpty: (list) => list.isEmpty,
-              empty: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text('No species match your search'),
-                    const SizedBox(height: AppSpacing.md),
-                    FilledButton.icon(
-                      onPressed: _identifyFromPhoto,
-                      icon: const Icon(Icons.photo_camera),
-                      label: const Text('Identify from photo'),
+              loading: ListView.builder(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                itemCount: 8,
+                itemBuilder: (_, __) => Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                  child: ShimmerSkeleton(
+                    child: Container(
+                      height: 72,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(AppRadius.lg),
+                      ),
                     ),
-                  ],
+                  ),
                 ),
               ),
-              data: (species) => ListView.separated(
-                itemCount: species.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
-                itemBuilder: (context, index) {
-                  final s = species[index];
-                  return ListTile(
-                    minVerticalPadding: AppSpacing.sm,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.md,
-                      vertical: AppSpacing.xs,
-                    ),
-                    leading: ClipRRect(
-                      borderRadius: BorderRadius.circular(14),
-                      child: s.imageUrl != null
-                          ? CachedNetworkImage(
-                              imageUrl: s.imageUrl!,
-                              width: 56,
-                              height: 56,
-                              fit: BoxFit.cover,
-                            )
-                          : Container(
-                              width: 56,
-                              height: 56,
-                              color: AppColors.surfaceDark,
-                              child: const Icon(Icons.pets),
-                            ),
-                    ),
-                    title: Text(
-                      s.displayName(),
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                    subtitle: Text(
-                      s.scientificName,
-                      style: const TextStyle(fontStyle: FontStyle.italic),
-                    ),
-                    trailing: const Icon(Icons.chevron_right),
+              isEmpty: (list) => list.isEmpty,
+              empty: EmptyState(
+                icon: Icons.travel_explore_outlined,
+                title: _query.isNotEmpty
+                    ? 'No species match "$_query"'
+                    : 'No species yet',
+                subtitle: 'Try identifying from a photo with the AI engine.',
+                cta: 'Identify from photo',
+                onCta: _identifyFromPhoto,
+              ),
+              data: (species) => StaggeredListAnimation(
+                children: species.map((s) {
+                  return _SpeciesCard(
+                    key: ValueKey(s.id),
+                    displayName: s.displayName(),
+                    scientificName: s.scientificName,
+                    imageUrl: s.imageUrl,
                     onTap: () => context.push('/species/${s.id}'),
                   );
-                },
+                }).toList(),
               ),
             ),
           ),
@@ -179,6 +173,102 @@ class _SpeciesBrowserScreenState extends ConsumerState<SpeciesBrowserScreen> {
         icon: const Icon(Icons.photo_camera),
         label: const Text('Identify'),
       ),
+    );
+  }
+}
+
+class _SpeciesCard extends StatelessWidget {
+  const _SpeciesCard({
+    super.key,
+    required this.displayName,
+    required this.scientificName,
+    this.imageUrl,
+    this.onTap,
+  });
+
+  final String displayName;
+  final String scientificName;
+  final String? imageUrl;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return OceanCard(
+      onTap: onTap,
+      margin: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.xs,
+      ),
+      child: Row(
+        children: [
+          // Species thumbnail
+          Hero(
+            tag: 'species-img-$displayName',
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              child: SizedBox(
+                width: 52,
+                height: 52,
+                child: imageUrl != null
+                    ? CachedNetworkImage(
+                        imageUrl: imageUrl!,
+                        fit: BoxFit.cover,
+                        placeholder: (_, __) => ShimmerSkeleton(
+                          child: Container(color: Colors.white),
+                        ),
+                        errorWidget: (_, __, ___) => _PlaceholderIcon(),
+                      )
+                    : _PlaceholderIcon(),
+              ),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  displayName,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  scientificName,
+                  style: TextStyle(
+                    fontStyle: FontStyle.italic,
+                    fontSize: 12.5,
+                    color: AppColors.textSecondary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Icon(
+            Icons.chevron_right,
+            color: AppColors.textSecondary,
+            size: 20,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PlaceholderIcon extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: AppColors.oceanMid.withValues(alpha: 0.2),
+      child: const Icon(Icons.set_meal_outlined, color: AppColors.textSecondary),
     );
   }
 }
