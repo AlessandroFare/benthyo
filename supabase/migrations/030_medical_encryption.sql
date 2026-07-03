@@ -24,9 +24,6 @@
 -- does NOT come through the SECURITY DEFINER RPC, so direct PostgREST writes
 -- are rejected.
 
--- Ensure pgcrypto is available (used only for hmac/digest in other migrations).
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
-
 -- ---------------------------------------------------------------------------
 -- Stub helpers (no-ops at DB level; real work done in application layer).
 -- ---------------------------------------------------------------------------
@@ -37,17 +34,13 @@ LANGUAGE sql
 IMMUTABLE
 AS $$
   -- Returns a deterministic opaque token used as a key-derivation input
-  -- in the application layer. The DB itself never uses this for crypto.
-  SELECT encode(
-    hmac(
-      p_operator_id::text,
-      COALESCE(
+  -- in the application layer. Uses built-in md5() — no pgcrypto required.
+  SELECT md5(
+    p_operator_id::text
+    || COALESCE(
         current_setting('app.medical_master_key', true),
         'benthyo-dev-master-key-do-not-use-in-prod'
-      ),
-      'sha256'
-    ),
-    'hex'
+      )
   )
 $$;
 
