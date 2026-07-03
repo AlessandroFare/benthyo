@@ -74,7 +74,9 @@ export function KpiCard({
       onClick={onClick}
       className={cn(onClick && "cursor-pointer")}
     >
-      <Card className="border-border bg-card text-card-foreground">
+      <Card className="overflow-hidden border-border bg-card text-card-foreground">
+        {/* Colored top accent line */}
+        <div className="h-0.5 w-full" style={{ backgroundColor: color }} />
         <CardContent className="p-5">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
@@ -117,8 +119,8 @@ export function KpiCard({
               )}
             </div>
             <div
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
-              style={{ backgroundColor: `${color}1f` }}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1"
+              style={{ backgroundColor: `${color}18`, ringColor: `${color}30` }}
             >
               <Icon className="h-5 w-5" style={{ color }} />
             </div>

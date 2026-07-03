@@ -105,8 +105,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
             children: [
               // Animated icon + ripple
               SizedBox(
-                width: 120,
-                height: 120,
+                width: 140,
+                height: 140,
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
@@ -114,14 +114,14 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                     AnimatedBuilder(
                       animation: _ripple,
                       builder: (context, _) => Container(
-                        width: 80 + _ripple.value * 40,
-                        height: 80 + _ripple.value * 40,
+                        width: 96 + _ripple.value * 44,
+                        height: 96 + _ripple.value * 44,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           border: Border.all(
                             color: AppColors.accent
-                                .withValues(alpha: (1 - _ripple.value) * 0.4),
-                            width: 2,
+                                .withValues(alpha: (1 - _ripple.value) * 0.45),
+                            width: 1.5,
                           ),
                         ),
                       ),
@@ -132,30 +132,26 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                       child: FadeTransition(
                         opacity: _logoFade,
                         child: Container(
-                          width: 72,
-                          height: 72,
+                          width: 80,
+                          height: 80,
                           decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                AppColors.accent.withValues(alpha: 0.9),
-                                AppColors.oceanMid,
-                              ],
-                            ),
+                            borderRadius: BorderRadius.circular(AppRadius.xl),
                             boxShadow: [
                               BoxShadow(
-                                color: AppColors.accent.withValues(alpha: 0.35),
-                                blurRadius: 24,
-                                spreadRadius: 4,
+                                color: AppColors.accent.withValues(alpha: 0.40),
+                                blurRadius: 32,
+                                spreadRadius: 6,
                               ),
                             ],
                           ),
-                          child: const Icon(
-                            Icons.scuba_diving,
-                            size: 36,
-                            color: Colors.white,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(AppRadius.xl),
+                            child: Image.asset(
+                              'assets/brand/icon-1024.png',
+                              width: 80,
+                              height: 80,
+                              fit: BoxFit.cover,
+                            ),
                           ),
                         ),
                       ),

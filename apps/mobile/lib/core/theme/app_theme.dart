@@ -4,8 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 class AppColors {
   static const primary = Color(0xFF0A2342);
   static const accent = Color(0xFF00E5FF);
-  static const backgroundDark = Color(0xFF0D1117);
-  static const surfaceDark = Color(0xFF161B22);
+  static const backgroundDark = Color(0xFF080E18); // deep ocean navy
+  static const surfaceDark = Color(0xFF111823);
   static const surfaceLight = Color(0xFFF6F8FA);
   static const error = Color(0xFFFF6B6B);
   static const success = Color(0xFF3FB950);
@@ -232,6 +232,8 @@ class AppTheme {
       appBarTheme: AppBarTheme(
         backgroundColor: AppColors.backgroundDark,
         foregroundColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 0,
         titleTextStyle: GoogleFonts.spaceGrotesk(
           fontSize: 20,
           fontWeight: FontWeight.w600,
@@ -243,7 +245,7 @@ class AppTheme {
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: Color(0xFF30363D)),
+          side: BorderSide(color: AppColors.borderDark.withValues(alpha: 0.8)),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
@@ -275,10 +277,19 @@ class AppTheme {
       navigationBarTheme: NavigationBarThemeData(
         height: 72,
         backgroundColor: AppColors.surfaceDark,
-        indicatorColor: AppColors.accent.withValues(alpha: 0.15),
-        labelTextStyle: WidgetStatePropertyAll(
-          GoogleFonts.inter(fontSize: 12, color: Colors.white70),
+        indicatorColor: AppColors.accent.withValues(alpha: 0.18),
+        indicatorShape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
         ),
+        iconTheme: WidgetStatePropertyAll(
+          IconThemeData(color: Colors.white70, size: 22),
+        ),
+        labelTextStyle: WidgetStatePropertyAll(
+          GoogleFonts.inter(fontSize: 11.5, color: Colors.white70, fontWeight: FontWeight.w500),
+        ),
+        surfaceTintColor: Colors.transparent,
+        shadowColor: Colors.transparent,
+        elevation: 0,
       ),
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: AppColors.accent,

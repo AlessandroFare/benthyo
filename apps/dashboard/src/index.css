@@ -38,25 +38,25 @@
 
   /* ── Dark theme ─────────────────────────────────────────────────────────── */
   .dark {
-    --background: 215 28% 7%;           /* #0D1117 */
+    --background: 216 46% 6%;           /* deep ocean navy #07101A */
     --foreground: 210 40% 98%;
-    --card: 213 22% 12%;                /* #161B22 */
+    --card: 216 36% 10%;                /* #0D1825 */
     --card-foreground: 210 40% 98%;
-    --popover: 213 22% 12%;
+    --popover: 216 36% 10%;
     --popover-foreground: 210 40% 98%;
-    --primary: 201 96% 42%;             /* brighter ocean on dark */
+    --primary: 199 96% 48%;             /* vivid ocean teal on dark */
     --primary-foreground: 222 47% 11%;
-    --secondary: 215 28% 17%;           /* #21262D */
+    --secondary: 216 30% 16%;           /* #182435 */
     --secondary-foreground: 210 40% 98%;
-    --muted: 215 28% 17%;
-    --muted-foreground: 215 14% 65%;    /* #8B949E — AA-compliant on card */
-    --accent: 215 28% 20%;
+    --muted: 216 30% 16%;
+    --muted-foreground: 215 18% 62%;    /* AA-compliant on card */
+    --accent: 216 30% 18%;
     --accent-foreground: 210 40% 98%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 210 40% 98%;
-    --border: 215 14% 22%;              /* #30363D */
-    --input: 215 14% 22%;
-    --ring: 201 96% 42%;
+    --border: 216 24% 20%;              /* subtle ocean border */
+    --input: 216 24% 20%;
+    --ring: 199 96% 48%;
 
     /* Sidebar tokens stay the same dark navy */
     --sidebar-bg: 213 78% 15%;

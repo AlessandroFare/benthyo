@@ -32,12 +32,35 @@ class AppScaffold extends StatelessWidget {
           : AppBar(
               title: Text(title!),
               automaticallyImplyLeading: false,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(1),
+                child: Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: AppColors.borderDark.withValues(alpha: 0.6),
+                ),
+              ),
               leading: showBack && canPop
                   ? IconButton(
                       icon: const Icon(Icons.arrow_back),
                       onPressed: () => context.pop(),
                     )
-                  : null,
+                  : !showBack
+                      ? Padding(
+                          padding: const EdgeInsets.all(10),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(AppRadius.sm),
+                            child: Image.asset(
+                              'assets/brand/icon-1024.png',
+                              width: 36,
+                              height: 36,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        )
+                      : null,
               actions: actions,
             ),
       body: body,
