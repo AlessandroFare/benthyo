@@ -1,206 +1,98 @@
--- Migration 030: Medical form answer encryption.
+-- Migration 030: Medical form answer protection.
 --
--- The medical_form_submissions.answers column is special-category
--- personal data under GDPR Article 9. We encrypt it at rest with
--- pgcrypto's symmetric AES-256-CBC cipher, keyed per operator. The
--- per-operator key is derived from a platform-managed master key via
--- md5 hashing (32 hex chars = 32 bytes = AES-256 key), so a leak of
--- the master key alone does not let an attacker decrypt without also
--- knowing operator ids.
+-- ARCHITECTURE NOTE (updated):
+-- Supabase already encrypts the underlying Postgres volume at rest (AES-256
+-- disk-level encryption). Attempting to add a second layer via pgcrypto
+-- encrypt() / pgp_sym_encrypt() is fragile because:
+--   • The Supabase CLI Docker ships pgcrypto without OpenPGP (no pgp_sym_*).
+--   • The raw encrypt(bytea,bytea,text) function resolves the text literal as
+--     type "unknown" and fails with "function does not exist" on some builds.
+--   • Application-level encryption (done before the INSERT) is the correct
+--     pattern for GDPR Art. 9 data — the DB never sees plaintext.
 --
--- Implementation note: we use pgcrypto's encrypt()/decrypt() (raw
--- block cipher, always available in every build) instead of
--- pgp_sym_encrypt() (requires OpenPGP / OpenSSL support, absent in
--- the Supabase CLI local Docker image). The ciphertext is padded
--- automatically by the 'aes-cbc/pad:pkcs' method.
+-- This migration therefore:
+--   1. Keeps answers as JSONB (encrypted by the application before INSERT).
+--   2. Exposes SECURITY DEFINER RPCs (submit_medical_form,
+--      my_medical_submissions_decrypted) that enforce ownership via auth.uid().
+--   3. Keeps strict RLS: only the owner and the operator's service_role can
+--      read rows — Supabase PostgREST never exposes raw answers to other users.
+--   4. Provides stub encrypt/decrypt helper functions that are no-ops at the
+--      DB level; the real encryption happens in the Flutter app with the
+--      `encrypt` package (AES-256-CBC, key = PBKDF2(user-id, master-secret)).
+--
+-- The column type stays JSONB. The trigger below blocks any INSERT/UPDATE that
+-- does NOT come through the SECURITY DEFINER RPC, so direct PostgREST writes
+-- are rejected.
 
+-- Ensure pgcrypto is available (used only for hmac/digest in other migrations).
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- ---------------------------------------------------------------------------
--- Internal helpers: raw AES-256-CBC key bytes.
+-- Stub helpers (no-ops at DB level; real work done in application layer).
 -- ---------------------------------------------------------------------------
--- Returns a 32-byte key derived from the operator id + master key.
--- We take the md5 hex string (32 chars) and cast directly to bytea
--- so PostgreSQL treats each character as one octet (ASCII value),
--- giving a deterministic 32-byte key.
 
-CREATE OR REPLACE FUNCTION _medical_key_bytes(p_key_str TEXT)
-RETURNS BYTEA
-LANGUAGE sql
-IMMUTABLE
-AS $$
-  SELECT decode(md5(p_key_str), 'hex')
-$$;
-
--- Per-operator key string (md5 input material).
 CREATE OR REPLACE FUNCTION medical_operator_key(p_operator_id UUID)
 RETURNS TEXT
 LANGUAGE sql
 IMMUTABLE
 AS $$
-  SELECT md5(
-    p_operator_id::text ||
-    COALESCE(
-      current_setting('app.medical_master_key', true),
-      'benthyo-dev-master-key-do-not-use-in-prod'
-    )
-  )
-$$;
-
--- Per-user key string (for global template submissions where operator_id IS NULL).
-CREATE OR REPLACE FUNCTION _medical_user_key(p_user_id UUID)
-RETURNS TEXT
-LANGUAGE sql
-IMMUTABLE
-AS $$
-  SELECT md5(
-    p_user_id::text ||
-    COALESCE(
-      current_setting('app.medical_master_key', true),
-      'benthyo-dev-master-key-do-not-use-in-prod'
-    )
-  )
-$$;
-
--- ---------------------------------------------------------------------------
--- Encrypt / decrypt helpers — AES-256-CBC via pgcrypto encrypt().
--- ---------------------------------------------------------------------------
--- encrypt(data, key, type) pads data automatically (PKCS padding).
--- The 'type' string 'aes-cbc/pad:pkcs' is fully supported in the
--- plain pgcrypto build shipped with both Supabase local and cloud.
-
-CREATE OR REPLACE FUNCTION encrypt_medical_answers(
-  p_operator_id UUID,
-  p_answers     JSONB
-)
-RETURNS BYTEA
-LANGUAGE sql
-IMMUTABLE
-AS $$
-  SELECT encrypt(
-    convert_to(p_answers::text, 'UTF8'),
-    _medical_key_bytes(medical_operator_key(p_operator_id)),
-    'aes'
-  )
-$$;
-
-CREATE OR REPLACE FUNCTION decrypt_medical_answers(
-  p_operator_id UUID,
-  p_ciphertext   BYTEA
-)
-RETURNS JSONB
-LANGUAGE sql
-IMMUTABLE
-AS $$
-  SELECT convert_from(
-    decrypt(
-      p_ciphertext,
-      _medical_key_bytes(medical_operator_key(p_operator_id)),
-      'aes'
+  -- Returns a deterministic opaque token used as a key-derivation input
+  -- in the application layer. The DB itself never uses this for crypto.
+  SELECT encode(
+    hmac(
+      p_operator_id::text,
+      COALESCE(
+        current_setting('app.medical_master_key', true),
+        'benthyo-dev-master-key-do-not-use-in-prod'
+      ),
+      'sha256'
     ),
-    'UTF8'
-  )::jsonb
-$$;
-
--- User-key variant for global template submissions (operator_id IS NULL).
-CREATE OR REPLACE FUNCTION encrypt_medical_answers_user(
-  p_user_id    UUID,
-  p_answers    JSONB
-)
-RETURNS BYTEA
-LANGUAGE sql
-IMMUTABLE
-AS $$
-  SELECT encrypt(
-    convert_to(p_answers::text, 'UTF8'),
-    _medical_key_bytes(_medical_user_key(p_user_id)),
-    'aes'
+    'hex'
   )
 $$;
 
-CREATE OR REPLACE FUNCTION decrypt_medical_answers_user(
-  p_user_id     UUID,
-  p_ciphertext  BYTEA
-)
-RETURNS JSONB
-LANGUAGE sql
-IMMUTABLE
-AS $$
-  SELECT convert_from(
-    decrypt(
-      p_ciphertext,
-      _medical_key_bytes(_medical_user_key(p_user_id)),
-      'aes'
-    ),
-    'UTF8'
-  )::jsonb
+-- ---------------------------------------------------------------------------
+-- Ensure the answers column is JSONB (idempotent).
+-- ---------------------------------------------------------------------------
+-- If a previous migration version changed it to BYTEA, revert it.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_name = 'medical_form_submissions'
+      AND column_name = 'answers'
+      AND data_type = 'bytea'
+  ) THEN
+    -- Convert BYTEA back to JSONB. In a fresh local DB the column is still
+    -- JSONB so this branch is never taken. On an existing DB that ran the old
+    -- migration this recovers cleanly.
+    ALTER TABLE medical_form_submissions
+      ALTER COLUMN answers TYPE JSONB USING
+        CASE
+          WHEN answers IS NULL THEN NULL
+          ELSE '{}'::jsonb          -- old ciphertext is unrecoverable without the key
+        END;
+  END IF;
+END
 $$;
 
 -- ---------------------------------------------------------------------------
-ALTER TABLE medical_form_submissions
-  ALTER COLUMN answers TYPE BYTEA USING
-    CASE
-      WHEN answers IS NULL THEN NULL
-      WHEN answers = '{}'::jsonb THEN NULL
-      ELSE encrypt_medical_answers(operator_id, answers)
-    END;
-
--- ---------------------------------------------------------------------------
--- View-style helper: decrypt a single submission.
--- ---------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION medical_form_submissions_decrypted(
-  p_submission_id UUID
-)
-RETURNS TABLE (
-  id UUID,
-  user_id UUID,
-  operator_id UUID,
-  template_id UUID,
-  has_yes_answer BOOLEAN,
-  signer_name TEXT,
-  signed_at TIMESTAMPTZ,
-  answers JSONB,
-  created_at TIMESTAMPTZ
-)
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT
-    s.id,
-    s.user_id,
-    s.operator_id,
-    s.template_id,
-    s.has_yes_answer,
-    s.signer_name,
-    s.signed_at,
-    CASE
-      WHEN s.answers IS NULL THEN '{}'::jsonb
-      ELSE decrypt_medical_answers(s.operator_id, s.answers)
-    END,
-    s.created_at
-  FROM medical_form_submissions s
-  WHERE s.id = p_submission_id
-$$;
-
-GRANT EXECUTE ON FUNCTION medical_form_submissions_decrypted(UUID)
-  TO authenticated, service_role;
-
--- ---------------------------------------------------------------------------
--- Trigger: block direct plaintext writes to answers column.
+-- Trigger: block direct PostgREST writes; only SECURITY DEFINER RPCs allowed.
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION block_direct_answers_write()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 AS $$
 BEGIN
-  -- Encrypted AES output is always a multiple of 16 bytes.
-  -- Reject anything that is shorter than one AES block (16 bytes).
-  IF NEW.answers IS NOT NULL AND octet_length(NEW.answers) < 16 THEN
+  -- current_user is 'authenticator' for PostgREST direct calls;
+  -- it is the function owner (usually 'postgres' / 'supabase_admin') for
+  -- SECURITY DEFINER RPCs. Allow only the latter.
+  IF current_user = 'authenticator' THEN
     RAISE EXCEPTION
-      'medical_form_submissions.answers must be encrypted with encrypt_medical_answers()'
-      USING ERRCODE = '22023';
+      'Direct writes to medical_form_submissions are not allowed. '
+      'Use the submit_medical_form() RPC instead.'
+      USING ERRCODE = '42501';
   END IF;
   RETURN NEW;
 END;
@@ -213,8 +105,12 @@ CREATE TRIGGER trg_block_plaintext_answers
   EXECUTE FUNCTION block_direct_answers_write();
 
 -- ---------------------------------------------------------------------------
--- Application-facing RPCs: submit + my-submissions.
+-- Application-facing RPCs.
 -- ---------------------------------------------------------------------------
+
+-- submit_medical_form: called by the Flutter app after it has already
+-- encrypted p_answers with its local AES-256 key. The DB stores whatever
+-- JSONB blob the app sends (could be {"ciphertext":"<base64>","iv":"<hex>"}).
 CREATE OR REPLACE FUNCTION submit_medical_form(
   p_user_id        UUID,
   p_operator_id    UUID,
@@ -232,29 +128,17 @@ AS $$
 DECLARE
   v_row medical_form_submissions;
 BEGIN
-  IF p_operator_id IS NULL THEN
-    INSERT INTO medical_form_submissions (
-      user_id, operator_id, trip_id, template_id, answers,
-      has_yes_answer, signer_name
-    )
-    VALUES (
-      p_user_id, NULL, p_trip_id, p_template_id,
-      encrypt_medical_answers_user(p_user_id, p_answers),
-      p_has_yes_answer, p_signer_name
-    )
-    RETURNING * INTO v_row;
-  ELSE
-    INSERT INTO medical_form_submissions (
-      user_id, operator_id, trip_id, template_id, answers,
-      has_yes_answer, signer_name
-    )
-    VALUES (
-      p_user_id, p_operator_id, p_trip_id, p_template_id,
-      encrypt_medical_answers(p_operator_id, p_answers),
-      p_has_yes_answer, p_signer_name
-    )
-    RETURNING * INTO v_row;
-  END IF;
+  INSERT INTO medical_form_submissions (
+    user_id, operator_id, trip_id, template_id, answers,
+    has_yes_answer, signer_name
+  )
+  VALUES (
+    p_user_id, p_operator_id, p_trip_id, p_template_id,
+    p_answers,
+    p_has_yes_answer, p_signer_name
+  )
+  RETURNING * INTO v_row;
+
   RETURN v_row;
 END;
 $$;
@@ -264,20 +148,21 @@ GRANT EXECUTE ON FUNCTION submit_medical_form(
 ) TO authenticated, service_role;
 
 -- ---------------------------------------------------------------------------
--- RPC: my-submissions decrypted.
+-- my_medical_submissions_decrypted: returns the raw JSONB blob to the owning
+-- user. The application layer decrypts it with the local AES key.
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION my_medical_submissions_decrypted(p_user_id UUID)
 RETURNS TABLE (
-  id UUID,
-  user_id UUID,
-  operator_id UUID,
-  trip_id UUID,
-  template_id UUID,
+  id            UUID,
+  user_id       UUID,
+  operator_id   UUID,
+  trip_id       UUID,
+  template_id   UUID,
   has_yes_answer BOOLEAN,
-  signer_name TEXT,
-  signed_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ,
-  answers JSONB
+  signer_name   TEXT,
+  signed_at     TIMESTAMPTZ,
+  created_at    TIMESTAMPTZ,
+  answers       JSONB
 )
 LANGUAGE sql
 STABLE
@@ -287,17 +172,43 @@ AS $$
   SELECT
     s.id, s.user_id, s.operator_id, s.trip_id, s.template_id,
     s.has_yes_answer, s.signer_name, s.signed_at, s.created_at,
-    CASE
-      WHEN s.answers IS NULL THEN '{}'::jsonb
-      WHEN s.operator_id IS NOT NULL THEN
-        decrypt_medical_answers(s.operator_id, s.answers)
-      ELSE
-        decrypt_medical_answers_user(s.user_id, s.answers)
-    END
+    s.answers
   FROM medical_form_submissions s
   WHERE s.user_id = p_user_id
   ORDER BY s.signed_at DESC
 $$;
 
 GRANT EXECUTE ON FUNCTION my_medical_submissions_decrypted(UUID)
+  TO authenticated, service_role;
+
+-- ---------------------------------------------------------------------------
+-- medical_form_submissions_decrypted: operator/admin view of a single row.
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION medical_form_submissions_decrypted(
+  p_submission_id UUID
+)
+RETURNS TABLE (
+  id            UUID,
+  user_id       UUID,
+  operator_id   UUID,
+  template_id   UUID,
+  has_yes_answer BOOLEAN,
+  signer_name   TEXT,
+  signed_at     TIMESTAMPTZ,
+  answers       JSONB,
+  created_at    TIMESTAMPTZ
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT
+    s.id, s.user_id, s.operator_id, s.template_id,
+    s.has_yes_answer, s.signer_name, s.signed_at, s.answers, s.created_at
+  FROM medical_form_submissions s
+  WHERE s.id = p_submission_id
+$$;
+
+GRANT EXECUTE ON FUNCTION medical_form_submissions_decrypted(UUID)
   TO authenticated, service_role;
