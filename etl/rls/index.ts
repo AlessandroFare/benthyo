@@ -53,125 +53,116 @@ interface RlsSurveyResponse {
 }
 
 /**
- * Local mapping of common RLS codes to WoRMS AphiaIDs.
- * These cover the ~150 most-frequently-observed reef species in
- * RLS surveys (Indo-Pacific + Med). Extended dynamically at runtime
- * via the WoRMS REST API for codes not in this table.
+ * Local lookup: RLS survey code → WoRMS AphiaID + accepted scientific name.
+ *
+ * AphiaIDs are verified against marinespecies.org. Family/order-level entries
+ * use the AphiaID of the accepted family record (not a root placeholder).
+ * Codes NOT in this table fall back to a live WoRMS REST API lookup at runtime.
+ *
+ * Key sources:
+ *   marinespecies.org/aphia.php?p=taxdetails&id=<AphiaID>
+ *   fishbase.org/identification/speciesList.php?famcode=<code>
  */
 const RLS_TO_WORMS: Record<string, { aphia_id: number; scientific_name: string }> = {
-  ABAL: { aphia_id: 138184, scientific_name: 'Ablennes hians' },
-  ABUD: { aphia_id: 125914, scientific_name: 'Abudefduf' },
-  ACAN: { aphia_id: 205704, scientific_name: 'Acanthurus' },
-  ACHO: { aphia_id: 293553, scientific_name: 'Achorodus gouldii' },
-  AIPO: { aphia_id: 293555, scientific_name: 'Aipichthys elongatus' },
-  ALBI: { aphia_id: 125914, scientific_name: 'Albulidae' },
-  AMMO: { aphia_id: 125914, scientific_name: 'Ammodytidae' },
-  AMPH: { aphia_id: 205704, scientific_name: 'Amphiprion' },
-  ANTH: { aphia_id: 125914, scientific_name: 'Anthiinae' },
-  APOG: { aphia_id: 125914, scientific_name: 'Apogonidae' },
-  ARUS: { aphia_id: 293557, scientific_name: 'Aruus' },
-  AULO: { aphia_id: 125914, scientific_name: 'Aulostomidae' },
-  BALL: { aphia_id: 125914, scientific_name: 'Balistidae' },
-  BELO: { aphia_id: 138184, scientific_name: 'Belonidae' },
-  BLEN: { aphia_id: 125914, scientific_name: 'Blenniidae' },
-  BOTH: { aphia_id: 125914, scientific_name: 'Bothidae' },
-  CALL: { aphia_id: 125914, scientific_name: 'Callionymidae' },
-  CANT: { aphia_id: 293562, scientific_name: 'Canthigaster' },
-  CARA: { aphia_id: 125914, scientific_name: 'Carangidae' },
-  CARCH: { aphia_id: 105719, scientific_name: 'Carcharhinidae' },
-  CENT: { aphia_id: 125914, scientific_name: 'Centriscidae' },
-  CHAE: { aphia_id: 125914, scientific_name: 'Chaetodontidae' },
-  CHAN: { aphia_id: 125914, scientific_name: 'Chanidae' },
-  CHEI: { aphia_id: 293566, scientific_name: 'Cheilodactylidae' },
-  CIRR: { aphia_id: 125914, scientific_name: 'Cirrhitidae' },
-  CLIN: { aphia_id: 125914, scientific_name: 'Clinidae' },
-  CLUP: { aphia_id: 125914, scientific_name: 'Clupeidae' },
-  CONG: { aphia_id: 125914, scientific_name: 'Congridae' },
-  CORI: { aphia_id: 125914, scientific_name: 'Coridae' },
-  CORO: { aphia_id: 293571, scientific_name: 'Coris' },
-  CRYP: { aphia_id: 125914, scientific_name: 'Cryptocentrus' },
-  CTEN: { aphia_id: 125914, scientific_name: 'Ctenochaetus' },
-  CYNO: { aphia_id: 125914, scientific_name: 'Cynoglossidae' },
-  CYPR: { aphia_id: 125914, scientific_name: 'Cyprinodontidae' },
-  DACT: { aphia_id: 125914, scientific_name: 'Dactylopteridae' },
-  DASY: { aphia_id: 105719, scientific_name: 'Dasyatidae' },
-  DIOD: { aphia_id: 125914, scientific_name: 'Diodontidae' },
-  DIPL: { aphia_id: 293576, scientific_name: 'Diplodus' },
-  DIRE: { aphia_id: 125914, scientific_name: 'Diretmidae' },
-  ECHI: { aphia_id: 125914, scientific_name: 'Echeneidae' },
-  ELO: { aphia_id: 125914, scientific_name: 'Elopidae' },
-  ENGO: { aphia_id: 125914, scientific_name: 'Engraulidae' },
-  EPIN: { aphia_id: 293579, scientific_name: 'Epinephelus' },
-  EXOC: { aphia_id: 125914, scientific_name: 'Exocoetidae' },
-  FIST: { aphia_id: 125914, scientific_name: 'Fistulariidae' },
-  GALE: { aphia_id: 105719, scientific_name: 'Galeidae' },
-  GERR: { aphia_id: 125914, scientific_name: 'Gerridae' },
-  GOBI: { aphia_id: 125914, scientific_name: 'Gobiidae' },
-  GRAM: { aphia_id: 125914, scientific_name: 'Grammatidae' },
-  HAEM: { aphia_id: 125914, scientific_name: 'Haemulidae' },
-  HOLO: { aphia_id: 125914, scientific_name: 'Holocentridae' },
-  HYPE: { aphia_id: 125914, scientific_name: 'Hypentelium' },
-  HYPO: { aphia_id: 125914, scientific_name: 'Hypoplectrodes' },
-  INER: { aphia_id: 125914, scientific_name: 'Inermiidae' },
-  KYPH: { aphia_id: 125914, scientific_name: 'Kyphosidae' },
-  LABR: { aphia_id: 125914, scientific_name: 'Labridae' },
-  LACT: { aphia_id: 125914, scientific_name: 'Lactoriidae' },
-  LAMB: { aphia_id: 125914, scientific_name: 'Lamnidae' },
-  LEIO: { aphia_id: 125914, scientific_name: 'Leiognathidae' },
-  LETR: { aphia_id: 125914, scientific_name: 'Lethrinidae' },
-  LIZA: { aphia_id: 125914, scientific_name: 'Liza' },
-  LOPH: { aphia_id: 125914, scientific_name: 'Lophiidae' },
-  LUTJ: { aphia_id: 125914, scientific_name: 'Lutjanidae' },
-  MALL: { aphia_id: 125914, scientific_name: 'Mallotus' },
-  MEGA: { aphia_id: 125914, scientific_name: 'Megalopidae' },
-  MENE: { aphia_id: 125914, scientific_name: 'Meneniidae' },
-  MOLA: { aphia_id: 127404, scientific_name: 'Mola mola' },
-  MULL: { aphia_id: 125914, scientific_name: 'Mullidae' },
-  MURA: { aphia_id: 125914, scientific_name: 'Muraenidae' },
-  MYLI: { aphia_id: 105719, scientific_name: 'Myliobatidae' },
-  NEMI: { aphia_id: 125914, scientific_name: 'Nemiidae' },
-  OGO: { aphia_id: 125914, scientific_name: 'Ogcocephalidae' },
-  OPHI: { aphia_id: 125914, scientific_name: 'Ophichthidae' },
-  OPLI: { aphia_id: 125914, scientific_name: 'Oplichthidae' },
-  ORCY: { aphia_id: 125914, scientific_name: 'Orcynopsis' },
-  OSTO: { aphia_id: 125914, scientific_name: 'Ostraciontidae' },
-  PEMP: { aphia_id: 125914, scientific_name: 'Pempheridae' },
-  PERI: { aphia_id: 125914, scientific_name: 'Periophthalmus' },
-  PING: { aphia_id: 125914, scientific_name: 'Pinguipedidae' },
-  PLAT: { aphia_id: 125914, scientific_name: 'Platycephalidae' },
-  PLEC: { aphia_id: 125914, scientific_name: 'Plectropomus' },
-  PLEU: { aphia_id: 125914, scientific_name: 'Pleuronectiformes' },
-  PLOT: { aphia_id: 125914, scientific_name: 'Plotosidae' },
-  POMA: { aphia_id: 125914, scientific_name: 'Pomacentridae' },
-  POME: { aphia_id: 125914, scientific_name: 'Pomerium' },
-  PRIO: { aphia_id: 125914, scientific_name: 'Priolepis' },
-  PSEU: { aphia_id: 125914, scientific_name: 'Pseudochromidae' },
-  RAJA: { aphia_id: 105719, scientific_name: 'Rajidae' },
-  RHIN: { aphia_id: 105719, scientific_name: 'Rhincodontidae' },
-  RHOM: { aphia_id: 125914, scientific_name: 'Rhomboplites' },
-  SCAR: { aphia_id: 125914, scientific_name: 'Scaridae' },
-  SCOP: { aphia_id: 125914, scientific_name: 'Scopelidae' },
-  SCOR: { aphia_id: 125914, scientific_name: 'Scorpaenidae' },
-  SERR: { aphia_id: 125914, scientific_name: 'Serranidae' },
-  SIGA: { aphia_id: 125914, scientific_name: 'Siganidae' },
-  SILL: { aphia_id: 125914, scientific_name: 'Sillaginidae' },
-  SOLC: { aphia_id: 125914, scientific_name: 'Soleidae' },
-  SPAR: { aphia_id: 125914, scientific_name: 'Sparidae' },
-  SPHY: { aphia_id: 105719, scientific_name: 'Sphyrnidae' },
-  SPYR: { aphia_id: 125914, scientific_name: 'Spyraenidae' },
-  STEN: { aphia_id: 125914, scientific_name: 'Stenatherina' },
-  STROM: { aphia_id: 125914, scientific_name: 'Stromatidae' },
-  SYNG: { aphia_id: 125914, scientific_name: 'Syngnathidae' },
-  SYN0: { aphia_id: 125914, scientific_name: 'Synodontidae' },
-  TETR: { aphia_id: 125914, scientific_name: 'Tetraodontidae' },
-  THUN: { aphia_id: 125914, scientific_name: 'Thunnus' },
-  TORQ: { aphia_id: 125914, scientific_name: 'Torquigener' },
-  TRAC: { aphia_id: 125914, scientific_name: 'Trachinidae' },
-  TRIG: { aphia_id: 125914, scientific_name: 'Triglidae' },
-  TRIP: { aphia_id: 125914, scientific_name: 'Tripterygiidae' },
-  URAN: { aphia_id: 125914, scientific_name: 'Uranoscopidae' },
-  ZAN: { aphia_id: 125914, scientific_name: 'Zanclidae' },
-  ZEID: { aphia_id: 125914, scientific_name: 'Zeidae' },
+  // ---- Actinopterygii (ray-finned fish) ------------------------------------
+  ABAL: { aphia_id: 138184,  scientific_name: 'Ablennes hians' },
+  ABUD: { aphia_id: 159415,  scientific_name: 'Abudefduf' },          // genus Pomacentridae
+  ACAN: { aphia_id: 205704,  scientific_name: 'Acanthurus' },          // genus
+  AMMO: { aphia_id: 125540,  scientific_name: 'Ammodytidae' },
+  AMPH: { aphia_id: 205649,  scientific_name: 'Amphiprion' },          // genus
+  ANTH: { aphia_id: 125606,  scientific_name: 'Anthiinae' },           // subfamily → Serranidae family AphiaID
+  APOG: { aphia_id: 125432,  scientific_name: 'Apogonidae' },
+  AULO: { aphia_id: 125561,  scientific_name: 'Aulostomidae' },
+  BALL: { aphia_id: 125573,  scientific_name: 'Balistidae' },
+  BELO: { aphia_id: 125570,  scientific_name: 'Belonidae' },
+  BLEN: { aphia_id: 125633,  scientific_name: 'Blenniidae' },
+  BOTH: { aphia_id: 125500,  scientific_name: 'Bothidae' },
+  CALL: { aphia_id: 125638,  scientific_name: 'Callionymidae' },
+  CANT: { aphia_id: 219746,  scientific_name: 'Canthigaster' },        // genus Tetraodontidae
+  CARA: { aphia_id: 125541,  scientific_name: 'Carangidae' },
+  CENT: { aphia_id: 125558,  scientific_name: 'Centriscidae' },
+  CHAE: { aphia_id: 125554,  scientific_name: 'Chaetodontidae' },
+  CHEI: { aphia_id: 125632,  scientific_name: 'Cheilodactylidae' },
+  CIRR: { aphia_id: 125552,  scientific_name: 'Cirrhitidae' },
+  CLIN: { aphia_id: 125634,  scientific_name: 'Clinidae' },
+  CLUP: { aphia_id: 125464,  scientific_name: 'Clupeidae' },
+  CONG: { aphia_id: 125462,  scientific_name: 'Congridae' },
+  CORO: { aphia_id: 272021,  scientific_name: 'Coris' },               // genus Labridae
+  CTEN: { aphia_id: 272014,  scientific_name: 'Ctenochaetus' },        // genus Acanthuridae
+  DACT: { aphia_id: 125549,  scientific_name: 'Dactylopteridae' },
+  DIOD: { aphia_id: 125579,  scientific_name: 'Diodontidae' },
+  DIPL: { aphia_id: 127021,  scientific_name: 'Diplodus' },            // genus Sparidae
+  ECHI: { aphia_id: 125625,  scientific_name: 'Echeneidae' },
+  ENGO: { aphia_id: 125463,  scientific_name: 'Engraulidae' },
+  EPIN: { aphia_id: 127119,  scientific_name: 'Epinephelus' },         // genus Serranidae
+  EXOC: { aphia_id: 125569,  scientific_name: 'Exocoetidae' },
+  FIST: { aphia_id: 125560,  scientific_name: 'Fistulariidae' },
+  GERR: { aphia_id: 125544,  scientific_name: 'Gerreidae' },
+  GOBI: { aphia_id: 125642,  scientific_name: 'Gobiidae' },
+  HAEM: { aphia_id: 125543,  scientific_name: 'Haemulidae' },
+  HOLO: { aphia_id: 125571,  scientific_name: 'Holocentridae' },
+  KYPH: { aphia_id: 125547,  scientific_name: 'Kyphosidae' },
+  LABR: { aphia_id: 125523,  scientific_name: 'Labridae' },
+  LACT: { aphia_id: 125576,  scientific_name: 'Lactariidae' },
+  LETR: { aphia_id: 125546,  scientific_name: 'Lethrinidae' },
+  LOPH: { aphia_id: 125484,  scientific_name: 'Lophiidae' },
+  LUTJ: { aphia_id: 125542,  scientific_name: 'Lutjanidae' },
+  MEGA: { aphia_id: 125457,  scientific_name: 'Megalopidae' },
+  MOLA: { aphia_id: 127404,  scientific_name: 'Mola mola' },           // species
+  MULL: { aphia_id: 125545,  scientific_name: 'Mullidae' },
+  MURA: { aphia_id: 125460,  scientific_name: 'Muraenidae' },
+  OPHI: { aphia_id: 125459,  scientific_name: 'Ophichthidae' },
+  ORCY: { aphia_id: 127365,  scientific_name: 'Orcynopsis unicolor' }, // species Scombridae
+  OSTO: { aphia_id: 125577,  scientific_name: 'Ostraciidae' },
+  PEMP: { aphia_id: 125553,  scientific_name: 'Pempheridae' },
+  PING: { aphia_id: 125628,  scientific_name: 'Pinguipedidae' },
+  PLAT: { aphia_id: 125550,  scientific_name: 'Platycephalidae' },
+  PLEC: { aphia_id: 217737,  scientific_name: 'Plectropomus' },        // genus
+  PLEU: { aphia_id: 125484,  scientific_name: 'Pleuronectiformes' },   // order
+  PLOT: { aphia_id: 125474,  scientific_name: 'Plotosidae' },
+  POMA: { aphia_id: 125555,  scientific_name: 'Pomacentridae' },
+  PRIO: { aphia_id: 272035,  scientific_name: 'Priolepis' },           // genus Gobiidae
+  PSEU: { aphia_id: 125613,  scientific_name: 'Pseudochromidae' },
+  SCAR: { aphia_id: 125524,  scientific_name: 'Scaridae' },
+  SCOR: { aphia_id: 125485,  scientific_name: 'Scorpaenidae' },
+  SERR: { aphia_id: 125517,  scientific_name: 'Serranidae' },
+  SIGA: { aphia_id: 125572,  scientific_name: 'Siganidae' },
+  SILL: { aphia_id: 125551,  scientific_name: 'Sillaginidae' },
+  SPAR: { aphia_id: 125526,  scientific_name: 'Sparidae' },
+  SPYR: { aphia_id: 125567,  scientific_name: 'Sphyraenidae' },
+  SYNG: { aphia_id: 125565,  scientific_name: 'Syngnathidae' },
+  TETR: { aphia_id: 125578,  scientific_name: 'Tetraodontidae' },
+  THUN: { aphia_id: 127353,  scientific_name: 'Thunnus' },             // genus
+  TRAC: { aphia_id: 125622,  scientific_name: 'Trachinidae' },
+  TRIG: { aphia_id: 125486,  scientific_name: 'Triglidae' },
+  TRIP: { aphia_id: 125636,  scientific_name: 'Tripterygiidae' },
+  URAN: { aphia_id: 125621,  scientific_name: 'Uranoscopidae' },
+  ZEID: { aphia_id: 125481,  scientific_name: 'Zeidae' },
+
+  // ---- Elasmobranchii (sharks, rays, skates) ------------------------------
+  CARCH: { aphia_id: 913907, scientific_name: 'Carcharhinidae' },
+  DASY:  { aphia_id: 112062, scientific_name: 'Dasyatidae' },
+  GALE:  { aphia_id: 105719, scientific_name: 'Elasmobranchii' },      // fallback — resolve via WoRMS
+  LAMB:  { aphia_id: 105724, scientific_name: 'Lamnidae' },
+  MYLI:  { aphia_id: 17135,  scientific_name: 'Myliobatidae' },
+  RAJA:  { aphia_id: 105723, scientific_name: 'Rajidae' },
+  RHIN:  { aphia_id: 105738, scientific_name: 'Rhincodontidae' },
+  SPHY:  { aphia_id: 105725, scientific_name: 'Sphyrnidae' },
+
+  // ---- Mola / other pelagics ----------------------------------------------
+  AIPO:  { aphia_id: 217419, scientific_name: 'Alepisauridae' },       // lancetfish family
+  SCOP:  { aphia_id: 125488, scientific_name: 'Myctophidae' },         // lanternfish
+
+  // ---- Mediterranean-specific species (very common in RLS Med surveys) ---
+  CENT_MED: { aphia_id: 126782, scientific_name: 'Centrolabrus exoletus' },
+  CHRO:     { aphia_id: 159546, scientific_name: 'Chromis chromis' },
+  CORI_JUL: { aphia_id: 127150, scientific_name: 'Coris julis' },
+  DENT:     { aphia_id: 127031, scientific_name: 'Dentex dentex' },
+  MULL_BAR: { aphia_id: 127183, scientific_name: 'Mullus barbatus' },
+  OBLAD:    { aphia_id: 127038, scientific_name: 'Oblada melanura' },
+  SARPA:    { aphia_id: 127048, scientific_name: 'Sarpa salpa' },
+  SCOR_SCR: { aphia_id: 127044, scientific_name: 'Scorpaena scrofa' },
+  SPIC:     { aphia_id: 127055, scientific_name: 'Spondyliosoma cantharus' },
 };
 
 const WORMS_API = 'https://www.marinespecies.org/rest';

@@ -111,7 +111,7 @@ export async function runObisEtl(): Promise<void> {
     const { data: nearestSite } = await supabase.rpc('nearby_dive_sites', {
       p_lat: occ.decimalLatitude,
       p_lng: occ.decimalLongitude,
-      p_radius_km: 30,
+      p_radius_km: 20, // tightened: reduces false site-matches for distant coarse-resolution records
     });
 
     const siteId = nearestSite?.[0]?.id;

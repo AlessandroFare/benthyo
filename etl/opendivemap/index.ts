@@ -15,7 +15,12 @@ import { isMainModule } from '../shared/cli';
 
 const API_BASE = process.env.OPENDIVEMAP_API_URL ?? 'https://api.opendivemap.com/v1';
 const PAGE_SIZE = Number(process.env.OPENDIVEMAP_PAGE_SIZE ?? 500);
-const MAX_SITES = Number(process.env.OPENDIVEMAP_MAX_SITES ?? 5000);
+const MAX_SITES = Number(process.env.OPENDIVEMAP_MAX_SITES ?? 10000);
+
+// Fetch marine sites only: ocean environment + all saltwater topologies.
+// Setting environment=ocean excludes lakes, rivers, springs, quarries, pools.
+// Not filtering by topology so we get all marine types (reef, wall, wreck, etc.)
+const OCEAN_FILTER = 'ocean';
 
 const limiter = new RateLimiter({ minIntervalMs: 300 });
 
@@ -44,6 +49,7 @@ async function fetchPage(offset: number, limit: number): Promise<OpenDiveMapFeat
   const params = new URLSearchParams({
     limit: String(limit),
     offset: String(offset),
+    environment: OCEAN_FILTER, // marine sites only — excludes lakes, rivers, springs, pools
   });
   const country = process.env.OPENDIVEMAP_COUNTRY;
   const bbox = process.env.OPENDIVEMAP_BBOX;
@@ -61,15 +67,30 @@ function mapFeature(feature: OpenDiveMapFeature, seenSlugs: Set<string>): DiveSi
   if (!props.name || !Number.isFinite(lon) || !Number.isFinite(lat)) return null;
 
   const tags = props.tags ?? {};
-  const description =
-    (typeof tags.description === 'string' ? tags.description : null) ??
-    (typeof tags.description_wildlife === 'string' ? tags.description_wildlife : null);
 
+  // Prefer structured description fields, fall back to wildlife/notes tags
+  const description: string | null =
+    (typeof tags.description === 'string' ? tags.description : null) ??
+    (typeof tags.description_wildlife === 'string' ? tags.description_wildlife : null) ??
+    (typeof tags.notes === 'string' ? tags.notes : null);
+
+  // OpenDiveMap v1 exposes depth in properties.max_depth (preferred) and as a
+  // tag. min_depth is available in tags when reported by the contributor.
+  const depthMax = Number(props.max_depth ?? tags.max_depth ?? tags.depth_max ?? 30);
+  const depthMin = Number(tags.min_depth ?? tags.depth_min ?? 0);
+
+  // Use the first (most-specific) topology; ODM v1 supports all our site_type values
+  // plus: artificial_reef, blue_hole, cavern, kelp_forest, channel, open_water.
+  // normalizeSiteType handles the ODM extras correctly.
   const topology = props.topologies?.[0];
+
   const slug = uniqueSlug(`odm-${props.id}`, props.id, seenSlugs);
-  const depthMax = Number(props.max_depth ?? tags.max_depth ?? 30);
-  const depthMin = Number(tags.min_depth ?? 0);
-  const hint = `${description ?? ''} ${props.name}`;
+  const hint = `${description ?? ''} ${topology ?? ''} ${props.name}`;
+
+  // Hero image: ODM exposes it in tags.thumbnail or tags.image
+  const heroImage =
+    (typeof tags.thumbnail === 'string' ? tags.thumbnail : null) ??
+    (typeof tags.image === 'string' ? tags.image : null);
 
   return {
     name: props.name,
@@ -77,10 +98,13 @@ function mapFeature(feature: OpenDiveMapFeature, seenSlugs: Set<string>): DiveSi
     description,
     location: geographyPoint(lon, lat),
     country_code: normalizeCountryCode(props.country_code),
-    region: props.country_name ?? null,
-    depth_min: Number.isFinite(depthMin) ? depthMin : 0,
-    depth_max: Number.isFinite(depthMax) ? depthMax : 30,
-    difficulty: normalizeDifficulty(undefined, hint),
+    region: props.country_name ?? (typeof tags.region === 'string' ? tags.region : null),
+    depth_min: Number.isFinite(depthMin) && depthMin >= 0 ? depthMin : 0,
+    depth_max: Number.isFinite(depthMax) && depthMax > 0 ? depthMax : 30,
+    difficulty: normalizeDifficulty(
+      typeof tags.difficulty === 'string' ? tags.difficulty : undefined,
+      hint,
+    ),
     site_type: normalizeSiteType(topology),
     access_type: normalizeAccessType(props.entry, hint),
     verified: false,
@@ -90,7 +114,7 @@ function mapFeature(feature: OpenDiveMapFeature, seenSlugs: Set<string>): DiveSi
       environment: props.environment,
       topologies: props.topologies,
       tags,
-      hero_image: typeof tags.thumbnail === 'string' ? tags.thumbnail : null,
+      hero_image: heroImage,
     },
   };
 }

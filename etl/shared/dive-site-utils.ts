@@ -47,14 +47,22 @@ const DIFFICULTIES = new Set(['beginner', 'intermediate', 'advanced', 'technical
 const ACCESS_TYPES = new Set(['shore', 'boat', 'liveaboard']);
 
 export function normalizeSiteType(value: string | undefined): string {
-  const lower = (value ?? 'other').toLowerCase();
+  const lower = (value ?? 'other').toLowerCase().replace(/_/g, ' ');
   if (SITE_TYPES.has(lower)) return lower;
-  if (lower.includes('wreck')) return 'wreck';
-  if (lower.includes('wall')) return 'wall';
-  if (lower.includes('cave') || lower.includes('cavern')) return 'cave';
-  if (lower.includes('pinnacle')) return 'pinnacle';
-  if (lower.includes('muck')) return 'muck';
-  if (lower.includes('reef') || lower.includes('kelp')) return 'reef';
+  // OpenDiveMap v1 topology values not in SITE_TYPES
+  if (lower === 'artificial reef' || lower === 'artificial_reef') return 'reef';
+  if (lower === 'blue hole'       || lower === 'blue_hole')       return 'cave';
+  if (lower === 'cavern')                                         return 'cave';
+  if (lower === 'kelp forest'     || lower === 'kelp_forest')     return 'reef';
+  if (lower === 'channel')                                        return 'other';
+  if (lower === 'open water'      || lower === 'open_water')      return 'other';
+  // Generic keyword matching
+  if (lower.includes('wreck'))                                    return 'wreck';
+  if (lower.includes('wall') || lower.includes('drop'))          return 'wall';
+  if (lower.includes('cave') || lower.includes('cavern'))        return 'cave';
+  if (lower.includes('pinnacle') || lower.includes('seamount'))  return 'pinnacle';
+  if (lower.includes('muck'))                                     return 'muck';
+  if (lower.includes('reef') || lower.includes('kelp'))          return 'reef';
   return 'other';
 }
 
@@ -112,13 +120,21 @@ export const OVERPASS_REGIONS: OverpassRegion[] = [
 
 export function buildOverpassQuery(region: OverpassRegion): string {
   const { south, west, north, east } = region;
+  const bb = `(${south},${west},${north},${east})`;
   return `
-[out:json][timeout:180];
+[out:json][timeout:240];
 (
-  node["sport"="scuba_diving"](${south},${west},${north},${east});
-  node["leisure"="diving"](${south},${west},${north},${east});
-  node["tourism"="attraction"]["scuba_diving"](${south},${west},${north},${east});
-  way["sport"="scuba_diving"](${south},${west},${north},${east});
+  node["sport"="scuba_diving"]${bb};
+  node["sport"="freediving"]${bb};
+  node["leisure"="diving"]${bb};
+  node["tourism"="attraction"]["scuba_diving"]${bb};
+  node["amenity"="dive_centre"]${bb};
+  node["seamark:type"="wreck"]["depth"]${bb};
+  node["historic"="wreck"]["seamark:type"]${bb};
+  way["sport"="scuba_diving"]${bb};
+  way["sport"="freediving"]${bb};
+  way["seamark:type"="wreck"]${bb};
+  relation["sport"="scuba_diving"]${bb};
 );
 out center tags;
 `;
