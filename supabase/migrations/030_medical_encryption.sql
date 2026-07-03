@@ -52,8 +52,7 @@ IMMUTABLE
 AS $$
   SELECT pgp_sym_encrypt(
     p_answers::text,
-    medical_operator_key(p_operator_id),
-    'cipher-algo=aes256'
+    medical_operator_key(p_operator_id)
   )
 $$;
 
@@ -103,8 +102,7 @@ AS $$
     md5(p_user_id::text || COALESCE(
       current_setting('app.medical_master_key', true),
       'benthyo-dev-master-key-do-not-use-in-prod'
-    )),
-    'cipher-algo=aes256'
+    ))
   )
 $$;
 -- ---------------------------------------------------------------------------
