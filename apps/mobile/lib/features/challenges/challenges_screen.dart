@@ -5,7 +5,7 @@ import 'package:intl/intl.dart';
 import '../../core/supabase/supabase_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_scaffold.dart';
-import '../../core/widgets/async_value_widget.dart';
+import '../../core/widgets/main_navigation.dart';
 import 'challenges_providers.dart';
 
 class ChallengesScreen extends ConsumerWidget {
@@ -19,8 +19,12 @@ class ChallengesScreen extends ConsumerWidget {
         DateFormat('MMMM yyyy').format(DateTime.now());
 
     return AppScaffold(
+      showBack: false,
       title: 'Monthly Challenge',
-      body: leaderboardAsync.when(
+      body: Column(
+        children: [
+          Expanded(
+            child: leaderboardAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(
           child: Column(
@@ -94,6 +98,10 @@ class ChallengesScreen extends ConsumerWidget {
             ],
           ],
         ),
+            ),
+          ),
+          const MainNavigationBar(currentIndex: 4),
+        ],
       ),
     );
   }

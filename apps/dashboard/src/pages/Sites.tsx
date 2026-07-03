@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MapPin, Plus, Star, Trash2 } from "lucide-react";
+import { Code2, MapPin, Plus, Star, Trash2 } from "lucide-react";
 import { useAddSite, useRemoveSite, useSites } from "@/hooks/useSites";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { AnimatedPage, AnimatedItem } from "@/components/shared/AnimatedPage";
@@ -131,20 +131,34 @@ export function SitesPage() {
       key: "actions",
       header: "",
       cell: (s) => (
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={(e) => {
-            e.stopPropagation();
-            setRemoveId(s.id);
-          }}
-          aria-label={`Remove ${s.name}`}
-        >
-          <Trash2 className="h-4 w-4 text-destructive" />
-        </Button>
+        <div className="flex items-center justify-end gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={(e) => {
+              e.stopPropagation();
+              window.open(`/embed/site/${s.dive_site_id}/generate`, "_blank");
+            }}
+            aria-label={`Get embed code for ${s.name}`}
+            title="Get embed code"
+          >
+            <Code2 className="h-4 w-4 text-primary" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={(e) => {
+              e.stopPropagation();
+              setRemoveId(s.id);
+            }}
+            aria-label={`Remove ${s.name}`}
+          >
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </Button>
+        </div>
       ),
       align: "right",
-      className: "w-12",
+      className: "w-24",
     },
   ];
 

@@ -57,6 +57,9 @@ const EmbedSitePage = lazy(() =>
 const EmbedPrepPage = lazy(() =>
   import("@/pages/EmbedSite").then((m) => ({ default: m.EmbedPrepPage })),
 );
+const EmbedSiteGeneratorPage = lazy(() =>
+  import("@/pages/EmbedSite").then((m) => ({ default: m.EmbedSiteGeneratorPage })),
+);
 
 function PageLoader({ children }: { children: ReactNode }) {
   return (
@@ -90,6 +93,14 @@ export default function App() {
         element={
           <PageLoader>
             <EmbedSitePage />
+          </PageLoader>
+        }
+      />
+      <Route
+        path="/embed/site/:slug/generate"
+        element={
+          <PageLoader>
+            <EmbedSiteGeneratorPage />
           </PageLoader>
         }
       />
