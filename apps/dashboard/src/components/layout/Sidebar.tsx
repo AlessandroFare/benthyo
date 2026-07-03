@@ -1,4 +1,4 @@
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 import {
   Anchor,
   BarChart3,
@@ -60,11 +60,7 @@ function SidebarBody({
   onNavigate?: () => void;
 }) {
   const { data: operator } = useOperator();
-  const location = useLocation();
   const labelClass = forceLabels ? "block" : "hidden xl:block";
-
-  // Determine current active path for the animated pill
-  const activePath = location.pathname;
 
   return (
     <>
