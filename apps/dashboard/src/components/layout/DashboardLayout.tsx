@@ -16,7 +16,7 @@ export function DashboardLayout({ user }: DashboardLayoutProps) {
 
   return (
     <ToastProvider>
-      <div className="dark flex h-full bg-background text-foreground">
+      <div className="flex h-full bg-background text-foreground">
         <Sidebar
           mobileOpen={mobileNavOpen}
           onNavigate={() => setMobileNavOpen(false)}

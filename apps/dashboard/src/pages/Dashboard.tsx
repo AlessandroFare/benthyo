@@ -19,6 +19,7 @@ import {
   useDashboardKpis,
   useRecentActivity,
 } from "@/hooks/useDashboard";
+import { useChartTheme } from "@/hooks/useChartTheme";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { AnimatedPage, AnimatedItem } from "@/components/shared/AnimatedPage";
@@ -57,6 +58,7 @@ export function DashboardPage() {
   const kpisQuery = useDashboardKpis();
   const chartsQuery = useDashboardCharts();
   const activityQuery = useRecentActivity();
+  const chart = useChartTheme();
 
   const isLoading =
     kpisQuery.isLoading || chartsQuery.isLoading || activityQuery.isLoading;
@@ -169,16 +171,10 @@ export function DashboardPage() {
               ) : charts?.sightings_trend.length ? (
                 <ResponsiveContainer width="100%" height={280}>
                   <BarChart data={charts.sightings_trend}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                    <XAxis dataKey="label" tick={{ fontSize: 12, fill: "rgba(255,255,255,0.45)" }} />
-                    <YAxis tick={{ fontSize: 12, fill: "rgba(255,255,255,0.45)" }} />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "hsl(213 22% 12%)",
-                        border: "1px solid rgba(255,255,255,0.08)",
-                        borderRadius: 12,
-                      }}
-                    />
+                    <CartesianGrid strokeDasharray="3 3" stroke={chart.gridStroke} />
+                    <XAxis dataKey="label" tick={{ fontSize: 12, fill: chart.tickFill }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 12, fill: chart.tickFill }} axisLine={false} tickLine={false} />
+                    <Tooltip contentStyle={chart.tooltipStyle} labelStyle={chart.tooltipLabelStyle} />
                     <Bar dataKey="value" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -213,16 +209,10 @@ export function DashboardPage() {
               ) : charts?.dives_by_site.length ? (
                 <ResponsiveContainer width="100%" height={280}>
                   <BarChart data={charts.dives_by_site}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                    <XAxis dataKey="label" tick={{ fontSize: 11, fill: "rgba(255,255,255,0.45)" }} />
-                    <YAxis tick={{ fontSize: 12, fill: "rgba(255,255,255,0.45)" }} />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "hsl(213 22% 12%)",
-                        border: "1px solid rgba(255,255,255,0.08)",
-                        borderRadius: 12,
-                      }}
-                    />
+                    <CartesianGrid strokeDasharray="3 3" stroke={chart.gridStroke} />
+                    <XAxis dataKey="label" tick={{ fontSize: 11, fill: chart.tickFill }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 12, fill: chart.tickFill }} axisLine={false} tickLine={false} />
+                    <Tooltip contentStyle={chart.tooltipStyle} labelStyle={chart.tooltipLabelStyle} />
                     <Bar dataKey="value" fill="#38bdf8" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -282,7 +272,7 @@ export function DashboardPage() {
                       className="border-border"
                     >
                       <TableCell>
-                        <Badge variant="secondary" className="bg-white/10 text-foreground">
+                        <Badge variant="secondary" className="text-foreground">
                           {activityTypeLabels[item.type] ?? item.type}
                         </Badge>
                       </TableCell>

@@ -3,63 +3,69 @@
 @tailwind utilities;
 
 @layer base {
+  /* ── Light theme (default) ─────────────────────────────────────────────── */
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 210 30% 97%;          /* very light blue-gray */
+    --foreground: 222 47% 11%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 201 96% 32%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 201 96% 32%;             /* ocean blue */
     --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
+    --secondary: 210 30% 93%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 30% 93%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 210 30% 90%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
+    --border: 214 32% 88%;
+    --input: 214 32% 88%;
     --ring: 201 96% 32%;
-    --radius: 0.5rem;
+    --radius: 0.625rem;
+
+    /* Sidebar tokens — stays dark navy in both themes (brand identity) */
+    --sidebar-bg: 213 78% 15%;          /* #0A2342 */
+    --sidebar-fg: 210 40% 98%;
+    --sidebar-border: 213 60% 20%;
+    --sidebar-muted: 213 40% 60%;
+    --sidebar-active-bg: 0 0% 100% / 0.1;
+    --sidebar-hover-bg: 0 0% 100% / 0.05;
+    --sidebar-active-fg: 0 0% 100%;
   }
 
-  /*
-   * Dark theme tokens. The dashboard layout renders with `class="dark"` so
-   * every shadcn/ui component (Card, Badge, Button, Input, ...) that uses
-   * `bg-card` / `text-foreground` / `text-muted-foreground` etc. resolves to
-   * these values. Without this block those utilities fell back to the light
-   * `:root` tokens, producing white cards + light-gray text on the dark
-   * layout background — i.e. the contrast bugs found in the polish pass
-   * (invisible "0 total customers" on Customers.tsx, broken tables on
-   * Today/Corrections/Settings, etc.).
-   *
-   * Palette aligns with the values previously hardcoded across the dark
-   * pages (bg #0D1117, surface #161B22, border #30363D, subtext ~white/70
-   * and white/60), so token-based and hardcoded pages now look identical.
-   */
+  /* ── Dark theme ─────────────────────────────────────────────────────────── */
   .dark {
-    --background: 215 28% 7%;          /* #0D1117 */
-    --foreground: 210 40% 98%;          /* near-white */
+    --background: 215 28% 7%;           /* #0D1117 */
+    --foreground: 210 40% 98%;
     --card: 213 22% 12%;                /* #161B22 */
     --card-foreground: 210 40% 98%;
     --popover: 213 22% 12%;
     --popover-foreground: 210 40% 98%;
-    --primary: 201 96% 42%;             /* ocean blue, brighter on dark */
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 201 96% 42%;             /* brighter ocean on dark */
+    --primary-foreground: 222 47% 11%;
     --secondary: 215 28% 17%;           /* #21262D */
     --secondary-foreground: 210 40% 98%;
     --muted: 215 28% 17%;
-    --muted-foreground: 215 14% 65%;    /* ~#8B949E, 5.6:1 on card — passes AA */
+    --muted-foreground: 215 14% 65%;    /* #8B949E — AA-compliant on card */
     --accent: 215 28% 20%;
     --accent-foreground: 210 40% 98%;
-    --destructive: 0 72% 51%;           /* darker red for dark bg */
+    --destructive: 0 72% 51%;
     --destructive-foreground: 210 40% 98%;
     --border: 215 14% 22%;              /* #30363D */
     --input: 215 14% 22%;
     --ring: 201 96% 42%;
+
+    /* Sidebar tokens stay the same dark navy */
+    --sidebar-bg: 213 78% 15%;
+    --sidebar-fg: 210 40% 98%;
+    --sidebar-border: 213 60% 20%;
+    --sidebar-muted: 213 40% 60%;
+    --sidebar-active-bg: 0 0% 100% / 0.1;
+    --sidebar-hover-bg: 0 0% 100% / 0.05;
+    --sidebar-active-fg: 0 0% 100%;
   }
 }
 
@@ -67,9 +73,32 @@
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Custom scrollbar — subtle in both themes */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-border;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/40;
+  }
+
+  /* Selection color */
+  ::selection {
+    @apply bg-primary/20 text-foreground;
   }
 }
 
@@ -77,4 +106,57 @@ html,
 body,
 #root {
   height: 100%;
+}
+
+/* ── Utility keyframes ───────────────────────────────────────────────────── */
+@layer utilities {
+  @keyframes fade-in-up {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  @keyframes shimmer {
+    0%   { background-position: -200% 0; }
+    100% { background-position:  200% 0; }
+  }
+
+  @keyframes scale-in {
+    from { opacity: 0; transform: scale(0.92); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+
+  .animate-fade-in-up {
+    animation: fade-in-up 0.3s ease-out both;
+  }
+
+  .animate-fade-in {
+    animation: fade-in 0.2s ease-out both;
+  }
+
+  .animate-scale-in {
+    animation: scale-in 0.25s ease-out both;
+  }
+
+  /* Shimmer loading pulse */
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--muted)) 25%,
+      hsl(var(--muted-foreground) / 0.15) 50%,
+      hsl(var(--muted)) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.6s ease-in-out infinite;
+  }
 }
