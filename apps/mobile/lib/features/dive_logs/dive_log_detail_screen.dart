@@ -6,6 +6,7 @@ import '../../core/models/enums.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_scaffold.dart';
 import '../../core/widgets/async_value_widget.dart';
+import 'export/dive_export_service.dart';
 import 'widgets/dive_profile_chart.dart';
 import 'dive_logs_providers.dart';
 
@@ -21,6 +22,19 @@ class DiveLogDetailScreen extends ConsumerWidget {
 
     return AppScaffold(
       title: 'Dive Log',
+      actions: [
+        logAsync.when(
+          data: (log) => log == null
+              ? const SizedBox.shrink()
+              : IconButton(
+                  tooltip: 'Export dive log',
+                  icon: const Icon(Icons.upload_file_outlined),
+                  onPressed: () => _showExportSheet(context, log),
+                ),
+          loading: () => const SizedBox.shrink(),
+          error: (_, __) => const SizedBox.shrink(),
+        ),
+      ],
       body: AsyncValueWidget(
         value: logAsync,
         data: (log) {
@@ -83,6 +97,58 @@ class DiveLogDetailScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+void _showExportSheet(BuildContext context, DiveLog log) {
+  showModalBottomSheet<void>(
+    context: context,
+    builder: (sheetCtx) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(
+                bottom: AppSpacing.sm,
+                top: AppSpacing.xs,
+              ),
+              child: Text(
+                'Export dive log',
+                style: Theme.of(sheetCtx).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.map_outlined),
+              title: const Text('GPX (GPS Exchange Format)'),
+              subtitle: const Text('Compatible with Subsurface, Garmin Connect'),
+              onTap: () {
+                Navigator.pop(sheetCtx);
+                DiveExportService.share(log, DiveExportFormat.gpx);
+              },
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.scuba_diving_outlined),
+              title: const Text('UDDF (Universal Dive Data Format)'),
+              subtitle: const Text('Compatible with Subsurface, DivingLog, Dive+'),
+              onTap: () {
+                Navigator.pop(sheetCtx);
+                DiveExportService.share(log, DiveExportFormat.uddf);
+              },
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 class _DetailTile extends StatelessWidget {

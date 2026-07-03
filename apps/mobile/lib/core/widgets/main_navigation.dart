@@ -39,6 +39,8 @@ class MainNavigationBar extends StatelessWidget {
             case 3:
               context.go('/species');
             case 4:
+              context.go('/challenges');
+            case 5:
               context.go('/profile');
           }
         },
@@ -66,6 +68,12 @@ class MainNavigationBar extends StatelessWidget {
             selectedIcon: Icon(Icons.biotech),
             label: 'Species',
             tooltip: 'Species catalogue and life list',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.emoji_events_outlined),
+            selectedIcon: Icon(Icons.emoji_events),
+            label: 'Challenges',
+            tooltip: 'Monthly leaderboards and challenges',
           ),
           NavigationDestination(
             icon: Icon(Icons.account_circle_outlined),

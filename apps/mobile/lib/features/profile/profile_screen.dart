@@ -325,7 +325,7 @@ class ProfileScreen extends ConsumerWidget {
               },
             ),
           ),
-          const MainNavigationBar(currentIndex: 4),
+          const MainNavigationBar(currentIndex: 5),
         ],
       ),
     );

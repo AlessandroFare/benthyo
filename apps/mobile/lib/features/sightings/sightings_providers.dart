@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../../core/models/citizen_science_impact.dart';
 import '../../core/models/enums.dart';
 import '../../core/models/sighting.dart';
+import '../../core/models/sighting_photo.dart';
 import '../../core/offline/sync_manager.dart';
 import '../../core/supabase/supabase_client.dart';
 
@@ -46,6 +47,56 @@ class SightingsRepository {
       );
     }
   }
+
+  // ─── Photo gallery methods ─────────────────────────────────────────────────
+
+  /// Fetches all photos for [sightingId] ordered by [sort_order].
+  Future<List<SightingPhoto>> fetchPhotosForSighting(
+      String sightingId) async {
+    final data = await _client
+        .from('sighting_photos')
+        .select()
+        .eq('sighting_id', sightingId)
+        .order('sort_order')
+        .order('created_at');
+    final rows = (data as List).cast<Map<String, dynamic>>();
+    return rows.map(SightingPhoto.fromJson).toList();
+  }
+
+  /// Inserts a photo row for [sightingId].
+  ///
+  /// [storagePathOrUrl] is the Supabase Storage path; [publicUrl] is the
+  /// resolved CDN URL. If the caller only has a URL (legacy path), pass the
+  /// same value for both parameters.
+  Future<SightingPhoto> addPhoto({
+    required String sightingId,
+    required String userId,
+    required String storagePath,
+    required String publicUrl,
+    String? caption,
+    int sortOrder = 0,
+  }) async {
+    final data = await _client
+        .from('sighting_photos')
+        .insert({
+          'sighting_id': sightingId,
+          'user_id': userId,
+          'storage_path': storagePath,
+          'public_url': publicUrl,
+          'caption': caption,
+          'sort_order': sortOrder,
+        })
+        .select()
+        .single();
+    return SightingPhoto.fromJson(data);
+  }
+
+  /// Deletes [photoId] (caller must own the row — enforced by RLS).
+  Future<void> deletePhoto(String photoId) async {
+    await _client.from('sighting_photos').delete().eq('id', photoId);
+  }
+
+  // ─── Sighting fetch methods ────────────────────────────────────────────────
 
   Future<List<SightingWithDetails>> fetchForUser(String userId) async {
     final data = await _client
@@ -132,6 +183,15 @@ final userSightingsProvider =
   final user = ref.watch(currentUserProvider);
   if (user == null) return [];
   return ref.watch(sightingsRepositoryProvider).fetchForUser(user.id);
+});
+
+/// Fetches all [SightingPhoto] rows for a given sighting ID.
+/// Automatically refreshed when [sightingsRepositoryProvider] is invalidated.
+final sightingPhotosProvider =
+    FutureProvider.family<List<SightingPhoto>, String>((ref, sightingId) {
+  return ref.watch(sightingsRepositoryProvider).fetchPhotosForSighting(
+        sightingId,
+      );
 });
 
 /// Fetches the citizen-science contribution counts for the current user
