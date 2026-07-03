@@ -10,6 +10,44 @@ class AppColors {
   static const error = Color(0xFFFF6B6B);
   static const success = Color(0xFF3FB950);
   static const textSecondary = Color(0xFF8B949E);
+
+  // Semantic extensions ------------------------------------------------------
+  static const warning = Color(0xFFE3A008);
+  static const info = Color(0xFF58A6FF);
+
+  /// Ocean depth palette: shallow -> deep. Used for depth badges, headers
+  /// and anywhere the UI should evoke the water column.
+  static const oceanShallow = Color(0xFF14B8C4);
+  static const oceanMid = Color(0xFF0E5F8A);
+  static const oceanDeep = Color(0xFF0A2342);
+  static const oceanAbyss = Color(0xFF06121F);
+
+  /// Elevated dark surface (one step above [surfaceDark]).
+  static const surfaceDarkHigh = Color(0xFF1D242D);
+  static const borderDark = Color(0xFF30363D);
+
+  /// Hero / header gradient evoking descent through the water column.
+  static const oceanGradient = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [oceanMid, oceanDeep, oceanAbyss],
+  );
+
+  /// Subtle horizontal gradient for accents (chips, progress, rings).
+  static const accentGradient = LinearGradient(
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+    colors: [accent, oceanShallow],
+  );
+
+  /// Returns a colour representing a depth in metres (shallow teal to
+  /// deep navy). Keeps depth badges instantly scannable in the logbook.
+  static Color depthColor(double meters) {
+    if (meters < 12) return oceanShallow;
+    if (meters < 25) return oceanMid;
+    if (meters < 40) return oceanDeep;
+    return oceanAbyss;
+  }
 }
 
 class AppSpacing {
@@ -19,6 +57,31 @@ class AppSpacing {
   static const md = 16.0;
   static const lg = 24.0;
   static const xl = 32.0;
+}
+
+/// Corner radius tokens - keep every rounded surface consistent.
+class AppRadius {
+  static const sm = 8.0;
+  static const md = 12.0;
+  static const lg = 16.0;
+  static const xl = 24.0;
+  static const full = 999.0;
+}
+
+/// Motion tokens - all animations in the app should pick from these so the
+/// interface feels coherent.
+class AppDurations {
+  static const fast = Duration(milliseconds: 150);
+  static const base = Duration(milliseconds: 250);
+  static const slow = Duration(milliseconds: 400);
+  static const stagger = Duration(milliseconds: 50);
+}
+
+/// Easing tokens.
+class AppCurves {
+  static const standard = Curves.easeOutCubic;
+  static const emphasized = Curves.easeOutQuart;
+  static const spring = Curves.easeOutBack;
 }
 
 class AppTheme {
@@ -109,6 +172,44 @@ class AppTheme {
         backgroundColor: AppColors.accent,
         foregroundColor: AppColors.primary,
       ),
+      splashColor: AppColors.primary.withValues(alpha: 0.08),
+      highlightColor: AppColors.primary.withValues(alpha: 0.05),
+      dividerTheme: DividerThemeData(
+        color: Colors.grey.shade300,
+        thickness: 1,
+        space: 1,
+      ),
+      chipTheme: ChipThemeData(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.full),
+        ),
+        side: BorderSide(color: Colors.grey.shade300),
+        labelStyle: GoogleFonts.inter(fontSize: 13),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: AppColors.oceanDeep,
+        contentTextStyle: GoogleFonts.inter(color: Colors.white),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        showDragHandle: true,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+        ),
+      ),
+      dialogTheme: DialogThemeData(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+        ),
+      ),
+      listTileTheme: ListTileThemeData(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+      ),
     );
   }
 
@@ -182,6 +283,46 @@ class AppTheme {
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: AppColors.accent,
         foregroundColor: AppColors.primary,
+      ),
+      splashColor: AppColors.accent.withValues(alpha: 0.08),
+      highlightColor: AppColors.accent.withValues(alpha: 0.05),
+      dividerTheme: const DividerThemeData(
+        color: AppColors.borderDark,
+        thickness: 1,
+        space: 1,
+      ),
+      chipTheme: ChipThemeData(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.full),
+        ),
+        side: const BorderSide(color: AppColors.borderDark),
+        labelStyle: GoogleFonts.inter(fontSize: 13, color: Colors.white70),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: AppColors.surfaceDarkHigh,
+        contentTextStyle: GoogleFonts.inter(color: Colors.white),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        showDragHandle: true,
+        backgroundColor: AppColors.surfaceDark,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+        ),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: AppColors.surfaceDarkHigh,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+        ),
+      ),
+      listTileTheme: ListTileThemeData(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
       ),
     );
   }
@@ -287,6 +428,26 @@ class AppTheme {
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
+      ),
+      dividerTheme: const DividerThemeData(
+        color: sunBorder,
+        thickness: 1.5,
+        space: 1.5,
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: AppColors.oceanAbyss,
+        contentTextStyle:
+            GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.w600),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        showDragHandle: true,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+        ),
       ),
     );
   }

@@ -1,38 +1,62 @@
 name: CodeQL
 
+# CodeQL analysis for Benthyo.
+#
+# IMPORTANT — setup steps (one-time, do this in GitHub UI before merging):
+#   1. Repo → Settings → Code security → Code scanning
+#   2. If "Default setup" is ON, click it and select "Disable CodeQL".
+#      Two CodeQL configurations cannot coexist: if Default Setup is enabled
+#      GitHub rejects this workflow's SARIF upload with
+#      "CodeQL analyses from advanced configurations cannot be processed when
+#       the default setup is enabled."
+#   3. After disabling Default Setup, this workflow becomes the single source
+#      of truth for CodeQL and its SARIF upload will be accepted.
+#
+# This workflow scans the TypeScript/JavaScript source for the security
+# categories below and uploads results to the repo's Code Scanning tab.
+
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
   schedule:
-    - cron: '0 6 * * 1'
+    # Weekly scan on Monday 02:00 UTC.
+    - cron: '0 2 * * 1'
 
 permissions:
-  actions: read
   contents: read
-  security-events: write
 
 jobs:
   analyze:
-    name: Analyze TypeScript/JavaScript
+    name: Analyze
     runs-on: ubuntu-latest
     permissions:
-      actions: read
       contents: read
       security-events: write
+      actions: read
+    timeout-minutes: 30
+
     strategy:
       fail-fast: false
       matrix:
         language: [javascript-typescript]
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
-          # Skip Java/Kotlin/Swift autobuild — this repo is TS/JS only.
-          build-mode: none
+          # security-and-quality adds best-practice rules on top of security.
+          queries: security-and-quality
+          config-file: .github/codeql-config.yml
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v4
+
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
         with:

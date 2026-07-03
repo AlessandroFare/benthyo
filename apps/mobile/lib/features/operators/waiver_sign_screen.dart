@@ -33,7 +33,7 @@ class _WaiverSignScreenState extends ConsumerState<WaiverSignScreen> {
   }
 
   Future<void> _loadWaiver() async {
-    final apiBase = const String.fromEnvironment(
+    const apiBase = String.fromEnvironment(
       'API_URL',
       defaultValue: 'http://localhost:3000/api/v1',
     );
@@ -45,10 +45,10 @@ class _WaiverSignScreenState extends ConsumerState<WaiverSignScreen> {
         setState(() => _error = 'Waiver not available');
       } else {
         final body = jsonDecode(res.body) as Map<String, dynamic>;
-        final data = body['data'] ?? body;
+        final data = (body['data'] as Map<String, dynamic>?) ?? body;
         setState(() {
-          _operator = data['operator'] as Map<String, dynamic>?;
-          _waiver = data['waiver'] as Map<String, dynamic>?;
+          _operator = (data['operator'] as Map<String, dynamic>?) ;
+          _waiver = (data['waiver'] as Map<String, dynamic>?) ;
         });
       }
     } catch (e) {
@@ -71,7 +71,7 @@ class _WaiverSignScreenState extends ConsumerState<WaiverSignScreen> {
       _error = null;
     });
 
-    final apiBase = const String.fromEnvironment(
+    const apiBase = String.fromEnvironment(
       'API_URL',
       defaultValue: 'http://localhost:3000/api/v1',
     );

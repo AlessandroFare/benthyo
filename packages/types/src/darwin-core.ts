@@ -1,7 +1,7 @@
 import type { DwCBasisOfRecord, DwCOccurrenceStatus } from './enums';
 
 /**
- * Darwin Core Occurrence record (subset used by OceanLog GBIF export).
+ * Darwin Core Occurrence record (subset used by Benthyo GBIF export).
  * @see https://dwc.tdwg.org/terms/
  */
 export interface DarwinCoreOccurrence {
@@ -74,16 +74,16 @@ export interface DarwinCoreOccurrence {
   license?: string;
   /** dwc:rightsHolder */
   rightsHolder?: string;
-  /** dwc:institutionCode — always OCEANLOG for platform exports. */
-  institutionCode: 'OCEANLOG';
+  /** dwc:institutionCode — always BENTHYO for platform exports. */
+  institutionCode: 'BENTHYO';
   /** dwc:collectionCode */
   collectionCode: 'SIGHTINGS';
   /** dwc:catalogNumber — internal sighting UUID. */
   catalogNumber: string;
-  /** OceanLog extension: source system provenance. */
-  oceanlogSource?: string;
-  /** OceanLog extension: external occurrence key (GBIF, OBIS). */
-  oceanlogExternalId?: string;
+  /** Benthyo extension: source system provenance. */
+  benthyoSource?: string;
+  /** Benthyo extension: external occurrence key (GBIF, OBIS). */
+  benthyoExternalId?: string;
 }
 
 /** Darwin Core Archive metadata file (meta.xml) descriptor. */
@@ -117,7 +117,7 @@ export interface DarwinCoreExportBundle {
   archive_url?: string;
 }
 
-/** Map an OceanLog sighting row to a Darwin Core occurrence. */
+/** Map an Benthyo sighting row to a Darwin Core occurrence. */
 export interface MapToDarwinCoreInput {
   sightingId: string;
   scientificName: string;

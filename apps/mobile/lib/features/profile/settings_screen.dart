@@ -13,7 +13,6 @@ import '../../core/widgets/app_scaffold.dart';
 import '../../core/widgets/async_value_widget.dart';
 import '../auth/auth_providers.dart';
 import '../sync/dead_letter_banner.dart';
-import '../sync/dead_letter_providers.dart';
 import 'profile_providers.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -243,6 +242,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             onTap: () => context.push('/marketplace'),
           ),
           const Divider(),
+          const SectionHeader(title: 'Onboarding'),
+          ListTile(
+            leading: const Icon(Icons.waving_hand),
+            title: const Text('Show onboarding intro'),
+            subtitle: const Text('Replay the welcome cards'),
+            onTap: () => context.push('/onboarding'),
+          ),
+          const Divider(),
           const SectionHeader(title: 'Data export'),
           ListTile(
             leading: const Icon(Icons.science),
@@ -271,11 +278,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const Divider(),
           ListTile(
             leading: const Icon(Icons.info_outline),
-            title: const Text('About OceanLog'),
+            title: const Text('About Benthyo'),
             subtitle: const Text('Version 1.0.0'),
             onTap: () => showAboutDialog(
               context: context,
-              applicationName: 'OceanLog',
+              applicationName: 'Benthyo',
               applicationVersion: '1.0.0',
               applicationLegalese:
                   'B2B-anchored citizen-science platform for scuba diving.\n'
@@ -283,7 +290,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               children: const [
                 SizedBox(height: 12),
                 Text(
-                  'OceanLog lets you log dives, discover sites, and record '
+                  'Benthyo lets you log dives, discover sites, and record '
                   'marine species sightings — data that feeds a GBIF-exportable '
                   'observation layer with contributor attribution.',
                 ),
@@ -353,7 +360,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             children: [
               const Text(
                 'This is permanent. All your dives, sightings, photos, and '
-                'personal data will be removed from OceanLog.',
+                'personal data will be removed from Benthyo.',
               ),
               const SizedBox(height: 12),
               const Text(

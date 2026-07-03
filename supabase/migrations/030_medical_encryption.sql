@@ -34,7 +34,7 @@ AS $$
     p_operator_id::text ||
     COALESCE(
       current_setting('app.medical_master_key', true),
-      'oceanlog-dev-master-key-do-not-use-in-prod'
+      'benthyo-dev-master-key-do-not-use-in-prod'
     )
   )
 $$;
@@ -84,7 +84,7 @@ AS $$
     p_ciphertext,
     md5(p_user_id::text || COALESCE(
       current_setting('app.medical_master_key', true),
-      'oceanlog-dev-master-key-do-not-use-in-prod'
+      'benthyo-dev-master-key-do-not-use-in-prod'
     ))
   )::jsonb
 $$;
@@ -102,7 +102,7 @@ AS $$
     p_answers::text,
     md5(p_user_id::text || COALESCE(
       current_setting('app.medical_master_key', true),
-      'oceanlog-dev-master-key-do-not-use-in-prod'
+      'benthyo-dev-master-key-do-not-use-in-prod'
     )),
     'cipher-algo=aes256'
   )

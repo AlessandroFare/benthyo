@@ -1,9 +1,7 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/config/api_config.dart';
 import '../../core/supabase/supabase_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/async_value_widget.dart';
@@ -38,7 +36,7 @@ final similarSpeciesProvider =
     FutureProvider.family<List<SimilarSpecies>, String>((ref, speciesId) async {
   final client = ref.watch(supabaseClientProvider);
   try {
-    final res = await client.rpc(
+    final res = await client.rpc<List<Map<String, dynamic>>>(
       'find_similar_species_by_species_id',
       params: {
         'p_species_id': speciesId,
@@ -46,8 +44,8 @@ final similarSpeciesProvider =
         'p_min_sim': 0.65,
       },
     );
-    if (res is List && res.isNotEmpty) {
-      return (res as List)
+    if (res.isNotEmpty) {
+      return (res)
           .cast<Map<String, dynamic>>()
           .map(SimilarSpecies.fromJson)
           .toList();

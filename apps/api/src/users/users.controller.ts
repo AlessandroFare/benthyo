@@ -56,7 +56,7 @@ export class UsersController {
     res.setHeader('Content-Type', 'application/json');
     res.setHeader(
       'Content-Disposition',
-      `attachment; filename="oceanlog-export-${user.id}-${Date.now()}.json"`,
+      `attachment; filename="benthyo-export-${user.id}-${Date.now()}.json"`,
     );
     res.send(JSON.stringify(payload, null, 2));
   }

@@ -1,14 +1,16 @@
 {
-  "name": "@oceanlog/etl",
+  "name": "@benthyo/etl",
   "version": "0.1.0",
   "private": true,
-  "description": "OceanLog ETL pipelines for dive sites, species, and enrichment",
+  "description": "Benthyo ETL pipelines for dive sites, species, and enrichment",
   "license": "MIT",
   "type": "module",
   "scripts": {
     "gbif": "tsx gbif/index.ts",
     "gbif:push": "tsx gbif/push-verified.ts",
     "obis": "tsx obis/index.ts",
+    "seamap": "tsx seamap/index.ts",
+    "rls": "tsx rls/index.ts",
     "worms": "tsx worms/index.ts",
     "overpass": "tsx overpass/index.ts",
     "opendivemap": "tsx opendivemap/index.ts",
@@ -24,7 +26,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@oceanlog/types": "workspace:*",
+    "@benthyo/types": "workspace:*",
     "@supabase/supabase-js": "^2.47.10",
     "dotenv": "^16.4.7"
   },

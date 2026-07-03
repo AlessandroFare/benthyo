@@ -1,5 +1,5 @@
 /**
- * Shared TypeScript types for OceanLog.
+ * Shared TypeScript types for Benthyo.
  * Mirrors the PostgreSQL schema in supabase/migrations/ and API contracts.
  */
 

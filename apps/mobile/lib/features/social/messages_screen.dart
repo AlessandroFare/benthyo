@@ -7,7 +7,6 @@ import 'package:http/http.dart' as http;
 
 import '../../core/config/api_config.dart';
 import '../../core/supabase/supabase_client.dart';
-import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_scaffold.dart';
 import '../../core/widgets/async_value_widget.dart';
 
@@ -21,11 +20,14 @@ final conversationsProvider =
     Uri.parse('${ApiConfig.baseUrl}/conversations'),
     headers: {'Authorization': 'Bearer $token'},
   );
-  if (res.statusCode != 200) return [];
+  if (res.statusCode != 200) {
+    throw Exception('Failed to load conversations (${res.statusCode})');
+  }
   final body = jsonDecode(res.body);
   return body is List
       ? body.cast<Map<String, dynamic>>()
-      : (body['data'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
+      : ((body as Map<String, dynamic>)['data'] as List<dynamic>? ?? [])
+          .cast<Map<String, dynamic>>();
 });
 
 class MessagesScreen extends ConsumerWidget {
@@ -54,7 +56,7 @@ class MessagesScreen extends ConsumerWidget {
                 : conv['participant_a'] as String;
             return ListTile(
               leading: const Icon(Icons.person),
-              title: Text('Conversation'),
+              title: const Text('Conversation'),
               subtitle: Text(
                 conv['last_message_at'] != null
                     ? DateTime.parse(conv['last_message_at'] as String).toLocal().toString()

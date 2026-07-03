@@ -121,7 +121,7 @@ export function LoginPage() {
               <Waves className="h-7 w-7" />
             </motion.div>
             <div>
-              <CardTitle className="text-2xl">OceanLog</CardTitle>
+              <CardTitle className="text-2xl">Benthyo</CardTitle>
               <CardDescription>
                 Sign in to your dive center dashboard
               </CardDescription>

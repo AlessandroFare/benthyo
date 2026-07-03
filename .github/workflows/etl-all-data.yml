@@ -18,10 +18,11 @@ jobs:
       # GitHub Actions secrets — never log the values.
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      ETL_SYSTEM_USER_ID: ${{ secrets.ETL_SYSTEM_USER_ID }}
       INAT_API_BASE: https://api.inaturalist.org/v1
       INAT_TAXON_MIN_SCORE: 90
       COMMONS_API_URL: https://commons.wikimedia.org/w/api.php
-      WIKIMEDIA_USER_AGENT: 'OceanLog/1.0 (https://oceanlog.app; contact@oceanlog.app)'
+      WIKIMEDIA_USER_AGENT: 'Benthyo/1.0 (https://benthyo.com; contact@benthyo.com)'
       GBIF_MAX_RECORDS: 5000
       OBIS_MAX_RECORDS: 3000
       WORMS_MAX_PER_TERM: 200
@@ -46,5 +47,5 @@ jobs:
       # in dependency order (see etl/run-all-data.ts, the single source of
       # truth). The previous duplicate wikimedia/inaturalist steps were
       # removed: they re-ran the image backfills a second time every week.
-      - run: pnpm --filter @oceanlog/etl all-data
+      - run: pnpm --filter @benthyo/etl all-data
         working-directory: etl

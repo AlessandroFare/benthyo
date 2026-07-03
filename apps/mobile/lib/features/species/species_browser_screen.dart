@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
@@ -45,8 +47,10 @@ class _SpeciesBrowserScreenState extends ConsumerState<SpeciesBrowserScreen> {
       maxWidth: 1600,
     );
     if (file == null || !mounted) return;
-    context.push(
-      '/species/identify?path=${Uri.encodeComponent(file.path)}',
+    unawaited(
+      context.push(
+        '/species/identify?path=${Uri.encodeComponent(file.path)}',
+      ),
     );
   }
 
@@ -58,8 +62,10 @@ class _SpeciesBrowserScreenState extends ConsumerState<SpeciesBrowserScreen> {
       maxWidth: 1600,
     );
     if (file == null || !mounted) return;
-    context.push(
-      '/species/identify?path=${Uri.encodeComponent(file.path)}',
+    unawaited(
+      context.push(
+        '/species/identify?path=${Uri.encodeComponent(file.path)}',
+      ),
     );
   }
 

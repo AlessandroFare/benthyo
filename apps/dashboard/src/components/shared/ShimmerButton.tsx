@@ -25,7 +25,7 @@ export const ShimmerButton = forwardRef<HTMLButtonElement, ShimmerButtonProps>(
         whileTap={{ scale: 0.97 }}
         transition={{ duration: 0.18, ease: "easeOut" }}
         className={cn(
-          "group relative inline-flex items-center justify-center overflow-hidden rounded-md px-5 py-2.5 text-sm font-medium text-white shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0D1117] disabled:pointer-events-none disabled:opacity-50",
+          "group relative inline-flex items-center justify-center overflow-hidden rounded-md px-5 py-2.5 text-sm font-medium text-white shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50",
           colorClass,
           className,
         )}

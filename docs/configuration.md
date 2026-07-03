@@ -1,4 +1,4 @@
-# OceanLog — configuration checklist
+# Benthyo — configuration checklist
 
 Use this checklist to get **mobile (Flutter)**, **web dashboard**, and **API** fully operational locally or on Supabase cloud.
 
@@ -9,7 +9,7 @@ Use this checklist to get **mobile (Flutter)**, **web dashboard**, and **API** f
 | Copy env | `cp .env.example .env` |
 | Start Docker | `docker compose up -d` (Postgres `54322`, Redis `6379`) |
 | Apply migrations | Run all `supabase/migrations/*.sql` through `020` + `supabase/seed.sql` |
-| Build packages | `pnpm --filter @oceanlog/types build` |
+| Build packages | `pnpm --filter @benthyo/types build` |
 
 ## 2. Supabase (local or cloud)
 
@@ -38,7 +38,7 @@ Use this checklist to get **mobile (Flutter)**, **web dashboard**, and **API** f
 | `API_CORS_ORIGIN` | Dashboard + Flutter web (`http://localhost:5173,http://localhost:7357`) |
 
 ```bash
-pnpm --filter @oceanlog/api start:dev
+pnpm --filter @benthyo/api start:dev
 ```
 
 Verify: `http://localhost:3000/health` and `http://localhost:3000/api/v1/species`.
@@ -56,7 +56,7 @@ VITE_POSTHOG_KEY=
 ```
 
 ```bash
-pnpm --filter @oceanlog/dashboard dev
+pnpm --filter @benthyo/dashboard dev
 ```
 
 **Embed booking widget:**  
@@ -71,7 +71,7 @@ pnpm --filter @oceanlog/dashboard dev
 **MCP server (Claude / Cursor):**
 ```bash
 cd apps/mcp-server && pnpm install
-OCEANLOG_API_URL=http://localhost:3000/api/v1 pnpm start
+BENTHYO_API_URL=http://localhost:3000/api/v1 pnpm start
 ```
 
 ## 5. Flutter mobile + web
@@ -142,8 +142,8 @@ Dive sites: `opendivemap`, `overpass`, `divenumber`, `apify:google-maps`, or `al
 Species images: `inaturalist:images`, `tavily:species`.
 
 ```bash
-pnpm --filter @oceanlog/etl all-data
-pnpm --filter @oceanlog/etl gbif
+pnpm --filter @benthyo/etl all-data
+pnpm --filter @benthyo/etl gbif
 ```
 
 ## 8. Production checklist

@@ -1,11 +1,11 @@
 # Testing Guide
 
-End-to-end checklist for validating OceanLog locally before production deploy.
+End-to-end checklist for validating Benthyo locally before production deploy.
 
 ## 1. Prerequisites
 
 ```powershell
-cd C:\Users\alefare\scuba\oceanlog
+cd C:\Users\alefare\scuba\benthyo
 docker compose up -d
 supabase start          # or apply migrations manually (see setup.md)
 pnpm install
@@ -40,30 +40,30 @@ psql "$env:DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/seed.sql
 psql "$env:DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/rls.sql
 
 # API unit tests
-pnpm --filter @oceanlog/api test
+pnpm --filter @benthyo/api test
 
 # Dashboard typecheck + build
-pnpm --filter @oceanlog/dashboard typecheck
-pnpm --filter @oceanlog/dashboard build
+pnpm --filter @benthyo/dashboard typecheck
+pnpm --filter @benthyo/dashboard build
 
 # ETL unit tests
-pnpm --filter @oceanlog/etl test
+pnpm --filter @benthyo/etl test
 ```
 
-Expected RLS output: `All OceanLog RLS tests passed.`
+Expected RLS output: `All Benthyo RLS tests passed.`
 
 ## 3. Start services
 
 Terminal 1 — API:
 
 ```powershell
-pnpm --filter @oceanlog/api start:dev
+pnpm --filter @benthyo/api start:dev
 ```
 
 Terminal 2 — Dashboard:
 
 ```powershell
-pnpm --filter @oceanlog/dashboard dev
+pnpm --filter @benthyo/dashboard dev
 ```
 
 Terminal 3 — Mobile (web):
@@ -111,27 +111,27 @@ supabase functions serve --env-file .env
 ### Run everything (recommended first time)
 
 ```powershell
-pnpm --filter @oceanlog/etl all-data
+pnpm --filter @benthyo/etl all-data
 ```
 
 Individual commands (when debugging one source):
 
 ```powershell
-pnpm --filter @oceanlog/etl opendivemap    # ~3k sites, no key
-pnpm --filter @oceanlog/etl overpass      # OSM regions
-pnpm --filter @oceanlog/etl worms
-pnpm --filter @oceanlog/etl gbif          # needs ETL_SYSTEM_USER_ID
-pnpm --filter @oceanlog/etl obis
-pnpm --filter @oceanlog/etl inaturalist:images
-pnpm --filter @oceanlog/etl wikimedia:images
+pnpm --filter @benthyo/etl opendivemap    # ~3k sites, no key
+pnpm --filter @benthyo/etl overpass      # OSM regions
+pnpm --filter @benthyo/etl worms
+pnpm --filter @benthyo/etl gbif          # needs ETL_SYSTEM_USER_ID
+pnpm --filter @benthyo/etl obis
+pnpm --filter @benthyo/etl inaturalist:images
+pnpm --filter @benthyo/etl wikimedia:images
 ```
 
 Optional (API keys in `.env`):
 
 ```powershell
-pnpm --filter @oceanlog/etl divenumber
-pnpm --filter @oceanlog/etl apify:google-maps
-pnpm --filter @oceanlog/etl tavily:species
+pnpm --filter @benthyo/etl divenumber
+pnpm --filter @benthyo/etl apify:google-maps
+pnpm --filter @benthyo/etl tavily:species
 ```
 
 ### Parallel tips

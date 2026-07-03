@@ -11,8 +11,8 @@
 ## 1. Clone and install
 
 ```bash
-git clone https://github.com/oceanlog/oceanlog.git
-cd oceanlog
+git clone https://github.com/benthyo/benthyo.git
+cd benthyo
 pnpm install
 ```
 
@@ -50,7 +50,7 @@ This starts:
 Apply migrations in order:
 
 ```bash
-export DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/oceanlog
+export DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/benthyo
 
 for f in supabase/migrations/*.sql; do
   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"
@@ -64,8 +64,8 @@ Seed data includes 50 Mediterranean dive sites, 200 marine species, 5 Italian di
 ## 5. Build shared packages
 
 ```bash
-pnpm --filter @oceanlog/types build
-pnpm --filter @oceanlog/ui build
+pnpm --filter @benthyo/types build
+pnpm --filter @benthyo/ui build
 ```
 
 ## 6. Run services
@@ -73,13 +73,13 @@ pnpm --filter @oceanlog/ui build
 **API (NestJS):**
 
 ```bash
-pnpm --filter @oceanlog/api start:dev
+pnpm --filter @benthyo/api start:dev
 ```
 
 **Dashboard (Vite):**
 
 ```bash
-pnpm --filter @oceanlog/dashboard dev
+pnpm --filter @benthyo/dashboard dev
 ```
 
 Dashboard runs at `http://localhost:5173`, API at `http://localhost:3000`.
@@ -105,16 +105,16 @@ Set in `.env`:
 
 | Command | Source | Auth |
 |---------|--------|------|
-| `pnpm --filter @oceanlog/etl opendivemap` | [OpenDiveMap](https://opendivemap.com/docs/api) GeoJSON API (~3k+ sites) | None |
-| `pnpm --filter @oceanlog/etl overpass` | OpenStreetMap (9 regions incl. Nordic) | None |
-| `pnpm --filter @oceanlog/etl divenumber` | [Dive Number](https://divenumber.com/free_dive_site_map) embed API (region-scoped) | `DIVENUMBER_API_KEY` |
-| `pnpm --filter @oceanlog/etl apify:google-maps` | Google Maps via [Apify](https://apify.com) | `APIFY_TOKEN` |
-| `pnpm --filter @oceanlog/etl all-data` | Runs all of the above + species images | Mixed |
+| `pnpm --filter @benthyo/etl opendivemap` | [OpenDiveMap](https://opendivemap.com/docs/api) GeoJSON API (~3k+ sites) | None |
+| `pnpm --filter @benthyo/etl overpass` | OpenStreetMap (9 regions incl. Nordic) | None |
+| `pnpm --filter @benthyo/etl divenumber` | [Dive Number](https://divenumber.com/free_dive_site_map) embed API (region-scoped) | `DIVENUMBER_API_KEY` |
+| `pnpm --filter @benthyo/etl apify:google-maps` | Google Maps via [Apify](https://apify.com) | `APIFY_TOKEN` |
+| `pnpm --filter @benthyo/etl all-data` | Runs all of the above + species images | Mixed |
 
 ```bash
-pnpm --filter @oceanlog/etl opendivemap
-pnpm --filter @oceanlog/etl overpass
-pnpm --filter @oceanlog/etl all-data
+pnpm --filter @benthyo/etl opendivemap
+pnpm --filter @benthyo/etl overpass
+pnpm --filter @benthyo/etl all-data
 ```
 
 Norway / Nordic sites: run Overpass (`OVERPASS_REGIONS=nordic`) or Apify with `APIFY_GOOGLE_SEARCHES=scuba diving sites Norway`.
@@ -123,11 +123,11 @@ Norway / Nordic sites: run Overpass (`OVERPASS_REGIONS=nordic`) or Apify with `A
 
 | Command | Purpose |
 |---------|---------|
-| `pnpm --filter @oceanlog/etl gbif` | Mediterranean occurrence imports |
-| `pnpm --filter @oceanlog/etl obis` | OBIS marine occurrences |
-| `pnpm --filter @oceanlog/etl worms` | WoRMS taxonomy |
-| `pnpm --filter @oceanlog/etl inaturalist:images` | Backfill `image_url` from `inat_taxon_id` |
-| `pnpm --filter @oceanlog/etl tavily:species` | Image search fallback via [Tavily](https://www.tavily.com) |
+| `pnpm --filter @benthyo/etl gbif` | Mediterranean occurrence imports |
+| `pnpm --filter @benthyo/etl obis` | OBIS marine occurrences |
+| `pnpm --filter @benthyo/etl worms` | WoRMS taxonomy |
+| `pnpm --filter @benthyo/etl inaturalist:images` | Backfill `image_url` from `inat_taxon_id` |
+| `pnpm --filter @benthyo/etl tavily:species` | Image search fallback via [Tavily](https://www.tavily.com) |
 
 ### Dashboard operator (local)
 

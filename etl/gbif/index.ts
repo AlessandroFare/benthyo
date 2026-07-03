@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import type { ConservationStatus } from '@oceanlog/types';
+import type { ConservationStatus } from '@benthyo/types';
 import { logger, logJobSummary } from '../shared/logger';
 import { paginate, RateLimiter } from '../shared/rate-limiter';
 import { getSupabase, upsertBatch } from '../shared/supabase';

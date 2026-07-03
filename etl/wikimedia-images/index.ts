@@ -7,7 +7,7 @@ import { isMainModule } from '../shared/cli';
 const COMMONS_API = process.env.COMMONS_API_URL ?? 'https://commons.wikimedia.org/w/api.php';
 const BATCH_SIZE = Number(process.env.WIKIMEDIA_BATCH_SIZE ?? 100);
 const MAX_SPECIES = Number(process.env.WIKIMEDIA_MAX_SPECIES ?? 500);
-const USER_AGENT = process.env.WIKIMEDIA_USER_AGENT ?? 'OceanLog/1.0 (https://oceanlog.app; contact@oceanlog.app)';
+const USER_AGENT = process.env.WIKIMEDIA_USER_AGENT ?? 'Benthyo/1.0 (https://benthyo.com; contact@benthyo.com)';
 
 const limiter = new RateLimiter({ minIntervalMs: 200 });
 

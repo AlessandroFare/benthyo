@@ -1,4 +1,4 @@
-# OceanLog — ignore secrets, build artifacts, IDE noise.
+# Benthyo — ignore secrets, build artifacts, IDE noise.
 
 # Secrets — never commit.
 .env
@@ -67,3 +67,11 @@ etl/tiles/
 
 # Generated docs
 docs/_generated/
+
+# Local verification artifacts — screenshots, tokens, perf captures,
+# temp SQL. All scratch, never commit (may hold local dev tokens).
+.verify/
+
+# Brand toolkit — transient sharp install only.
+# The generated/ PNGs ARE committed (consumed by apps/mobile + dashboard).
+brand/.icon-tools/

@@ -1,13 +1,13 @@
 {
-  "name": "oceanlog",
+  "name": "benthyo",
   "private": true,
   "version": "0.1.0",
-  "description": "OceanLog monorepo root",
+  "description": "Benthyo monorepo root",
   "scripts": {
-    "build": "pnpm --filter @oceanlog/types build && pnpm --filter @oceanlog/ui build",
-    "dev:api": "pnpm --filter @oceanlog/api start:dev",
-    "dev:dashboard": "pnpm --filter @oceanlog/dashboard dev",
-    "test:etl": "pnpm --filter @oceanlog/etl test",
+    "build": "pnpm --filter @benthyo/types build && pnpm --filter @benthyo/ui build",
+    "dev:api": "pnpm --filter @benthyo/api start:dev",
+    "dev:dashboard": "pnpm --filter @benthyo/dashboard dev",
+    "test:etl": "pnpm --filter @benthyo/etl test",
     "typecheck": "pnpm -r typecheck"
   },
   "engines": {
@@ -18,17 +18,20 @@
   "pnpm": {
     "overrides": {
       "vitest": "^3.0.5",
-      "vite": "^5.4.21",
-      "multer": "^2.0.1",
-      "lodash": "^4.17.21",
+      "vite": "^6.4.3",
+      "webpack": "^5.104.1",
+      "multer": "^2.2.0",
+      "lodash": "^4.18.1",
       "glob": "^11.0.1",
       "picomatch": "^4.0.2",
-      "qs": "^6.14.0",
-      "js-yaml": "^4.1.0",
+      "qs": "^6.15.2",
+      "js-yaml": "^4.2.0",
       "tmp": "^0.2.4",
-      "dompurify": "^3.2.4",
+      "dompurify": "^3.4.11",
       "esbuild": "^0.25.0",
-      "file-type": "^20.4.1"
+      "file-type": "^21.3.2",
+      "ajv": "^8.18.0",
+      "@opentelemetry/core": "^2.8.0"
     }
   }
 }

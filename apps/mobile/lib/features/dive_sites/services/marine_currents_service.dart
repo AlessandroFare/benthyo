@@ -205,7 +205,7 @@ class DriftPlanHint {
         level: DriftRiskLevel.low,
       );
     }
-    return DriftPlanHint(
+    return const DriftPlanHint(
       label: 'Standard profile',
       detail: 'Use isolines overlay to inspect bottom shape before planning entry/exit.',
       level: DriftRiskLevel.low,

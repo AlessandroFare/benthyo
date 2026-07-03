@@ -1,9 +1,10 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../uploads/uploads_repository.dart';
 import '../../core/ml/clip_providers.dart';
-import '../../core/supabase/supabase_client.dart';
 import 'species_api_repository.dart';
 import 'species_providers.dart';
 import '../../core/models/species.dart';
@@ -34,7 +35,7 @@ final speciesPhotoIdentifyProvider =
   );
 
   // Pre-compute CLIP embedding for vector search (cached locally until sighting saved).
-  ref.read(clipEmbeddingServiceProvider).embedBytes(bytes);
+  unawaited(ref.read(clipEmbeddingServiceProvider).embedBytes(bytes));
 
   final inatResults = await api.identifyFromImageUrl(publicUrl);
   if (inatResults.isEmpty) {

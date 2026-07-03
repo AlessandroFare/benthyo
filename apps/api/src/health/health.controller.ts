@@ -31,7 +31,7 @@ export class HealthController {
   health() {
     return {
       status: 'ok',
-      service: 'oceanlog-api',
+      service: 'benthyo-api',
       version: process.env['npm_package_version'] ?? '0.0.0',
       timestamp: new Date().toISOString(),
     };

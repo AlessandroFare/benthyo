@@ -1,11 +1,11 @@
 import 'dotenv/config';
 import { createHash } from 'crypto';
-import { logger, logJobSummary } from '../shared/logger';
+import { logger } from '../shared/logger';
 import { getSupabase } from '../shared/supabase';
 
 /**
  * Push user-opted verified sightings to GBIF export batch log.
- * Run via cron: pnpm --filter @oceanlog/etl gbif:push
+ * Run via cron: pnpm --filter @benthyo/etl gbif:push
  */
 async function main(): Promise<void> {
   const supabase = getSupabase();

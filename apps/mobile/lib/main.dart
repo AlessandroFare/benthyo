@@ -23,7 +23,7 @@ Future<void> main() async {
       appRunner: () async {
         await initializeSupabase();
         await DiveMapTileCache.initialize();
-        runApp(const ProviderScope(child: OceanLogApp()));
+        runApp(const ProviderScope(child: BenthyoApp()));
       },
     );
     return;
@@ -31,11 +31,11 @@ Future<void> main() async {
 
   await initializeSupabase();
   await DiveMapTileCache.initialize();
-  runApp(const ProviderScope(child: OceanLogApp()));
+  runApp(const ProviderScope(child: BenthyoApp()));
 }
 
-class OceanLogApp extends ConsumerWidget {
-  const OceanLogApp({super.key});
+class BenthyoApp extends ConsumerWidget {
+  const BenthyoApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -72,7 +72,7 @@ class OceanLogApp extends ConsumerWidget {
     );
 
     return MaterialApp.router(
-      title: 'OceanLog',
+      title: 'Benthyo',
       debugShowCheckedModeBanner: false,
       theme: lightTheme,
       darkTheme: darkTheme,

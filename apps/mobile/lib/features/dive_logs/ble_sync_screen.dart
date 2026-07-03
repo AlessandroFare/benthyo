@@ -21,11 +21,14 @@ final bleDevicesProvider = FutureProvider<List<Map<String, dynamic>>>((ref) asyn
     Uri.parse('${ApiConfig.baseUrl}/dive-computers'),
     headers: {'Authorization': 'Bearer $token'},
   );
-  if (res.statusCode != 200) return [];
+  if (res.statusCode != 200) {
+    throw Exception('Failed to load dive computers (${res.statusCode})');
+  }
   final body = jsonDecode(res.body);
   return body is List
       ? body.cast<Map<String, dynamic>>()
-      : (body['data'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
+      : ((body as Map<String, dynamic>)['data'] as List<dynamic>? ?? [])
+          .cast<Map<String, dynamic>>();
 });
 
 class BleSyncScreen extends ConsumerStatefulWidget {

@@ -21,6 +21,7 @@ import {
 } from "@/hooks/useSettings";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { PageSkeleton } from "@/components/shared/LoadingSkeleton";
+import { AnimatedPage } from "@/components/shared/AnimatedPage";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -181,7 +182,7 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <AnimatedPage>
       <Tabs defaultValue="profile">
         <TabsList>
           <TabsTrigger value="profile">Operator Profile</TabsTrigger>
@@ -213,7 +214,7 @@ export function SettingsPage() {
                   <Label htmlFor="email">Email</Label>
                   <Input
                     id="email"
-                    value={data.operator.email}
+                    value={data.operator.email ?? ""}
                     disabled
                   />
                 </div>
@@ -237,7 +238,7 @@ export function SettingsPage() {
               </div>
               <div className="space-y-2">
                 <Label>Country</Label>
-                <Input value={data.operator.country_code} disabled />
+                <Input value={data.operator.country_code ?? ""} disabled />
               </div>
               <Button
                 onClick={handleSaveProfile}
@@ -269,7 +270,7 @@ export function SettingsPage() {
                   <DialogHeader>
                     <DialogTitle>Invite Team Member</DialogTitle>
                     <DialogDescription>
-                      Add an existing OceanLog user by their account ID.
+                      Add an existing Benthyo user by their account ID.
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4">
@@ -628,6 +629,6 @@ export function SettingsPage() {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
+    </AnimatedPage>
   );
 }

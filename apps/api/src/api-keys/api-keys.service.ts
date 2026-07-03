@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { createHash, pbkdf2Sync, randomBytes, timingSafeEqual } from 'crypto';
+import { pbkdf2Sync, randomBytes, timingSafeEqual } from 'crypto';
 import { SupabaseService } from '../database/supabase.service';
 import { assertNoError } from '../common/utils/supabase-error.util';
 import { CreateApiKeyDto } from '../medical/dto/medical.dto';
@@ -14,20 +14,19 @@ function hashApiKey(raw: string): string {
 }
 
 function verifyApiKeyHash(raw: string, stored: string): boolean {
-  if (stored.startsWith('pbkdf2$')) {
-    const parts = stored.split('$');
-    if (parts.length !== 4) return false;
-    const iterations = Number.parseInt(parts[1] ?? '', 10);
-    const salt = parts[2] ?? '';
-    const expectedHex = parts[3] ?? '';
-    if (!Number.isFinite(iterations) || !salt || !expectedHex) return false;
-    const derived = pbkdf2Sync(raw, salt, iterations, 64, PBKDF2_DIGEST);
-    const expected = Buffer.from(expectedHex, 'hex');
-    if (expected.length !== derived.length) return false;
-    return timingSafeEqual(expected, derived);
+  if (!stored.startsWith('pbkdf2$')) {
+    return false;
   }
-  const legacy = createHash('sha256').update(raw).digest('hex');
-  return legacy === stored;
+  const parts = stored.split('$');
+  if (parts.length !== 4) return false;
+  const iterations = Number.parseInt(parts[1] ?? '', 10);
+  const salt = parts[2] ?? '';
+  const expectedHex = parts[3] ?? '';
+  if (!Number.isFinite(iterations) || !salt || !expectedHex) return false;
+  const derived = pbkdf2Sync(raw, salt, iterations, 64, PBKDF2_DIGEST);
+  const expected = Buffer.from(expectedHex, 'hex');
+  if (expected.length !== derived.length) return false;
+  return timingSafeEqual(expected, derived);
 }
 
 @Injectable()

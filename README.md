@@ -1,4 +1,4 @@
-# OceanLog
+# Benthyo
 
 > B2B-anchored citizen-science platform for scuba diving.
 
@@ -45,7 +45,7 @@ staff look ahead or back; the analytics overview moved to `/overview`.
 ## Quick start
 
 ```bash
-git clone <repo-url> && cd oceanlog
+git clone <repo-url> && cd benthyo
 pnpm install
 node scripts/sanitize-env.js        # replace real secrets with placeholders
 cp .env.example .env                # fill in real values for local dev
@@ -56,7 +56,7 @@ for f in supabase/migrations/0*.sql; do
   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"
 done
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/seed.sql
-pnpm --filter @oceanlog/types build
+pnpm --filter @benthyo/types build
 pnpm dev:api                         # http://localhost:3000
 pnpm dev:dashboard                   # http://localhost:5173
 cd apps/mobile && flutter run -d chrome \
@@ -110,14 +110,14 @@ vars.
 ## Repository layout
 
 ```
-oceanlog/
+benthyo/
 ├── apps/
 │   ├── api/            # NestJS backend
 │   ├── dashboard/      # React B2B dashboard
 │   ├── mcp-server/     # MCP integration (Claude / Cursor)
 │   └── mobile/         # Flutter consumer app
 ├── packages/
-│   └── types/          # @oceanlog/types — shared DTOs
+│   └── types/          # @benthyo/types — shared DTOs
 ├── supabase/
 │   ├── migrations/     # 000..030 in order
 │   ├── functions/      # Edge Functions (Deno)
@@ -144,10 +144,10 @@ pnpm -r typecheck
 pnpm -r test
 
 # Run the ETL dry-run for a single source
-pnpm --filter @oceanlog/etl gbif
+pnpm --filter @benthyo/etl gbif
 
 # Run the full data pipeline
-pnpm --filter @oceanlog/etl all-data
+pnpm --filter @benthyo/etl all-data
 ```
 
 The Supabase local stack (`supabase start`) is required for `pnpm dev:api`.
@@ -177,7 +177,7 @@ pipeline continues, exiting non-zero at the end if any step failed.
 
 ## Security model
 
-OceanLog is multi-tenant and security-sensitive. The full audit and
+Benthyo is multi-tenant and security-sensitive. The full audit and
 remediation are documented in
 [`SECURITY_AUDIT.md`](SECURITY_AUDIT.md). The core invariants:
 
@@ -254,20 +254,20 @@ stripe listen --forward-to localhost:3000/api/v1/billing/stripe/webhook \
   the signed waiver body are captured. The DB trigger
   `prevent_signed_waiver_delete` blocks deletion of any waiver that
   has signatures attached.
-- **Default cookie consent:** the only cookie set by OceanLog is the
+- **Default cookie consent:** the only cookie set by Benthyo is the
   Supabase auth token, which is treated as strictly necessary. No
   consent banner is required for that. PostHog is opt-in.
 
 ## Testing
 
 - **API unit tests** (`apps/api/src/**/*.spec.ts`): mock the Supabase
-  client, exercise the service layer. Run with `pnpm --filter @oceanlog/api test`.
+  client, exercise the service layer. Run with `pnpm --filter @benthyo/api test`.
 - **RLS test suite** (`supabase/tests/rls.sql`): bootstrap test rows
   under `anon`, `authenticated`, and `service_role` contexts and
   assert visibility + write permissions for every table. Run with
   `psql $DATABASE_URL -v ON_ERROR_STOP=1 -f supabase/tests/rls.sql`.
 - **ETL tests** (`etl/*/*.test.ts`): mock the upstream API responses,
-  verify the upsert payloads. Run with `pnpm --filter @oceanlog/etl test`.
+  verify the upsert payloads. Run with `pnpm --filter @benthyo/etl test`.
 - **Flutter widget + integration tests** (`apps/mobile/test/`):
   exercise the auth state machine, the sync queue idempotency, and
   the bottom sheets. Run with `flutter test` from `apps/mobile`.
@@ -281,8 +281,8 @@ Three targets:
 
 | Target  | URL                                          | Deploy  |
 |---------|----------------------------------------------|---------|
-| API     | https://api.oceanlog.app                    | Railway |
-| Dashboard | https://app.oceanlog.app                  | Cloudflare Pages |
+| API     | https://api.benthyo.com                    | Railway |
+| Dashboard | https://app.benthyo.com                  | Cloudflare Pages |
 | Mobile  | (Play Store / App Store)                    | Fastlane |
 
 Deploys are triggered by the GitHub Actions workflows in

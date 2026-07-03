@@ -119,7 +119,7 @@ class ProfileScreen extends ConsumerWidget {
                     ListTile(
                       leading: const Icon(Icons.public),
                       title: const Text('Public logbook'),
-                      subtitle: Text('oceanlog.app/u/${profile.username}'),
+                      subtitle: Text('benthyo.com/u/${profile.username}'),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () => context.push('/u/${profile.username}'),
                     ),

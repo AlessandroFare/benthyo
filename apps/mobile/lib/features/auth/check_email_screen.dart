@@ -48,7 +48,7 @@ class _CheckEmailScreenState extends ConsumerState<CheckEmailScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Icon(Icons.mark_email_unread_outlined,
-                size: 64, color: Theme.of(context).colorScheme.primary),
+                size: 64, color: Theme.of(context).colorScheme.primary,),
             const SizedBox(height: AppSpacing.lg),
             Text(
               'Check your email',

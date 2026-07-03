@@ -79,7 +79,7 @@ export function EmbedBriefingPage() {
         </a>
       </div>
 
-      <p style={{ fontSize: 11, color: "#888", marginTop: 20 }}>Powered by OceanLog</p>
+      <p style={{ fontSize: 11, color: "#888", marginTop: 20 }}>Powered by Benthyo</p>
       <p style={{ fontSize: 11, color: "#888" }}>
         <code>{`<iframe src="${window.location.origin}/embed/briefing/${slug}" width="420" height="360" />`}</code>
       </p>

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import type { AuthUser } from "@/lib/auth";
@@ -11,13 +12,18 @@ interface DashboardLayoutProps {
 
 export function DashboardLayout({ user }: DashboardLayoutProps) {
   const location = useLocation();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
   return (
     <ToastProvider>
-      <div className="dark flex h-full bg-[#0D1117] text-white">
-        <Sidebar />
-        <div className="flex flex-1 flex-col overflow-hidden">
-          <TopBar user={user} />
-          <main className="flex-1 overflow-y-auto bg-[#0D1117] p-6">
+      <div className="dark flex h-full bg-background text-foreground">
+        <Sidebar
+          mobileOpen={mobileNavOpen}
+          onNavigate={() => setMobileNavOpen(false)}
+        />
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          <TopBar user={user} onOpenMobileNav={() => setMobileNavOpen(true)} />
+          <main className="flex-1 overflow-y-auto bg-background p-4 sm:p-6">
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
                 key={location.pathname}

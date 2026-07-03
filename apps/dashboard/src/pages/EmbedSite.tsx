@@ -63,7 +63,7 @@ export function EmbedSitePage() {
           {data.avg_visibility_m != null && `Avg vis ${data.avg_visibility_m} m`}
         </p>
       )}
-      <p style={{ fontSize: 11, color: "#888", marginTop: 16 }}>Powered by OceanLog</p>
+      <p style={{ fontSize: 11, color: "#888", marginTop: 16 }}>Powered by Benthyo</p>
       <p style={{ fontSize: 11, color: "#888" }}>
         <code>{`<iframe src="${window.location.origin}/embed/site/${slug}" width="360" height="280" />`}</code>
       </p>
@@ -125,7 +125,7 @@ export function EmbedPrepPage() {
           <p>{data.recent_species.map((s) => s.common_name ?? s.scientific_name).join(", ")}</p>
         </>
       )}
-      <p style={{ fontSize: 12, color: "#888" }}>Powered by OceanLog</p>
+      <p style={{ fontSize: 12, color: "#888" }}>Powered by Benthyo</p>
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { ArrowLeft, Fish, MapPin, Users } from "lucide-react";
 import { useCustomer } from "@/hooks/useCustomers";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { PageSkeleton } from "@/components/shared/LoadingSkeleton";
+import { AnimatedPage, AnimatedItem } from "@/components/shared/AnimatedPage";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -51,14 +52,17 @@ export function CustomerDetailPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <AnimatedPage>
+      <AnimatedItem>
       <Button variant="ghost" size="sm" asChild>
         <Link to="/customers">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Customers
         </Link>
       </Button>
+      </AnimatedItem>
 
+      <AnimatedItem>
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-1">
           <CardHeader>
@@ -139,7 +143,9 @@ export function CustomerDetailPage() {
           </CardContent>
         </Card>
       </div>
+      </AnimatedItem>
 
+      <AnimatedItem>
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -182,6 +188,7 @@ export function CustomerDetailPage() {
           )}
         </CardContent>
       </Card>
-    </div>
+      </AnimatedItem>
+    </AnimatedPage>
   );
 }

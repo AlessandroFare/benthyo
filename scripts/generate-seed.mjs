@@ -122,7 +122,7 @@ const operators = [
 ];
 
 const badges = [
-  ['first-dive','First Splash','Log your first dive in OceanLog','dive_count','{"count":1}',1],
+  ['first-dive','First Splash','Log your first dive in Benthyo','dive_count','{"count":1}',1],
   ['ten-dives','Deco Disciple','Complete 10 logged dives','dive_count','{"count":10}',1],
   ['fifty-dives','Reef Regular','Complete 50 logged dives','dive_count','{"count":50}',2],
   ['hundred-dives','Centurion Diver','Complete 100 logged dives','dive_count','{"count":100}',3],
@@ -136,7 +136,7 @@ const badges = [
 
 const esc = (s) => String(s).replace(/'/g, "''");
 
-let sql = `-- OceanLog seed data (idempotent)
+let sql = `-- Benthyo seed data (idempotent)
 -- 50 Mediterranean dive sites, 200 marine species, 5 Italian operators, 10 badges
 
 BEGIN;

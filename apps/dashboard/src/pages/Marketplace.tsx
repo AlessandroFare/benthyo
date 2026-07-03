@@ -10,11 +10,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { TableSkeleton } from "@/components/shared/LoadingSkeleton";
+import { AnimatedPage, AnimatedItem } from "@/components/shared/AnimatedPage";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Store } from "lucide-react";
 
 export function MarketplacePage() {
-  const { data, isLoading } = useOperatorMarketplace();
+  const { data, isLoading, isError, refetch } = useOperatorMarketplace();
   const createListing = useCreateMarketplaceListing();
   const updateListing = useUpdateMarketplaceListing();
 
@@ -27,14 +28,17 @@ export function MarketplacePage() {
   if (isLoading) return <TableSkeleton rows={6} />;
 
   return (
-    <div className="space-y-6">
+    <AnimatedPage>
+      <AnimatedItem>
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Marketplace</h1>
         <p className="text-sm text-muted-foreground">
           Publish courses, fun dives, and liveaboards for divers to discover in the app.
         </p>
       </div>
+      </AnimatedItem>
 
+      <AnimatedItem>
       <Card>
         <CardHeader>
           <CardTitle className="text-base">New listing</CardTitle>
@@ -96,8 +100,18 @@ export function MarketplacePage() {
           ) : null}
         </CardContent>
       </Card>
+      </AnimatedItem>
 
-      {!data?.length ? (
+      <AnimatedItem>
+      {isError ? (
+        <EmptyState
+          icon={Store}
+          title="Couldn’t load listings"
+          description="There was a problem fetching your marketplace listings."
+          actionLabel="Retry"
+          onAction={() => refetch()}
+        />
+      ) : !data?.length ? (
         <EmptyState
           icon={Store}
           title="No listings"
@@ -106,7 +120,7 @@ export function MarketplacePage() {
       ) : (
         <div className="grid gap-3">
           {data.map((item) => (
-            <Card key={item.id}>
+            <Card key={item.id} className="transition-all hover:shadow-md hover:border-ocean-500/40">
               <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
                 <div>
                   <p className="font-medium">{item.title}</p>
@@ -131,6 +145,7 @@ export function MarketplacePage() {
           ))}
         </div>
       )}
-    </div>
+      </AnimatedItem>
+    </AnimatedPage>
   );
 }

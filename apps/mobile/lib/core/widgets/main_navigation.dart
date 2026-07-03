@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 class MainNavigationBar extends StatelessWidget {
@@ -10,7 +11,9 @@ class MainNavigationBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return NavigationBar(
       selectedIndex: currentIndex,
+      animationDuration: const Duration(milliseconds: 400),
       onDestinationSelected: (i) {
+        if (i != currentIndex) HapticFeedback.selectionClick();
         switch (i) {
           case 0:
             context.go('/map');

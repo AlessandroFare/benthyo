@@ -1,4 +1,4 @@
-# OceanLog — On-call Runbook
+# Benthyo — On-call Runbook
 
 This is the playbook for the on-call engineer. It is intentionally
 short. If you find yourself doing something not in this runbook,
@@ -13,7 +13,7 @@ update this file when you're done.
 | Mobile shows "0 sightings" | DB connectivity / RLS | §2 |
 | Sentry alert: "GDPR export failed" | Function deploys / env | §3 |
 | Stripe webhook not firing | `stripe events list` | §4 |
-| Dead-letter queue is growing | `pnpm --filter @oceanlog/etl sync-queue-inspect` | §5 |
+| Dead-letter queue is growing | `pnpm --filter @benthyo/etl sync-queue-inspect` | §5 |
 | RLS test suite red | `psql $DATABASE_URL -f supabase/tests/rls.sql` | §6 |
 | pgcron job missing | `SELECT * FROM cron.job;` | §7 |
 | MEDICAL_ENCRYPTION_MASTER_KEY rotation | manual SQL + deploy | §8 |
@@ -23,8 +23,8 @@ update this file when you're done.
 
 ```bash
 # 1.1 Liveness / readiness probes
-curl https://api.oceanlog.app/health/live
-curl https://api.oceanlog.app/health/ready
+curl https://api.benthyo.com/health/live
+curl https://api.benthyo.com/health/ready
 
 # 1.2 If the readiness probe fails, check:
 #     - Supabase URL reachable?
@@ -52,7 +52,7 @@ railway logs --follow --service api
 # 2.1 Run the RLS test suite. This file ships with the repo and
 #     must be re-run on every schema change.
 psql $DATABASE_URL -v ON_ERROR_STOP=1 -f supabase/tests/rls.sql
-#    Expected output: "All OceanLog RLS tests passed."
+#    Expected output: "All Benthyo RLS tests passed."
 
 # 2.2 If a test fails, read the failing policy. The most common
 #     regression is a DROP POLICY that wasn't replaced.

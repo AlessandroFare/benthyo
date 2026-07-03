@@ -16,6 +16,7 @@ import { useAnalytics } from "@/hooks/useAnalytics";
 import { useDashboardCharts, useDashboardKpis } from "@/hooks/useDashboard";
 import { MetricStrip } from "@/components/analytics/MetricStrip";
 import { AnalyticsAreaChart } from "@/components/charts/AnalyticsAreaChart";
+import { AnimatedPage, AnimatedItem } from "@/components/shared/AnimatedPage";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { PageSkeleton } from "@/components/shared/LoadingSkeleton";
 import {
@@ -134,20 +135,25 @@ export function AnalyticsPage() {
     activeMetric === "sites" ? "Dives by site" : "Sightings trend";
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-white">Analytics</h1>
-        <p className="text-sm text-white/45">
-          Insights and trends across your operation
-        </p>
-      </div>
+    <AnimatedPage>
+      <AnimatedItem>
+        <div>
+          <h1 className="text-2xl font-semibold text-foreground">Analytics</h1>
+          <p className="text-sm text-muted-foreground">
+            Insights and trends across your operation
+          </p>
+        </div>
+      </AnimatedItem>
 
-      <MetricStrip metrics={metrics} />
+      <AnimatedItem>
+        <MetricStrip metrics={metrics} />
+      </AnimatedItem>
 
-      <Card className="border-white/5 bg-[#161B22] text-white">
+      <AnimatedItem>
+      <Card className="border-border bg-card text-foreground">
         <CardHeader>
-          <CardTitle className="text-white">{chartLabel}</CardTitle>
-          <CardDescription className="text-white/45">
+          <CardTitle className="text-foreground">{chartLabel}</CardTitle>
+          <CardDescription className="text-muted-foreground">
             Select a metric above to explore trends
           </CardDescription>
         </CardHeader>
@@ -167,7 +173,7 @@ export function AnalyticsPage() {
                 <YAxis tick={{ fontSize: 12, fill: "rgba(255,255,255,0.45)" }} />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: "#161B22",
+                    backgroundColor: "hsl(213 22% 12%)",
                     border: "1px solid rgba(255,255,255,0.08)",
                     borderRadius: 12,
                   }}
@@ -180,11 +186,13 @@ export function AnalyticsPage() {
           )}
         </CardContent>
       </Card>
+      </AnimatedItem>
 
-      <Card className="border-white/5 bg-[#161B22] text-white">
+      <AnimatedItem>
+      <Card className="border-border bg-card text-foreground">
         <CardHeader>
-          <CardTitle className="text-white">Activity Heatmap</CardTitle>
-          <CardDescription className="text-white/45">
+          <CardTitle className="text-foreground">Activity Heatmap</CardTitle>
+          <CardDescription className="text-muted-foreground">
             Dive and sighting activity by day and hour
           </CardDescription>
         </CardHeader>
@@ -199,7 +207,7 @@ export function AnalyticsPage() {
           ) : (
             <div className="overflow-x-auto">
               <div className="inline-block min-w-full">
-                <div className="mb-2 flex pl-12 text-xs text-white/45">
+                <div className="mb-2 flex pl-12 text-xs text-muted-foreground">
                   {Array.from({ length: 24 }, (_, h) => (
                     <div key={h} className="w-4 text-center">
                       {h % 6 === 0 ? `${h}h` : ""}
@@ -208,7 +216,7 @@ export function AnalyticsPage() {
                 </div>
                 {heatmapGrid.map((row, day) => (
                   <div key={day} className="flex items-center gap-1">
-                    <span className="w-10 text-xs text-white/45">{DAYS[day]}</span>
+                    <span className="w-10 text-xs text-muted-foreground">{DAYS[day]}</span>
                     <div className="flex gap-0.5">
                       {row.map((value, hour) => (
                         <div
@@ -228,12 +236,14 @@ export function AnalyticsPage() {
           )}
         </CardContent>
       </Card>
+      </AnimatedItem>
 
+      <AnimatedItem>
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card className="border-white/5 bg-[#161B22] text-white">
+        <Card className="border-border bg-card text-foreground">
           <CardHeader>
-            <CardTitle className="text-white">Species Diversity</CardTitle>
-            <CardDescription className="text-white/45">
+            <CardTitle className="text-foreground">Species Diversity</CardTitle>
+            <CardDescription className="text-muted-foreground">
               Distribution by taxonomic family
             </CardDescription>
           </CardHeader>
@@ -265,7 +275,7 @@ export function AnalyticsPage() {
                   </Pie>
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: "#161B22",
+                      backgroundColor: "hsl(213 22% 12%)",
                       border: "1px solid rgba(255,255,255,0.08)",
                       borderRadius: 12,
                     }}
@@ -276,10 +286,10 @@ export function AnalyticsPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-white/5 bg-[#161B22] text-white">
+        <Card className="border-border bg-card text-foreground">
           <CardHeader>
-            <CardTitle className="text-white">Depth Histogram</CardTitle>
-            <CardDescription className="text-white/45">
+            <CardTitle className="text-foreground">Depth Histogram</CardTitle>
+            <CardDescription className="text-muted-foreground">
               Sighting depth distribution
             </CardDescription>
           </CardHeader>
@@ -299,7 +309,7 @@ export function AnalyticsPage() {
                   <YAxis tick={{ fontSize: 12, fill: "rgba(255,255,255,0.45)" }} />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: "#161B22",
+                      backgroundColor: "hsl(213 22% 12%)",
                       border: "1px solid rgba(255,255,255,0.08)",
                       borderRadius: 12,
                     }}
@@ -311,11 +321,13 @@ export function AnalyticsPage() {
           </CardContent>
         </Card>
       </div>
+      </AnimatedItem>
 
-      <Card className="border-white/5 bg-[#161B22] text-white">
+      <AnimatedItem>
+      <Card className="border-border bg-card text-foreground">
         <CardHeader>
-          <CardTitle className="text-white">Customer Retention</CardTitle>
-          <CardDescription className="text-white/45">
+          <CardTitle className="text-foreground">Customer Retention</CardTitle>
+          <CardDescription className="text-muted-foreground">
             Monthly cohort retention rates (%)
           </CardDescription>
         </CardHeader>
@@ -330,22 +342,22 @@ export function AnalyticsPage() {
           ) : (
             <Table>
               <TableHeader>
-                <TableRow className="border-white/5 hover:bg-transparent">
-                  <TableHead className="text-white/45">Cohort</TableHead>
-                  <TableHead className="text-white/45">Month 0</TableHead>
-                  <TableHead className="text-white/45">Month 1</TableHead>
-                  <TableHead className="text-white/45">Month 2</TableHead>
-                  <TableHead className="text-white/45">Month 3</TableHead>
+                <TableRow className="border-border hover:bg-transparent">
+                  <TableHead className="text-muted-foreground">Cohort</TableHead>
+                  <TableHead className="text-muted-foreground">Month 0</TableHead>
+                  <TableHead className="text-muted-foreground">Month 1</TableHead>
+                  <TableHead className="text-muted-foreground">Month 2</TableHead>
+                  <TableHead className="text-muted-foreground">Month 3</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {data.retention.map((row) => (
-                  <TableRow key={row.cohort} className="border-white/5">
-                    <TableCell className="font-medium text-white">{row.cohort}</TableCell>
-                    <TableCell className="text-white/70">{formatNumber(row.month_0)}%</TableCell>
-                    <TableCell className="text-white/70">{formatNumber(row.month_1)}%</TableCell>
-                    <TableCell className="text-white/70">{formatNumber(row.month_2)}%</TableCell>
-                    <TableCell className="text-white/70">{formatNumber(row.month_3)}%</TableCell>
+                  <TableRow key={row.cohort} className="border-border">
+                    <TableCell className="font-medium text-foreground">{row.cohort}</TableCell>
+                    <TableCell className="text-muted-foreground">{formatNumber(row.month_0)}%</TableCell>
+                    <TableCell className="text-muted-foreground">{formatNumber(row.month_1)}%</TableCell>
+                    <TableCell className="text-muted-foreground">{formatNumber(row.month_2)}%</TableCell>
+                    <TableCell className="text-muted-foreground">{formatNumber(row.month_3)}%</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -353,6 +365,7 @@ export function AnalyticsPage() {
           )}
         </CardContent>
       </Card>
-    </div>
+      </AnimatedItem>
+    </AnimatedPage>
   );
 }

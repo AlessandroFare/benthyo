@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, UnauthorizedException, InternalServerErrorException } from '@nestjs/common';
 import { SupabaseService } from '../database/supabase.service';
 import { R2Service } from '../storage/r2.service';
 import { assertNoError } from '../common/utils/supabase-error.util';
@@ -80,7 +80,13 @@ export class GdprService {
     targetUserId: string,
     isAdmin: boolean,
     confirmation: string,
-  ): Promise<{ ok: true; deleted_r2_objects: number; auth_deleted: boolean }> {
+  ): Promise<{
+    ok: true;
+    deleted_r2_objects: number;
+    auth_deleted: boolean;
+    inat_observations: number[];
+    r2_partial_failure: boolean;
+  }> {
     if (confirmation !== 'DELETE MY ACCOUNT') {
       throw new BadRequestException(
         'Confirmation string must equal "DELETE MY ACCOUNT"',
@@ -101,40 +107,76 @@ export class GdprService {
       p_reason: 'gdpr_erasure',
     });
 
-    // 2. Delete R2 objects. We use the deterministic key prefixes
-    //    that the upload endpoints create.
+    // 2. iNaturalist observations. Benthyo pushes verified sightings to iNat
+    //    via the inaturalist_push_queue (migration 021); the iNat observation
+    //    id is recorded on the queue row (status='sent', inat_observation_id
+    //    set), NOT on sightings. Deleting iNat-side requires the *user's*
+    //    OAuth token, which we do not store, so we collect the pushed
+    //    observation ids, log them as residual data, and return them so the
+    //    caller can surface "delete these on iNaturalist" guidance.
+    let inatObservations: number[] = [];
+    try {
+      const { data: obs } = await admin
+        .from('inaturalist_push_queue')
+        .select('inat_observation_id')
+        .eq('user_id', targetUserId)
+        .eq('status', 'sent')
+        .not('inat_observation_id', 'is', null);
+      inatObservations = (obs ?? [])
+        .map((r: { inat_observation_id: number | null }) => r.inat_observation_id)
+        .filter((id): id is number => typeof id === 'number');
+      if (inatObservations.length > 0) {
+        this.logger.warn(
+          `GDPR erasure for ${targetUserId}: ${inatObservations.length} iNaturalist observation(s) remain on iNat and must be removed by the user (ids: ${inatObservations.join(', ')}).`,
+        );
+      }
+    } catch (err) {
+      this.logger.error(
+        `Failed to enumerate iNat observations for ${targetUserId}`,
+        err as Error,
+      );
+    }
+
+    // 3. Delete R2 objects. We use the deterministic key prefixes
+    //    that the upload endpoints create. Track failures so we can
+    //    report partial completion rather than silently orphaning media.
+    let r2PartialFailure = false;
     const sightingsDeleted = await this.r2
       .deletePrefix(`sightings/${targetUserId}/`)
       .catch((err) => {
         this.logger.error(`R2 sightings delete failed for ${targetUserId}`, err as Error);
+        r2PartialFailure = true;
         return 0;
       });
     const avatarsDeleted = await this.r2
       .deletePrefix(`avatars/${targetUserId}/`)
       .catch((err) => {
         this.logger.error(`R2 avatars delete failed for ${targetUserId}`, err as Error);
+        r2PartialFailure = true;
         return 0;
       });
 
-    // 3. Remove the auth user. This cascades to public.users and every
+    // 4. Remove the auth user. This cascades to public.users and every
     //    FK that points at it (operator_users, dive_logs, sightings,
-    //    corrections, user_life_list, user_badges, ...).
+    //    corrections, user_life_list, user_badges, ...). This is the
+    //    canonical "user is gone" operation: if it fails we must NOT
+    //    report success, or the caller believes the account was erased.
     const { error: authErr } = await admin.auth.admin.deleteUser(targetUserId);
     if (authErr) {
       this.logger.error(
         `auth.admin.deleteUser failed for ${targetUserId}: ${authErr.message}`,
       );
-      return {
-        ok: true,
-        deleted_r2_objects: sightingsDeleted + avatarsDeleted,
-        auth_deleted: false,
-      };
+      throw new InternalServerErrorException(
+        'Account erasure failed at the final step. The account is soft-deleted and recoverable; retry or contact support.',
+      );
     }
 
     return {
       ok: true,
       deleted_r2_objects: sightingsDeleted + avatarsDeleted,
       auth_deleted: true,
+      inat_observations: inatObservations,
+      r2_partial_failure: r2PartialFailure,
     };
   }
 }

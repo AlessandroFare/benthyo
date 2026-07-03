@@ -1,0 +1,27 @@
+name: ETL RLS
+
+on:
+  schedule:
+    - cron: '0 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  etl:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+        working-directory: etl
+      - run: npx tsx rls/index.ts
+        working-directory: etl
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RLS_API_URL: ${{ secrets.RLS_API_URL }}
+          ETL_SYSTEM_USER_ID: ${{ secrets.ETL_SYSTEM_USER_ID }}

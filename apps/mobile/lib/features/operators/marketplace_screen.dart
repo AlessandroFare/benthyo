@@ -13,11 +13,14 @@ import '../../core/widgets/async_value_widget.dart';
 final marketplaceListingsProvider =
     FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final res = await http.get(Uri.parse('${ApiConfig.baseUrl}/marketplace/listings'));
-  if (res.statusCode != 200) return [];
+  if (res.statusCode != 200) {
+    throw Exception('Failed to load marketplace listings (${res.statusCode})');
+  }
   final body = jsonDecode(res.body);
   return body is List
       ? body.cast<Map<String, dynamic>>()
-      : (body['data'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
+      : ((body as Map<String, dynamic>)['data'] as List<dynamic>? ?? [])
+          .cast<Map<String, dynamic>>();
 });
 
 class MarketplaceScreen extends ConsumerWidget {

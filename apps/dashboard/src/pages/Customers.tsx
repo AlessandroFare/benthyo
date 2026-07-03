@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronRight, Search, Users } from "lucide-react";
 import { useCustomers } from "@/hooks/useCustomers";
+import { AnimatedPage, AnimatedItem } from "@/components/shared/AnimatedPage";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { TableSkeleton } from "@/components/shared/LoadingSkeleton";
 import { Badge } from "@/components/ui/badge";
@@ -45,7 +46,8 @@ export function CustomersPage() {
   const totalPages = data ? Math.ceil(data.total / data.page_size) : 0;
 
   return (
-    <div className="space-y-6">
+    <AnimatedPage>
+      <AnimatedItem>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold">Customers</h2>
@@ -63,7 +65,9 @@ export function CustomersPage() {
           />
         </form>
       </div>
+      </AnimatedItem>
 
+      <AnimatedItem>
       <Card>
         <CardHeader>
           <CardTitle>All Customers</CardTitle>
@@ -178,6 +182,7 @@ export function CustomersPage() {
           )}
         </CardContent>
       </Card>
-    </div>
+      </AnimatedItem>
+    </AnimatedPage>
   );
 }

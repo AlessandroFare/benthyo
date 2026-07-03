@@ -111,7 +111,7 @@ Deno.serve(async (req) => {
     );
 
     const resendKey = Deno.env.get("RESEND_API_KEY");
-    const fromEmail = Deno.env.get("DIGEST_FROM_EMAIL") ?? "OceanLog <digest@oceanlog.app>";
+    const fromEmail = Deno.env.get("DIGEST_FROM_EMAIL") ?? "Benthyo <digest@benthyo.com>";
 
     const weekStart = new Date();
     weekStart.setDate(weekStart.getDate() - 7);
@@ -184,7 +184,7 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           from: fromEmail,
           to: email,
-          subject: "Your OceanLog weekly dive digest",
+          subject: "Your Benthyo weekly dive digest",
           html,
         }),
       });
@@ -258,6 +258,6 @@ function buildDigestHtml(input: {
     </ul>
     ${sightingLines ? `<h2>Recent sightings</h2><ul>${sightingLines}</ul>` : ""}
     ${badgeLines ? `<h2>New badges</h2><ul>${badgeLines}</ul>` : ""}
-    <p>Keep exploring — <a href="https://oceanlog.app">Open OceanLog</a></p>
+    <p>Keep exploring — <a href="https://benthyo.com">Open Benthyo</a></p>
   `;
 }

@@ -21,7 +21,7 @@ final gearItemsProvider = FutureProvider<List<GearItem>>((ref) async {
   );
   if (res.statusCode != 200) throw Exception('Failed to load gear');
   final body = jsonDecode(res.body);
-  final list = body is List ? body : (body['data'] as List<dynamic>? ?? []);
+  final list = body is List ? body : ((body as Map<String, dynamic>)['data'] as List<dynamic>? ?? []);
   return list
       .map((e) => GearItem.fromJson(e as Map<String, dynamic>))
       .toList();
@@ -36,9 +36,11 @@ final gearServiceDueProvider = FutureProvider<List<GearItem>>((ref) async {
     Uri.parse('${ApiConfig.baseUrl}/gear/service-due'),
     headers: {'Authorization': 'Bearer $token'},
   );
-  if (res.statusCode != 200) return [];
+  if (res.statusCode != 200) {
+    throw Exception('Failed to load service-due gear (${res.statusCode})');
+  }
   final body = jsonDecode(res.body);
-  final list = body is List ? body : (body['data'] as List<dynamic>? ?? []);
+  final list = body is List ? body : ((body as Map<String, dynamic>)['data'] as List<dynamic>? ?? []);
   return list
       .map((e) => GearItem.fromJson(e as Map<String, dynamic>))
       .toList();

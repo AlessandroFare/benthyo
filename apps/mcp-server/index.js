@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 /**
- * OceanLog MCP server — exposes public dive data as tools for LLM agents.
+ * Benthyo MCP server — exposes public dive data as tools for LLM agents.
  *
- * Run: OCEANLOG_API_URL=http://localhost:3000/api/v1 node index.js
+ * Run: BENTHYO_API_URL=http://localhost:3000/api/v1 node index.js
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 
-const API = process.env.OCEANLOG_API_URL ?? 'http://localhost:3000/api/v1';
+const API = process.env.BENTHYO_API_URL ?? 'http://localhost:3000/api/v1';
 
 async function apiGet(path) {
   const res = await fetch(`${API}${path}`);
@@ -18,7 +18,7 @@ async function apiGet(path) {
 }
 
 const server = new McpServer({
-  name: 'oceanlog',
+  name: 'benthyo',
   version: '0.1.0',
 });
 

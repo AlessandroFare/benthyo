@@ -22,8 +22,8 @@ final tripsProvider = FutureProvider<List<TripSummary>>((ref) async {
     headers: {'Authorization': 'Bearer $token'},
   );
   if (res.statusCode != 200) throw Exception('Failed to load trips');
-  final body = jsonDecode(res.body);
-  final list = body is List ? body : (body['data'] as List<dynamic>? ?? []);
+  final body = jsonDecode(res.body) as dynamic;
+  final list = body is List ? body : ((body as Map<String, dynamic>)['data'] as List<dynamic>? ?? []);
   return list
       .map((e) => TripSummary.fromJson(e as Map<String, dynamic>))
       .toList();

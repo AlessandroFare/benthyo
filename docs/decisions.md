@@ -4,7 +4,7 @@
 
 **Status:** Accepted
 
-**Context:** OceanLog needs geospatial queries (PostGIS), row-level security, real-time subscriptions, and managed auth.
+**Context:** Benthyo needs geospatial queries (PostGIS), row-level security, real-time subscriptions, and managed auth.
 
 **Decision:** Use Supabase-hosted Postgres with PostGIS extension. Migrations live in `supabase/migrations/`.
 
@@ -18,7 +18,7 @@
 
 **Context:** The API, dashboard, ETL scripts, and Edge Functions all need consistent entity shapes and API DTOs.
 
-**Decision:** Publish `@oceanlog/types` as a workspace package with enums, entities, pagination helpers, and Darwin Core types.
+**Decision:** Publish `@benthyo/types` as a workspace package with enums, entities, pagination helpers, and Darwin Core types.
 
 **Consequences:** Single source of truth for TypeScript types. Requires build step before dependent packages compile.
 

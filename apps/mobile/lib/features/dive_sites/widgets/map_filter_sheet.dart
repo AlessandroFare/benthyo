@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/models/dive_site_filters.dart';
 import '../../../core/models/enums.dart';
-import '../../../core/theme/app_theme.dart';
 import '../dive_sites_providers.dart';
 
 /// Bottom sheet for editing the active [DiveSiteFilters] on the map

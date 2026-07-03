@@ -13,9 +13,18 @@
 CREATE SCHEMA IF NOT EXISTS auth;
 
 -- Minimal auth.users: only the id is referenced by application FKs.
+-- raw_user_meta_data / instance_id / aud / role are included because:
+--   - migration 003's handle_new_auth_user trigger reads NEW.raw_user_meta_data
+--   - the RLS suite (supabase/tests/rls.sql) inserts auth.users rows with
+--     id, instance_id, aud, role, email, raw_user_meta_data (matching the
+--     real Supabase auth.users shape).
 CREATE TABLE IF NOT EXISTS auth.users (
-  id    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email TEXT
+  id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  instance_id        UUID,
+  aud                TEXT,
+  role               TEXT,
+  email              TEXT,
+  raw_user_meta_data JSONB NOT NULL DEFAULT '{}'::jsonb
 );
 
 -- auth.uid(): the current request's user id. Matches the real Supabase
@@ -45,6 +54,21 @@ AS $$
     NULLIF(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role',
     NULLIF(current_setting('request.jwt.claim.role', true), ''),
     current_user
+  )
+$$;
+
+-- auth.jwt(): mirrors the real Supabase helper. Returns the current request's
+-- JWT claims as JSONB. Migrations 033/034 read app_metadata from it
+-- (e.g. is_admin). The RLS suite sets request.jwt.claims; return '{}' when
+-- unset so the function is safe to call outside a request context.
+CREATE OR REPLACE FUNCTION auth.jwt()
+RETURNS JSONB
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT COALESCE(
+    NULLIF(current_setting('request.jwt.claims', true), '')::jsonb,
+    '{}'::jsonb
   )
 $$;
 
@@ -108,3 +132,20 @@ ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
 
 GRANT USAGE ON SCHEMA storage TO anon, authenticated, service_role;
 GRANT ALL ON ALL TABLES IN SCHEMA storage TO anon, authenticated, service_role;
+
+-- ---------------------------------------------------------------------------
+-- Minimal Supabase Realtime publication shim. Hosted Supabase pre-creates the
+-- `supabase_realtime` publication; the bare postgis CI image does not, so
+-- migration 023 (`ALTER PUBLICATION supabase_realtime ADD TABLE buddy_messages`)
+-- fails without this. FOR ALL TABLES mirrors the hosted default and is
+-- harmless because the CI suite never asserts on replication.
+-- ---------------------------------------------------------------------------
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+    -- Empty publication (NOT FOR ALL TABLES): hosted Supabase creates it
+    -- empty so migrations can ALTER PUBLICATION ... ADD TABLE. A FOR ALL
+    -- TABLES publication rejects ADD TABLE, which would break migration 023.
+    CREATE PUBLICATION supabase_realtime;
+  END IF;
+END$$;

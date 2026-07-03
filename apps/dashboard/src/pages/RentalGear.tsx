@@ -5,11 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TableSkeleton } from "@/components/shared/LoadingSkeleton";
+import { AnimatedPage, AnimatedItem } from "@/components/shared/AnimatedPage";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Package } from "lucide-react";
 
 export function RentalGearPage() {
-  const { data, isLoading } = useRentalGear();
+  const { data, isLoading, isError, refetch } = useRentalGear();
   const createGear = useCreateRentalGear();
   const checkin = useCheckinRentalGear();
   const [label, setLabel] = useState("");
@@ -18,14 +19,17 @@ export function RentalGearPage() {
   if (isLoading) return <TableSkeleton rows={6} />;
 
   return (
-    <div className="space-y-6">
+    <AnimatedPage>
+      <AnimatedItem>
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Rental gear</h1>
         <p className="text-sm text-muted-foreground">
           Register inventory with QR codes for checkout tracking.
         </p>
       </div>
+      </AnimatedItem>
 
+      <AnimatedItem>
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Add gear</CardTitle>
@@ -52,8 +56,18 @@ export function RentalGearPage() {
           </div>
         </CardContent>
       </Card>
+      </AnimatedItem>
 
-      {!data?.length ? (
+      <AnimatedItem>
+      {isError ? (
+        <EmptyState
+          icon={Package}
+          title="Couldn’t load rental gear"
+          description="There was a problem fetching your rental inventory."
+          actionLabel="Retry"
+          onAction={() => refetch()}
+        />
+      ) : !data?.length ? (
         <EmptyState
           icon={Package}
           title="No rental gear"
@@ -62,7 +76,7 @@ export function RentalGearPage() {
       ) : (
         <div className="grid gap-3">
           {data.map((item) => (
-            <Card key={item.id}>
+            <Card key={item.id} className="transition-all hover:shadow-md hover:border-ocean-500/40">
               <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
                 <div>
                   <p className="font-medium">{item.label}</p>
@@ -89,6 +103,7 @@ export function RentalGearPage() {
           ))}
         </div>
       )}
-    </div>
+      </AnimatedItem>
+    </AnimatedPage>
   );
 }

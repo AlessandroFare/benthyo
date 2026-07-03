@@ -38,7 +38,7 @@ export class WaiversController {
   @Get('operator/:slug/manage')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Active waiver for operator dashboard editor' })
-  getForManage(@Param('slug') slug: string, @AccessToken() token: string) {
+  getForManage(@Param('slug') slug: string, @AccessToken() _token: string) {
     return this.waiversService.getActiveByOperatorSlug(slug);
   }
 

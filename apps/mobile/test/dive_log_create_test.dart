@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:oceanlog/core/models/enums.dart';
-import 'package:oceanlog/features/dive_logs/dive_logs_providers.dart';
+import 'package:benthyo/core/models/enums.dart';
+import 'package:benthyo/features/dive_logs/dive_logs_providers.dart';
 
 void main() {
   group('validateDiveLogInput', () {

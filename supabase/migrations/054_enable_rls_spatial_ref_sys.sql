@@ -1,0 +1,4 @@
+-- Migration 054 intentionally left empty.
+-- spatial_ref_sys is a PostGIS system table; enabling RLS requires superuser
+-- ownership and is not appropriate. The Supabase rls_disabled_in_public
+-- alert for this table is a false positive that can be safely ignored.

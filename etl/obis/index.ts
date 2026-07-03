@@ -3,6 +3,12 @@ import { logger, logJobSummary } from '../shared/logger';
 import { paginate, RateLimiter } from '../shared/rate-limiter';
 import { getSupabase, upsertBatch } from '../shared/supabase';
 import { isMainModule } from '../shared/cli';
+import {
+  assertSystemUserExists,
+  normalizeCount,
+  normalizeDepth,
+  normalizeObservedAt,
+} from '../shared/occurrence';
 
 const OBIS_API = 'https://api.obis.org/v3';
 
@@ -70,6 +76,7 @@ export async function runObisEtl(): Promise<void> {
   if (!systemUserId) {
     throw new Error('ETL_SYSTEM_USER_ID is required for sighting imports');
   }
+  await assertSystemUserExists(supabase, systemUserId);
 
   const speciesRows: Record<string, unknown>[] = [];
   const sightingRows: Record<string, unknown>[] = [];
@@ -110,18 +117,22 @@ export async function runObisEtl(): Promise<void> {
     const siteId = nearestSite?.[0]?.id;
     if (!siteId) continue;
 
-    const depth =
+    const observedAt = normalizeObservedAt(occ.date_start);
+    if (!observedAt) continue; // observed_at is NOT NULL; skip undatable rows
+
+    const depth = normalizeDepth(
       occ.minimumDepthInMeters != null
         ? occ.minimumDepthInMeters
-        : occ.maximumDepthInMeters;
+        : occ.maximumDepthInMeters,
+    );
 
     sightingRows.push({
       user_id: systemUserId,
       dive_site_id: siteId,
       species_id: null,
-      observed_at: occ.date_start ?? new Date().toISOString(),
+      observed_at: observedAt,
       depth_m: depth,
-      count: occ.individualCount ?? 1,
+      count: normalizeCount(occ.individualCount),
       confidence_level: 'likely',
       source: 'obis',
       external_id: occ.id,

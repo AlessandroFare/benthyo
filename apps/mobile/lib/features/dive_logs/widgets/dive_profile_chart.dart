@@ -33,6 +33,19 @@ class DiveProfileChart extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
+    // CustomPaint is invisible to assistive technology. Summarize the
+    // profile numerically so TalkBack/VoiceOver can announce it.
+    final sorted = [...samples]
+      ..sort((a, b) => a.timeSec.compareTo(b.timeSec));
+    final maxDepth = sorted.map((s) => s.depthM).reduce(math.max);
+    final maxTimeSec = sorted.map((s) => s.timeSec).reduce(math.max);
+    final avgDepth = sorted.map((s) => s.depthM).reduce((a, b) => a + b) /
+        sorted.length;
+    final profileSummary = 'Dive profile chart. '
+        'Maximum depth ${maxDepth.round()} metres, '
+        'average depth ${avgDepth.round()} metres, '
+        'duration ${(maxTimeSec / 60).toStringAsFixed(1)} minutes.';
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.md),
@@ -46,11 +59,15 @@ class DiveProfileChart extends StatelessWidget {
                   ),
             ),
             const SizedBox(height: AppSpacing.sm),
-            SizedBox(
-              height: height,
-              width: double.infinity,
-              child: CustomPaint(
-                painter: _ProfilePainter(samples: samples),
+            Semantics(
+              label: profileSummary,
+              textDirection: TextDirection.ltr,
+              child: SizedBox(
+                height: height,
+                width: double.infinity,
+                child: CustomPaint(
+                  painter: _ProfilePainter(samples: samples),
+                ),
               ),
             ),
           ],
@@ -79,7 +96,7 @@ class _ProfilePainter extends CustomPainter {
     final grid = Paint()
       ..color = Colors.grey.withValues(alpha: 0.2)
       ..strokeWidth = 1;
-    canvas.drawLine(Offset(pad, pad), Offset(pad, pad + chartH), grid);
+    canvas.drawLine(const Offset(pad, pad), Offset(pad, pad + chartH), grid);
     canvas.drawLine(Offset(pad, pad + chartH), Offset(pad + chartW, pad + chartH), grid);
 
     final path = Path();

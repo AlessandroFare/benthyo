@@ -69,9 +69,9 @@ export class NotificationsService implements OnModuleInit {
     switch (template) {
       case 'welcome':
         return {
-          subject: 'Welcome to OceanLog',
-          html: `<p>Hi ${data.name ?? 'diver'},</p><p>Welcome to OceanLog — start logging dives and building your life list.</p>`,
-          text: `Hi ${data.name ?? 'diver'}, welcome to OceanLog.`,
+          subject: 'Welcome to Benthyo',
+          html: `<p>Hi ${data.name ?? 'diver'},</p><p>Welcome to Benthyo — start logging dives and building your life list.</p>`,
+          text: `Hi ${data.name ?? 'diver'}, welcome to Benthyo.`,
         };
       case 'badge_earned':
         return {
@@ -81,8 +81,8 @@ export class NotificationsService implements OnModuleInit {
         };
       case 'operator_invite':
         return {
-          subject: `You've been invited to ${data.operator_name ?? 'an operator'} on OceanLog`,
-          html: `<p>You have been invited to join <strong>${data.operator_name ?? 'an operator'}</strong> on OceanLog.</p>`,
+          subject: `You've been invited to ${data.operator_name ?? 'an operator'} on Benthyo`,
+          html: `<p>You have been invited to join <strong>${data.operator_name ?? 'an operator'}</strong> on Benthyo.</p>`,
           text: `You have been invited to join ${data.operator_name ?? 'an operator'}.`,
         };
       default:

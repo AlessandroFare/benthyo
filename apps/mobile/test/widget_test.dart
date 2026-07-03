@@ -1,6 +1,6 @@
 // Smoke test: verifies the most-imported widget tree can resolve its
 // theme without throwing. We deliberately don't boot the full
-// `OceanLogApp` because it requires a live Supabase URL; instead we
+// `BenthyoApp` because it requires a live Supabase URL; instead we
 // build a minimal MaterialApp that touches every theme helper the
 // app relies on (`AppTheme.light()`, `AppTheme.dark()`,
 // `AppColors.*`, `AppSpacing.*`).
@@ -11,7 +11,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:oceanlog/core/theme/app_theme.dart';
+import 'package:benthyo/core/theme/app_theme.dart';
 
 void main() {
   testWidgets('AppTheme builds both light and dark schemes', (tester) async {

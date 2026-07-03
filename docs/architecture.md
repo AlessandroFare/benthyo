@@ -2,7 +2,7 @@
 
 ## System overview
 
-OceanLog follows **Option D**: a B2B-anchored citizen-science platform. Three clients share one PostgreSQL database:
+Benthyo follows **Option D**: a B2B-anchored citizen-science platform. Three clients share one PostgreSQL database:
 
 1. **Flutter mobile** — offline-first dive logbook, site discovery, species sightings
 2. **NestJS API** — business logic, iNaturalist proxy, R2 presigned uploads, operator analytics

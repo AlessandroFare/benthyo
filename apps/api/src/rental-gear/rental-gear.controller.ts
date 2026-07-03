@@ -1,12 +1,18 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser, AccessToken } from '../common/decorators/current-user.decorator';
+import { TierGuard, RequireTier } from '../common/guards/tier.guard';
 import { AuthUser } from '../common/types/auth-user.interface';
 import { OperatorsService } from '../operators/operators.service';
 import { RentalGearService } from './rental-gear.service';
 
+// Rental gear is a Pro-tier capability. The whole controller is gated so
+// registration, checkout, and checkin all require an active 'pro'
+// subscription. TierGuard resolves the caller's primary operator.
 @ApiTags('rental-gear')
 @ApiBearerAuth()
+@UseGuards(TierGuard)
+@RequireTier('pro')
 @Controller('operators/me/rental-gear')
 export class RentalGearController {
   constructor(

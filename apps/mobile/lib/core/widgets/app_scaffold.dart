@@ -63,6 +63,15 @@ class SectionHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
+          Container(
+            width: 4,
+            height: 20,
+            margin: const EdgeInsets.only(right: AppSpacing.sm + 2),
+            decoration: BoxDecoration(
+              gradient: AppColors.accentGradient,
+              borderRadius: BorderRadius.circular(AppRadius.full),
+            ),
+          ),
           Expanded(
             child: Text(title, style: Theme.of(context).textTheme.titleLarge),
           ),

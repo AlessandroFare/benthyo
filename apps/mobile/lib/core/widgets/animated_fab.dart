@@ -48,50 +48,57 @@ class _AnimatedFabState extends State<AnimatedFab>
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Tooltip(
-      message: widget.tooltip ?? '',
-      child: AnimatedBuilder(
-        animation: _pulse,
-        builder: (context, child) {
-          return Stack(
-            alignment: Alignment.center,
-            children: [
-              // Pulsing halo behind the FAB. Opacity fades as the
-              // ring expands, then snaps back when the controller
-              // restarts.
-              Opacity(
-                opacity: (1 - _pulse.value) * 0.4,
-                child: Container(
-                  width: 56 + 18 * _pulse.value,
-                  height: 56 + 18 * _pulse.value,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: scheme.primary.withValues(alpha: 0.25),
+    // Semantic label so screen readers announce the FAB action instead of
+    // just "button". The tooltip doubles as the accessible name.
+    return Semantics(
+      button: true,
+      label: widget.tooltip ?? widget.label?.toString() ?? 'Action',
+      container: true,
+      child: Tooltip(
+        message: widget.tooltip ?? '',
+        child: AnimatedBuilder(
+          animation: _pulse,
+          builder: (context, child) {
+            return Stack(
+              alignment: Alignment.center,
+              children: [
+                // Pulsing halo behind the FAB. Opacity fades as the
+                // ring expands, then snaps back when the controller
+                // restarts.
+                Opacity(
+                  opacity: (1 - _pulse.value) * 0.4,
+                  child: Container(
+                    width: 56 + 18 * _pulse.value,
+                    height: 56 + 18 * _pulse.value,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: scheme.primary.withValues(alpha: 0.25),
+                    ),
                   ),
                 ),
-              ),
-              child!,
-            ],
-          );
-        },
-        child: FloatingActionButton(
-          heroTag: widget.tooltip ?? 'fab',
-          onPressed: widget.onPressed,
-          backgroundColor: scheme.primary,
-          foregroundColor: scheme.onPrimary,
-          elevation: 4,
-          child: widget.extended
-              ? Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    widget.icon,
-                    if (widget.label != null) ...[
-                      const SizedBox(width: 8),
-                      widget.label!,
+                child!,
+              ],
+            );
+          },
+          child: FloatingActionButton(
+            heroTag: widget.tooltip ?? 'fab',
+            onPressed: widget.onPressed,
+            backgroundColor: scheme.primary,
+            foregroundColor: scheme.onPrimary,
+            elevation: 4,
+            child: widget.extended
+                ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      widget.icon,
+                      if (widget.label != null) ...[
+                        const SizedBox(width: 8),
+                        widget.label!,
+                      ],
                     ],
-                  ],
-                )
-              : widget.icon,
+                  )
+                : widget.icon,
+          ),
         ),
       ),
     );

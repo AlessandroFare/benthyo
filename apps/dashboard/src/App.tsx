@@ -42,6 +42,9 @@ const RentalGearPage = lazy(() =>
 const MarketplacePage = lazy(() =>
   import("@/pages/Marketplace").then((m) => ({ default: m.MarketplacePage })),
 );
+const SlotsPage = lazy(() =>
+  import("@/pages/bookings/SlotsPage").then((m) => ({ default: m.SlotsPage })),
+);
 const EmbedBookingPage = lazy(() =>
   import("@/pages/EmbedBooking").then((m) => ({ default: m.EmbedBookingPage })),
 );
@@ -190,6 +193,14 @@ export default function App() {
           element={
             <PageLoader>
               <RentalGearPage />
+            </PageLoader>
+          }
+        />
+        <Route
+          path="slots"
+          element={
+            <PageLoader>
+              <SlotsPage />
             </PageLoader>
           }
         />

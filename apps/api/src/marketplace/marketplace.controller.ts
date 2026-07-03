@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser, AccessToken } from '../common/decorators/current-user.decorator';
+import { TierGuard, RequireTier } from '../common/guards/tier.guard';
 import { AuthUser } from '../common/types/auth-user.interface';
 import { OperatorsService } from '../operators/operators.service';
 import {
@@ -38,6 +39,8 @@ export class MarketplaceController {
 
   @Post('operators/me/marketplace')
   @ApiBearerAuth()
+  @UseGuards(TierGuard)
+  @RequireTier('pro')
   @ApiOperation({ summary: 'Create marketplace listing' })
   async create(
     @CurrentUser() user: AuthUser,
@@ -50,6 +53,8 @@ export class MarketplaceController {
 
   @Patch('operators/me/marketplace/:id')
   @ApiBearerAuth()
+  @UseGuards(TierGuard)
+  @RequireTier('pro')
   @ApiOperation({ summary: 'Update marketplace listing' })
   async update(
     @CurrentUser() user: AuthUser,

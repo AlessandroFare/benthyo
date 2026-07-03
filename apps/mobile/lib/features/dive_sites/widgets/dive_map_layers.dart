@@ -13,7 +13,7 @@ class DiveMapLayers {
     final preset = MapConfig.basemap(mode);
     return TileLayer(
       urlTemplate: preset.urlTemplate,
-      userAgentPackageName: 'com.oceanlog.mobile',
+      userAgentPackageName: 'com.benthyo.app',
       maxNativeZoom: preset.maxNativeZoom,
       subdomains: preset.subdomains,
       tileProvider: tileProvider,
@@ -22,20 +22,20 @@ class DiveMapLayers {
 
   static TileLayer? contours({required bool enabled}) {
     if (!enabled) return null;
-    final preset = MapConfig.contoursOverlay;
+    const preset = MapConfig.contoursOverlay;
     return TileLayer(
       urlTemplate: preset.urlTemplate,
-      userAgentPackageName: 'com.oceanlog.mobile',
+      userAgentPackageName: 'com.benthyo.app',
       maxNativeZoom: preset.maxNativeZoom,
     );
   }
 
   static TileLayer? seamarks({required bool enabled}) {
     if (!enabled) return null;
-    final preset = MapConfig.seamarksOverlay;
+    const preset = MapConfig.seamarksOverlay;
     return TileLayer(
       urlTemplate: preset.urlTemplate,
-      userAgentPackageName: 'com.oceanlog.mobile',
+      userAgentPackageName: 'com.benthyo.app',
       maxNativeZoom: preset.maxNativeZoom,
     );
   }

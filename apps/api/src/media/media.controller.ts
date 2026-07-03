@@ -5,7 +5,6 @@ import {
   Param,
   Post,
   Req,
-  UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
@@ -37,7 +36,7 @@ export class MediaController {
    * caller's user_id segment before issuing the DeleteObjectCommand.
    * An admin (taxonomy_expert) can delete any key by passing X-Admin-Key.
    */
-  @Delete('objects/:userId/:filename(*)')
+  @Delete('objects/:userId/*filename')
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @ApiOperation({ summary: 'Delete a user-owned R2 object (right-to-erasure)' })
   deleteObject(
@@ -45,7 +44,7 @@ export class MediaController {
     @Param('filename') filename: string,
     @CurrentUser() user: AuthUser,
     @Req() req: Request,
-    @AccessToken() token: string,
+    @AccessToken() _token: string,
   ) {
     const isAdmin = req.headers['x-admin-key'] === process.env['ADMIN_API_KEY'];
     return this.mediaService.deleteObject(userId, filename, user.id, isAdmin);

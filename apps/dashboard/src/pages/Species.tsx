@@ -45,7 +45,7 @@ export function SpeciesPage() {
       key: "rank",
       header: "#",
       cell: (s) => (
-        <span className="font-medium text-white/40">
+        <span className="font-medium text-foreground/40">
           {/* DataTable supplies the index via the row's id ordering;
               we re-derive the absolute page rank from the row's
               sighting_count which is stable. */}
@@ -61,9 +61,9 @@ export function SpeciesPage() {
       header: "Species",
       cell: (s) => (
         <div>
-          <p className="font-medium italic text-white">{s.scientific_name}</p>
+          <p className="font-medium italic text-foreground">{s.scientific_name}</p>
           {s.common_name && (
-            <p className="text-sm text-white/45">{s.common_name}</p>
+            <p className="text-sm text-muted-foreground">{s.common_name}</p>
           )}
         </div>
       ),
@@ -96,7 +96,7 @@ export function SpeciesPage() {
     {
       key: "last_seen_at",
       header: "Last Seen",
-      cell: (s) => <span className="text-white/55">{formatDate(s.last_seen_at)}</span>,
+      cell: (s) => <span className="text-foreground/55">{formatDate(s.last_seen_at)}</span>,
       sortable: true,
       sortValue: (s) => s.last_seen_at,
     },
@@ -127,8 +127,8 @@ export function SpeciesPage() {
     <AnimatedPage>
       <AnimatedItem className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-white">Species Rankings</h2>
-          <p className="text-sm text-white/45">
+          <h2 className="text-lg font-semibold text-foreground">Species Rankings</h2>
+          <p className="text-sm text-muted-foreground">
             Most frequently sighted species across your sites
           </p>
         </div>
@@ -182,7 +182,7 @@ export function SpeciesPage() {
 
             {totalPages > 1 && (
               <div className="mt-4 flex items-center justify-between">
-                <p className="text-sm text-white/45">
+                <p className="text-sm text-muted-foreground">
                   Page {page} of {totalPages}
                 </p>
                 <div className="flex gap-2">

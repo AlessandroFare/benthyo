@@ -9,8 +9,27 @@ rootProject.buildDir = "../build"
 subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"
 }
+
+// Fix plugins that conditionally skip the Kotlin plugin when AGP >= 9
+// (e.g. file_picker 11.x). Flutter 3.44 does not yet provide Built-in
+// Kotlin, so we must ensure the Kotlin Gradle plugin is applied to every
+// subproject that contains .kt sources — before afterEvaluate, because
+// KGP cannot be applied in the EXECUTING phase.
 subprojects {
-    project.evaluationDependsOn(":app")
+    plugins.withId('com.android.library') {
+        def hasKotlin = project.fileTree('src').include('**/*.kt').files
+        if (!hasKotlin.isEmpty() && !project.plugins.hasPlugin('org.jetbrains.kotlin.android')) {
+            project.apply plugin: 'org.jetbrains.kotlin.android'
+        }
+    }
+}
+
+subprojects {
+    afterEvaluate { project ->
+        if (project.hasProperty('android')) {
+            project.android.compileSdk = 36
+        }
+    }
 }
 
 tasks.register("clean", Delete) {

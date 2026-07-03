@@ -34,7 +34,7 @@ export function EmbedBookingPage() {
           ? `Dive with us in ${data.region}.`
           : "Book your next dive with us."}
       </p>
-      <p style={{ color: "#555" }}>Powered by OceanLog</p>
+      <p style={{ color: "#555" }}>Powered by Benthyo</p>
       {data.website && (
         <a href={data.website} style={{ display: "inline-block", marginBottom: 16 }}>
           Visit website
@@ -50,7 +50,7 @@ export function EmbedBookingPage() {
       >
         <strong>Ready to dive?</strong>
         <p style={{ margin: "8px 0 0", fontSize: 14 }}>
-          Download OceanLog to log dives, sign the digital waiver, and explore our sites.
+          Download Benthyo to log dives, sign the digital waiver, and explore our sites.
         </p>
       </div>
       <p style={{ fontSize: 12, color: "#888", marginTop: 24 }}>

@@ -19,7 +19,9 @@ final conservationAlertsProvider =
     Uri.parse('${ApiConfig.baseUrl}/users/me/conservation-alerts'),
     headers: {'Authorization': 'Bearer $token'},
   );
-  if (res.statusCode != 200) return [];
+  if (res.statusCode != 200) {
+    throw Exception('Failed to load conservation alerts (${res.statusCode})');
+  }
   final body = jsonDecode(res.body);
   if (body is List) {
     return body.cast<Map<String, dynamic>>();

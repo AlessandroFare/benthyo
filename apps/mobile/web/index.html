@@ -23,14 +23,19 @@
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="oceanlog">
+  <meta name="apple-mobile-web-app-title" content="benthyo">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>oceanlog</title>
+  <title>benthyo</title>
   <link rel="manifest" href="manifest.json">
+
+  <!-- Corbado flutter-passkeys Web SDK (required by the passkeys_web plugin on
+       Flutter web). Without this the app throws "Passkeys Web SDK not loaded".
+       Bundle vendored from flutter-passkeys 2.4.0 release. -->
+  <script src="passkeys/bundle.js"></script>
 </head>
 <body>
   <!--
