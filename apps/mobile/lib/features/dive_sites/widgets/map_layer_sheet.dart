@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/config/map_config.dart';
-import '../../../core/theme/app_theme.dart';
 import '../../../core/models/species.dart';
+import '../../../core/theme/app_theme.dart';
 
 class MapLayerSheet extends StatelessWidget {
   const MapLayerSheet({
@@ -61,10 +61,7 @@ class MapLayerSheet extends StatelessWidget {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
+      backgroundColor: Colors.transparent,
       builder: (context) => MapLayerSheet(
         basemap: basemap,
         showContours: showContours,
@@ -87,125 +84,372 @@ class MapLayerSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.lg,
-          AppSpacing.sm,
-          AppSpacing.lg,
-          AppSpacing.lg,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFF0D1825),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+      ),
+      child: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.sm,
+            AppSpacing.lg,
+            AppSpacing.lg,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Handle
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  margin: const EdgeInsets.only(top: AppSpacing.sm),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+
+              // Title
+              Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: AppColors.accent.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      Icons.layers_outlined,
+                      color: AppColors.accent,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Dive map layers',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                      ),
+                      Text(
+                        'Basemaps, depth, currents & heatmaps',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.white.withValues(alpha: 0.45),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.lg),
+
+              // ── Basemap section ──────────────────────────────────────────
+              _SectionHeader(
+                icon: Icons.map_outlined,
+                label: 'Basemap',
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Wrap(
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.sm,
+                children: DiveMapBasemap.values.map((mode) {
+                  final preset = MapConfig.basemap(mode);
+                  final selected = basemap == mode;
+                  return GestureDetector(
+                    onTap: () => onBasemapChanged(mode),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? AppColors.accent.withValues(alpha: 0.18)
+                            : Colors.white.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: selected
+                              ? AppColors.accent.withValues(alpha: 0.55)
+                              : Colors.white.withValues(alpha: 0.12),
+                          width: 0.9,
+                        ),
+                      ),
+                      child: Text(
+                        preset.label,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight:
+                              selected ? FontWeight.w700 : FontWeight.w500,
+                          color: selected
+                              ? AppColors.accent
+                              : Colors.white.withValues(alpha: 0.75),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              _Divider(),
+
+              // ── Overlays section ─────────────────────────────────────────
+              const SizedBox(height: AppSpacing.md),
+              _SectionHeader(
+                icon: Icons.layers_outlined,
+                label: 'Overlays',
+              ),
+              const SizedBox(height: AppSpacing.xs),
+
+              _OverlayTile(
+                icon: Icons.waves_outlined,
+                title: 'Depth isolines',
+                subtitle: 'EMODnet — slope & wall planning',
+                value: showContours,
+                onChanged: onContoursChanged,
+              ),
+              _OverlayTile(
+                icon: Icons.anchor,
+                title: 'Nautical marks',
+                subtitle: 'OpenSeaMap moorings & hazards',
+                value: showSeamarks,
+                onChanged: onSeamarksChanged,
+              ),
+              _OverlayTile(
+                icon: Icons.air,
+                title: 'Live ocean currents',
+                subtitle: 'NOAA/GFS via Open-Meteo — cyan arrows',
+                value: showLiveCurrents,
+                onChanged: onLiveCurrentsChanged,
+              ),
+              _OverlayTile(
+                icon: Icons.thermostat_outlined,
+                title: 'Species heatmap',
+                subtitle:
+                    heatmapSpecies?.displayName() ?? 'Pick a species to overlay',
+                value: showSpeciesHeatmap,
+                onChanged: onSpeciesHeatmapChanged,
+              ),
+
+              if (showSpeciesHeatmap)
+                Padding(
+                  padding: const EdgeInsets.only(
+                    left: AppSpacing.lg,
+                    bottom: AppSpacing.sm,
+                  ),
+                  child: GestureDetector(
+                    onTap: onPickSpecies,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.md,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.accent.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: AppColors.accent.withValues(alpha: 0.30),
+                          width: 0.8,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.pets_outlined,
+                              size: 14, color: AppColors.accent),
+                          const SizedBox(width: 6),
+                          Text(
+                            heatmapSpecies == null
+                                ? 'Choose species'
+                                : 'Change species',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.accent,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
+              _Divider(),
+              const SizedBox(height: AppSpacing.md),
+
+              // ── Cache section ────────────────────────────────────────────
+              _SectionHeader(
+                icon: Icons.download_outlined,
+                label: 'Offline cache',
+              ),
+              const SizedBox(height: AppSpacing.xs),
+
+              _OverlayTile(
+                icon: Icons.save_outlined,
+                title: 'Offline tile cache',
+                subtitle:
+                    '$cacheStats · pan/zoom to cache ${MapConfig.tileCacheMaxTiles} tiles max',
+                value: offlineCache,
+                onChanged: onOfflineCacheChanged,
+              ),
+
+              const SizedBox(height: AppSpacing.sm),
+              Container(
+                padding: const EdgeInsets.all(AppSpacing.md),
                 decoration: BoxDecoration(
-                  color: Colors.black12,
-                  borderRadius: BorderRadius.circular(999),
+                  color: Colors.white.withValues(alpha: 0.04),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    width: 0.8,
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Text(
-              'Dive map layers',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.primary,
-                  ),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              'Ocean basemaps, depth isolines, live currents (Open-Meteo / Copernicus), and species sighting heatmaps.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            Text('Basemap', style: _sectionStyle(context)),
-            const SizedBox(height: AppSpacing.sm),
-            Wrap(
-              spacing: AppSpacing.sm,
-              runSpacing: AppSpacing.sm,
-              children: DiveMapBasemap.values.map((mode) {
-                final preset = MapConfig.basemap(mode);
-                return ChoiceChip(
-                  label: Text(preset.label),
-                  selected: basemap == mode,
-                  onSelected: (_) => onBasemapChanged(mode),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            Text('Overlays', style: _sectionStyle(context)),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Depth isolines'),
-              subtitle: const Text('EMODnet — slope & wall planning'),
-              value: showContours,
-              onChanged: onContoursChanged,
-            ),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Nautical marks'),
-              subtitle: const Text('OpenSeaMap moorings & hazards'),
-              value: showSeamarks,
-              onChanged: onSeamarksChanged,
-            ),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Live ocean currents'),
-              subtitle: const Text('NOAA/GFS via Open-Meteo — cyan arrows'),
-              value: showLiveCurrents,
-              onChanged: onLiveCurrentsChanged,
-            ),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Species heatmap'),
-              subtitle: Text(
-                heatmapSpecies?.displayName() ?? 'Pick a species to overlay',
-              ),
-              value: showSpeciesHeatmap,
-              onChanged: onSpeciesHeatmapChanged,
-            ),
-            if (showSpeciesHeatmap)
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  onPressed: onPickSpecies,
-                  icon: const Icon(Icons.pets),
-                  label: Text(
-                    heatmapSpecies == null
-                        ? 'Choose species'
-                        : 'Change species',
+                child: Text(
+                  'Live currents are model estimates (~8 km resolution). Site cards also show diver-reported conditions when available.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.white.withValues(alpha: 0.45),
+                    height: 1.5,
                   ),
                 ),
               ),
-            const Divider(),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Offline tile cache'),
-              subtitle: Text(
-                '$cacheStats · pan/zoom to cache ${MapConfig.tileCacheMaxTiles} tiles max',
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Section header ──────────────────────────────────────────────────────────────
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.icon, required this.label});
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: Colors.white.withValues(alpha: 0.45)),
+        const SizedBox(width: 6),
+        Text(
+          label.toUpperCase(),
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.8,
+            color: Colors.white.withValues(alpha: 0.45),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Overlay tile (dark themed) ──────────────────────────────────────────────────
+
+class _OverlayTile extends StatelessWidget {
+  const _OverlayTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () => onChanged(!value),
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: value
+                    ? AppColors.accent.withValues(alpha: 0.12)
+                    : Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(10),
               ),
-              value: offlineCache,
-              onChanged: onOfflineCacheChanged,
+              child: Icon(
+                icon,
+                size: 18,
+                color: value
+                    ? AppColors.accent
+                    : Colors.white.withValues(alpha: 0.40),
+              ),
             ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              'Live currents are model estimates (~8 km). Site cards also show diver-reported conditions.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.textSecondary,
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white.withValues(alpha: 0.90),
+                    ),
                   ),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.white.withValues(alpha: 0.45),
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            Switch(
+              value: value,
+              onChanged: onChanged,
+              activeColor: AppColors.accent,
+              activeTrackColor: AppColors.accent.withValues(alpha: 0.25),
+              inactiveThumbColor: Colors.white.withValues(alpha: 0.35),
+              inactiveTrackColor: Colors.white.withValues(alpha: 0.08),
             ),
           ],
         ),
       ),
     );
   }
+}
 
-  TextStyle? _sectionStyle(BuildContext context) =>
-      Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700);
+// ── Section divider ─────────────────────────────────────────────────────────────
+
+class _Divider extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Divider(
+      height: 1,
+      thickness: 0.8,
+      color: Colors.white.withValues(alpha: 0.08),
+    );
+  }
 }

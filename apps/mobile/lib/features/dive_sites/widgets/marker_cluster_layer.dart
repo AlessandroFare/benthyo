@@ -4,14 +4,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../../core/models/enums.dart';
+
+/// Returns the icon and fill color that best represent a [SiteType].
+({IconData icon, Color color}) siteTypeStyle(SiteType? type) {
+  return switch (type) {
+    SiteType.reef     => (icon: Icons.grass,                    color: const Color(0xFF2ECC71)),
+    SiteType.wreck    => (icon: Icons.anchor,                   color: const Color(0xFFE74C3C)),
+    SiteType.wall     => (icon: Icons.format_align_right,       color: const Color(0xFF3498DB)),
+    SiteType.cave     => (icon: Icons.circle_outlined,          color: const Color(0xFF9B59B6)),
+    SiteType.pinnacle => (icon: Icons.landscape,                color: const Color(0xFFF39C12)),
+    SiteType.muck     => (icon: Icons.water,                    color: const Color(0xFF95A5A6)),
+    _                 => (icon: Icons.scuba_diving,             color: const Color(0xFF00E5FF)),
+  };
+}
+
 /// Animated marker cluster that groups nearby dive sites into a single
-/// visual unit. The cluster grows and pulses when the count increases,
-/// and individual markers bounce slightly on tap.
-///
-/// Algorithm: greedy O(N) — start with no group; for each marker, if
-/// it falls within [clusterRadiusMeters] of an existing group's
-/// centroid, add it to that group; otherwise start a new group. The
-/// centroid is recomputed on each addition.
+/// visual unit. Single markers show a type-appropriate icon in the site's
+/// color; cluster bubbles use an ocean-depth gradient with a count label.
 class MarkerClusterLayer extends StatelessWidget {
   const MarkerClusterLayer({
     super.key,
@@ -33,8 +43,8 @@ class MarkerClusterLayer extends StatelessWidget {
       markers: [
         for (final c in clusters)
           Marker(
-            width: c.isCluster ? 56 : 44,
-            height: c.isCluster ? 56 : 44,
+            width: c.isCluster ? 56 : 48,
+            height: c.isCluster ? 56 : 48,
             point: c.centroid,
             child: _ClusterBubble(
               cluster: c,
@@ -53,10 +63,16 @@ class MarkerClusterLayer extends StatelessWidget {
 }
 
 class ClusterMarker {
-  const ClusterMarker({required this.id, required this.point, this.label});
+  const ClusterMarker({
+    required this.id,
+    required this.point,
+    this.label,
+    this.siteType,
+  });
   final String id;
   final LatLng point;
   final String? label;
+  final SiteType? siteType;
 }
 
 class _Cluster {
@@ -70,6 +86,7 @@ class _ClusterBubble extends StatefulWidget {
   const _ClusterBubble({required this.cluster, required this.onTap});
   final _Cluster cluster;
   final VoidCallback onTap;
+
   @override
   State<_ClusterBubble> createState() => _ClusterBubbleState();
 }
@@ -78,20 +95,16 @@ class _ClusterBubbleState extends State<_ClusterBubble>
     with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl;
   late final Animation<double> _scale;
-  late final Animation<double> _pulse;
 
   @override
   void initState() {
     super.initState();
     _ctrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 220),
+      duration: const Duration(milliseconds: 260),
     );
-    _scale = Tween<double>(begin: 0.85, end: 1.0).animate(
+    _scale = Tween<double>(begin: 0.75, end: 1.0).animate(
       CurvedAnimation(parent: _ctrl, curve: Curves.easeOutBack),
-    );
-    _pulse = Tween<double>(begin: 1.0, end: 1.15).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic),
     );
     _ctrl.forward();
   }
@@ -113,49 +126,134 @@ class _ClusterBubbleState extends State<_ClusterBubble>
   @override
   Widget build(BuildContext context) {
     final c = widget.cluster;
-    final theme = Theme.of(context);
-    final color = c.isCluster
-        ? theme.colorScheme.primary
-        : theme.colorScheme.tertiary;
+
     return GestureDetector(
       onTap: widget.onTap,
       child: AnimatedBuilder(
-        animation: _ctrl,
-        builder: (ctx, child) {
-          final s = c.isCluster ? _scale.value : _pulse.value;
-          return Transform.scale(
-            scale: s,
-            child: child,
-          );
-        },
-        child: Container(
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.white, width: 2.5),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.18),
-                blurRadius: 6,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          alignment: Alignment.center,
-          child: c.isCluster
-              ? Text(
-                  '${c.items.length}',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    color: theme.colorScheme.onPrimary,
-                    fontWeight: FontWeight.w700,
-                  ),
-                )
-              : Icon(
-                  Icons.scuba_diving,
-                  size: 22,
-                  color: theme.colorScheme.onTertiary,
-                ),
+        animation: _scale,
+        builder: (ctx, child) => Transform.scale(
+          scale: _scale.value,
+          child: child,
         ),
+        child: c.isCluster
+            ? _ClusterPill(count: c.items.length)
+            : _SingleMarker(siteType: c.items.first.siteType),
+      ),
+    );
+  }
+}
+
+// ── Single-site marker ─────────────────────────────────────────────────────────
+
+class _SingleMarker extends StatelessWidget {
+  const _SingleMarker({this.siteType});
+  final SiteType? siteType;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = siteTypeStyle(siteType);
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: style.color,
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 2.5),
+        boxShadow: [
+          BoxShadow(
+            color: style.color.withValues(alpha: 0.40),
+            blurRadius: 10,
+            spreadRadius: 1,
+            offset: const Offset(0, 2),
+          ),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.22),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      alignment: Alignment.center,
+      child: Icon(
+        style.icon,
+        size: 20,
+        color: Colors.white,
+      ),
+    );
+  }
+}
+
+// ── Cluster bubble ─────────────────────────────────────────────────────────────
+
+class _ClusterPill extends StatelessWidget {
+  const _ClusterPill({required this.count});
+  final int count;
+
+  /// Map count to an ocean-depth palette: shallow→deep.
+  static Color _clusterColor(int count) {
+    if (count < 5) return const Color(0xFF0284C7);   // sky-600
+    if (count < 15) return const Color(0xFF1D4ED8);  // blue-700
+    if (count < 40) return const Color(0xFF1E40AF);  // blue-800
+    return const Color(0xFF1E3A5F);                  // deep-navy
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _clusterColor(count);
+    final size = count > 99 ? 60.0 : 52.0;
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        gradient: RadialGradient(
+          colors: [
+            color.withValues(alpha: 0.9),
+            color,
+          ],
+          radius: 0.85,
+        ),
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.75),
+          width: 2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.50),
+            blurRadius: 14,
+            spreadRadius: 2,
+            offset: const Offset(0, 3),
+          ),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.20),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      alignment: Alignment.center,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            count > 99 ? '99+' : '$count',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              height: 1.0,
+            ),
+          ),
+          Text(
+            'sites',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.75),
+              fontSize: 9,
+              fontWeight: FontWeight.w500,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -168,7 +266,7 @@ List<_Cluster> _cluster(
 ) {
   final remaining = [...markers];
   final clusters = <_Cluster>[];
-  const earthRadius = 6371000.0; // meters
+  const earthRadius = 6371000.0;
   while (remaining.isNotEmpty) {
     final seed = remaining.removeAt(0);
     var latSum = seed.point.latitude;
@@ -178,8 +276,10 @@ List<_Cluster> _cluster(
     final toRemove = <int>[];
     for (var i = 0; i < remaining.length; i++) {
       final other = remaining[i];
-      final dLat = (other.point.latitude - seed.point.latitude) * math.pi / 180;
-      final dLng = (other.point.longitude - seed.point.longitude) * math.pi / 180;
+      final dLat =
+          (other.point.latitude - seed.point.latitude) * math.pi / 180;
+      final dLng =
+          (other.point.longitude - seed.point.longitude) * math.pi / 180;
       final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
           math.cos(seed.point.latitude * math.pi / 180) *
               math.cos(other.point.latitude * math.pi / 180) *
@@ -195,7 +295,6 @@ List<_Cluster> _cluster(
         toRemove.add(i);
       }
     }
-    // Remove the consumed markers (iterate in reverse).
     for (var j = toRemove.length - 1; j >= 0; j--) {
       remaining.removeAt(toRemove[j]);
     }
