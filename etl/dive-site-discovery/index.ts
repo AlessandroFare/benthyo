@@ -1,36 +1,44 @@
 /**
- * Dive Site Discovery ETL — v1 (multi-source, zero-budget).
+ * Dive Site Discovery ETL — v2 (LLM enumeration + Nominatim geocoding).
  *
- * Three discovery approaches combined:
+ * The core problem: there is no free API listing every named dive site on
+ * Earth. Map data (OSM/Overpass, OpenDiveMap) only covers a fraction, and
+ * Google Maps crawling (Apify) is paid. The most effective zero-budget way to
+ * enumerate *real* dive sites is exactly how a human would: ask a knowledgeable
+ * source to list the diving destinations of a region, then the named sites at
+ * each destination, then look up where each one is.
  *
- * 1. Wikimedia Commons geosearch: find geotagged underwater photos per region.
- *    Photos often have dive site names in titles/categories/descriptions.
+ * Pipeline (all zero-cost):
+ *   1. ENUMERATE — for every marine region, the OpenCode Zen LLM
+ *      (deepseek-v4-flash-free) lists well-known diving destinations
+ *      (e.g. "Malapascua", "Dahab", "Tulamben").
+ *   2. EXPAND — for each destination, the LLM lists real, named dive sites
+ *      with type / difficulty / depth / short description.
+ *   3. GEOCODE — each site is resolved to coordinates via Nominatim
+ *      (OpenStreetMap), biased to the region's bounding box so names like
+ *      "Blue Hole" land in the right place.
+ *   4. (optional) COMMONS — Wikimedia Commons geosearch adds extra candidate
+ *      names from geotagged underwater photos, fed through the same geocoder.
  *
- * 2. DuckDuckGo text search: "dive sites [region]" → extract names from
- *    search snippets using regex patterns.
+ * Discovered sites are stored unverified (verified=false, metadata.source =
+ * 'dive_site_discovery') so moderators can review before they go public.
  *
- * 3. LLM enrichment (optional, off by default): feed candidate names to a
- *    local Ollama model, Groq free tier, or DeepSeek via OpenCode Zen for
- *    structured extraction of location, depth, difficulty, type.
- *
- * All three approaches are zero-cost:
- *  - Wikimedia Commons: free API, no key required
- *  - DuckDuckGo: free HTML search (no API key)
- *  - Ollama: local, free
- *  - Groq: cloud free tier (30 req/min)
- *  - DeepSeek via OpenCode Zen: OpenAI-compatible, free tier available
+ * Requires OPENCODE_ZEN_API_KEY (see etl/shared/llm.ts). Without it the step
+ * logs a warning and no-ops instead of failing the pipeline.
  *
  * Usage:
- *   DISCOVERY_REGIONS=caribbean,red_sea tsx dive-site-discovery/index.ts
- *   DISCOVERY_REGIONS=all DISCOVERY_USE_LLM=ollama tsx dive-site-discovery/index.ts
- *   DISCOVERY_REGIONS=all DISCOVERY_USE_LLM=deepseek tsx dive-site-discovery/index.ts
+ *   DISCOVERY_REGIONS=southeast_asia,red_sea pnpm dive-site-discovery
+ *   DISCOVERY_REGIONS=all DISCOVERY_USE_COMMONS=1 pnpm dive-site-discovery
  */
 
 import 'dotenv/config';
+import { z } from 'zod';
 import { logger, logJobSummary } from '../shared/logger';
 import { RateLimiter } from '../shared/rate-limiter';
 import { getSupabase, upsertBatch } from '../shared/supabase';
 import { isMainModule } from '../shared/cli';
+import { generateJson, isLlmConfigured, llmLabel } from '../shared/llm';
+import { geocode } from '../shared/geocode';
 import {
   geographyPoint,
   normalizeAccessType,
@@ -45,408 +53,150 @@ import { resolveRegions, type MarineRegion } from '../shared/marine-regions';
 
 // ── Config ──────────────────────────────────────────────────────────
 
+const MAX_DESTINATIONS = Number(process.env.DISCOVERY_MAX_DESTINATIONS ?? 25);
+const MAX_SITES_PER_DEST = Number(process.env.DISCOVERY_MAX_SITES_PER_DEST ?? 20);
+const USE_COMMONS = process.env.DISCOVERY_USE_COMMONS === '1';
 const COMMONS_API = process.env.COMMONS_API_URL ?? 'https://commons.wikimedia.org/w/api.php';
-const USER_AGENT = process.env.WIKIMEDIA_USER_AGENT ?? 'Benthyo/1.0 (https://benthyo.com; contact@benthyo.com)';
-const DDG_SEARCH = process.env.DDG_SEARCH_URL ?? 'https://lite.duckduckgo.com/lite/';
-const LLM_MODE = (process.env.DISCOVERY_USE_LLM ?? '').toLowerCase(); // 'ollama' | 'groq' | 'deepseek' | '' (off)
-const OLLAMA_URL = process.env.OLLAMA_URL ?? 'http://localhost:11434';
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? 'llama3.2:3b';
-const GROQ_API_KEY = process.env.GROQ_API_KEY ?? '';
-const GROQ_MODEL = process.env.GROQ_MODEL ?? 'llama-3.1-8b-instant';
-// DeepSeek via OpenCode Zen (OpenAI-compatible API)
-const DEEPSEEK_BASE_URL = process.env.DEEPSEEK_BASE_URL ?? ''; // e.g., https://api.opencodezen.com/v1
-const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY ?? '';
-const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL ?? 'deepseek-chat';
-const MAX_PHOTOS_PER_REGION = Number(process.env.DISCOVERY_PHOTOS_PER_REGION ?? 50);
-const MAX_SEARCH_RESULTS = Number(process.env.DISCOVERY_SEARCH_RESULTS ?? 10);
-const MIN_PHOTO_RESOLUTION = 800; // skip tiny thumbnails
+const USER_AGENT =
+  process.env.WIKIMEDIA_USER_AGENT ?? 'Benthyo/1.0 (https://benthyo.com; contact@benthyo.com)';
+const MAX_COMMONS_PHOTOS = Number(process.env.DISCOVERY_COMMONS_PHOTOS ?? 40);
 
-const limiter = new RateLimiter({ minIntervalMs: 300 });
-const ddgLimiter = new RateLimiter({ minIntervalMs: 3000 }); // DuckDuckGo rate-limits aggressively
+/**
+ * Human-readable context for each region so the LLM enumerates the right
+ * geography. Keyed by MarineRegion.name (see shared/marine-regions.ts).
+ */
+const REGION_HINTS: Record<string, string> = {
+  caribbean: 'the Caribbean Sea (Cozumel, Bonaire, Roatán, Belize, Cayman Islands, Bahamas, Turks & Caicos)',
+  red_sea: 'the Red Sea (Egypt — Sharm el-Sheikh, Dahab, Marsa Alam, Hurghada; Sudan)',
+  indian_ocean: 'the tropical Indian Ocean (Maldives, Sri Lanka, Andaman Islands, Thailand — Similan/Phuket)',
+  southeast_asia: 'Southeast Asia (Indonesia — Bali, Komodo, Raja Ampat, Lembeh; Philippines — Malapascua, Anilao, Tubbataha; Malaysia — Sipadan)',
+  australia_nz: 'Australia & New Zealand (Great Barrier Reef, Ningaloo, Poor Knights Islands)',
+  pacific: 'the tropical Pacific (Palau, Micronesia — Chuuk/Truk, Fiji, French Polynesia, Hawaii, Galápagos)',
+  mediterranean: 'the Mediterranean Sea (Italy, Malta, Croatia, Greece, Spain, France, Cyprus, Egypt north coast)',
+  north_atlantic: 'the North Atlantic (Azores, Canary Islands, Florida, Caribbean fringe, US East Coast wrecks)',
+  nordic: 'Nordic & northern European waters (Norway, Iceland — Silfra, Scotland — Scapa Flow)',
+  east_africa: 'East Africa & western Indian Ocean (Mozambique, Tanzania — Zanzibar/Mafia, Kenya, South Africa — Sodwana/Aliwal, Seychelles, Mauritius)',
+  japan_korea: 'Japan & Korea (Okinawa, Izu Peninsula, Jeju)',
+};
 
-// ── Wikimedia Commons interfaces ────────────────────────────────────
+// ── LLM schemas ─────────────────────────────────────────────────────
+
+const DestinationsSchema = z.object({
+  destinations: z
+    .array(
+      z.object({
+        name: z.string().describe('Dive destination / area, e.g. "Malapascua"'),
+        country: z.string().describe('Country name'),
+      }),
+    )
+    .describe('Well-known scuba diving destinations in the region'),
+});
+
+const SitesSchema = z.object({
+  sites: z
+    .array(
+      z.object({
+        name: z.string().describe('The specific named dive site'),
+        site_type: z
+          .enum(['reef', 'wall', 'wreck', 'cave', 'pinnacle', 'muck', 'other'])
+          .nullable(),
+        difficulty: z
+          .enum(['beginner', 'intermediate', 'advanced', 'technical'])
+          .nullable(),
+        depth_min: z.number().nullable(),
+        depth_max: z.number().nullable(),
+        access_type: z.enum(['shore', 'boat', 'liveaboard']).nullable(),
+        description: z.string().nullable(),
+      }),
+    )
+    .describe('Real, named dive sites at this destination'),
+});
+
+type LlmSite = z.infer<typeof SitesSchema>['sites'][number];
+
+interface SiteCandidate {
+  name: string;
+  destination: string;
+  country: string;
+  region: MarineRegion;
+  llm: LlmSite | null;
+  discoverySource: 'llm' | 'commons';
+}
+
+// ── Approach 1: LLM enumeration ─────────────────────────────────────
+
+async function enumerateDestinations(region: MarineRegion): Promise<Array<{ name: string; country: string }>> {
+  const hint = REGION_HINTS[region.name] ?? region.name.replace(/_/g, ' ');
+  const result = await generateJson(DestinationsSchema, {
+    system:
+      'You are a scuba-diving domain expert with encyclopedic knowledge of dive travel. ' +
+      'You only list REAL, well-documented diving destinations. Never invent places.',
+    prompt:
+      `List up to ${MAX_DESTINATIONS} well-known scuba diving destinations or areas in ${hint}. ` +
+      'Prefer destinations famous for named dive sites. Return distinct places (towns, islands, ' +
+      'marine parks), not individual dive sites.',
+    temperature: 0.3,
+  });
+  return result.destinations.slice(0, MAX_DESTINATIONS);
+}
+
+async function enumerateSites(
+  destination: string,
+  country: string,
+  region: MarineRegion,
+): Promise<SiteCandidate[]> {
+  const result = await generateJson(SitesSchema, {
+    system:
+      'You are a scuba-diving domain expert. You list ONLY real, named dive sites that actually ' +
+      'exist at the given destination. Never invent site names. If unsure about a numeric field, use null.',
+    prompt:
+      `List up to ${MAX_SITES_PER_DEST} real, named scuba dive sites at ${destination}, ${country}. ` +
+      'For each: the exact site name divers use, its type, typical difficulty, min/max depth in metres, ' +
+      'usual access (shore/boat/liveaboard) and a one-sentence description.',
+    temperature: 0.3,
+  });
+
+  return result.sites.slice(0, MAX_SITES_PER_DEST).map((site) => ({
+    name: site.name,
+    destination,
+    country,
+    region,
+    llm: site,
+    discoverySource: 'llm' as const,
+  }));
+}
+
+// ── Approach 2 (optional): Wikimedia Commons geosearch ──────────────
 
 interface CommonsPage {
   pageid: number;
   title: string;
 }
 
-interface CommonsImageInfo {
-  url: string;
-  descriptionurl: string;
-  extmetadata?: Array<{ name: string; value: string }>;
-}
+const commonsLimiter = new RateLimiter({ minIntervalMs: 400 });
 
-interface CommonsSearchResponse {
-  query?: {
-    geosearch?: CommonsPage[];
-    pages?: Record<string, { imageinfo?: CommonsImageInfo[]; categories?: Array<{ title: string }> }>;
-  };
-}
-
-interface ExtractedCandidate {
-  name: string;
-  lat: number;
-  lng: number;
-  source: string; // description, category, title
-  rawContext: string;
-}
-
-// ── Approach 1: Wikimedia Commons geosearch ─────────────────────────
-
-async function geosearchPhotos(
-  region: MarineRegion,
-  limit: number,
-): Promise<CommonsPage[]> {
+async function commonsCandidateNames(region: MarineRegion): Promise<string[]> {
   const params = new URLSearchParams({
     action: 'query',
     list: 'geosearch',
-    gsbbox: [
-      region.bbox.nelat,
-      region.bbox.nelng,
-      region.bbox.swlat,
-      region.bbox.swlng,
-    ].join('|'),
-    gsnamespace: '6', // File namespace only
-    gslimit: String(limit),
+    gsbbox: [region.bbox.nelat, region.bbox.swlng, region.bbox.swlat, region.bbox.nelng].join('|'),
+    gsnamespace: '6',
+    gslimit: String(MAX_COMMONS_PHOTOS),
     format: 'json',
     origin: '*',
   });
-  const url = `${COMMONS_API}?${params}`;
-  const data = await limiter.fetchJson<CommonsSearchResponse>(url, {
-    headers: { 'User-Agent': USER_AGENT },
-  });
-  return data.query?.geosearch ?? [];
-}
-
-async function fetchImageDetails(pageIds: number[]): Promise<Record<string, CommonsImageInfo>> {
-  if (pageIds.length === 0) return {};
-  const params = new URLSearchParams({
-    action: 'query',
-    pageids: pageIds.join('|'),
-    prop: 'imageinfo|categories',
-    iiprop: 'url|extmetadata',
-    iilimit: '1',
-    cllimit: '20',
-    format: 'json',
-    origin: '*',
-  });
-  const url = `${COMMONS_API}?${params}`;
-  const data = await limiter.fetchJson<CommonsSearchResponse>(url, {
-    headers: { 'User-Agent': USER_AGENT },
-  });
-  const result: Record<string, CommonsImageInfo> = {};
-  const pages = data.query?.pages ?? {};
-  for (const [, page] of Object.entries(pages)) {
-    const info = page.imageinfo?.[0];
-    if (info) result[String(page.pageid ?? '')] = info;
-  }
-  return result;
-}
-
-const DIVE_SITE_NAME_PATTERNS = [
-  // "at [Name]" → extract Name
-  /(?:at|a|vicino a|near|off|di)\s+["']?([A-Z][A-Za-z\s'-]{3,40})["']?(?:\s*[,.;!]|\s*$)/g,
-  // "[Name] dive site" / "[Name] diving site"
-  /([A-Z][A-Za-z\s'-]{3,40})\s+(?:dive\s*site|diving\s*site|scuba\s*site)/gi,
-  // "Wreck of [Name]" / "Relitto [Name]"
-  /(?:Wreck\s+of|Relitto\s+(?:del|della|di)|Épave\s+(?:du|de))\s+["']?([A-Z][A-Za-z\s'-]{3,40})["']?/gi,
-  // "[Name] reef" / "[Name] wall" / "[Name] cave"
-  /([A-Z][A-Za-z\s'-]{3,40})\s+(?:reef|wall|pinnacle|wreck|cave|blue\s*hole|drop.off)/gi,
-  // Category: "Underwater diving in [Location]"
-  /(?:Underwater\s+diving\s+(?:in|at)|Scuba\s+diving\s+(?:in|at)|Diving\s+(?:in|at))\s+([A-Z][A-Za-z\s'-]{3,40})/gi,
-];
-
-/** Heuristic: does this look like a real dive site name and not noise? */
-function looksLikeDiveSiteName(name: string): boolean {
-  const cleaned = name.trim();
-  if (cleaned.length < 3 || cleaned.length > 50) return false;
-  // Exclude camera model names, EXIF tags, generic words
-  const noise = new Set([
-    'the', 'and', 'for', 'with', 'from', 'this', 'that', 'canon', 'nikon', 'sony',
-    'olympus', 'gopro', 'photo', 'image', 'jpg', 'jpeg', 'png', 'dsc', 'img',
-    'underwater', 'scuba', 'diving', 'diver', 'ocean', 'sea', 'water', 'blue',
-    'april', 'may', 'june', 'july', 'august', 'september', 'october',
-  ]);
-  if (noise.has(cleaned.toLowerCase())) return false;
-  // Must have at least one capital letter start
-  if (!/[A-Z]/.test(cleaned[0])) return false;
-  return true;
-}
-
-function extractCandidatesFromText(
-  text: string,
-  lat: number,
-  lng: number,
-): ExtractedCandidate[] {
-  const candidates: ExtractedCandidate[] = [];
-  const seen = new Set<string>();
-
-  for (const pattern of DIVE_SITE_NAME_PATTERNS) {
-    // Reset regex state
-    pattern.lastIndex = 0;
-    let match: RegExpExecArray | null;
-    while ((match = pattern.exec(text)) !== null) {
-      const name = (match[1] ?? match[2] ?? '').trim();
-      if (!name || seen.has(name.toLowerCase())) continue;
-      if (!looksLikeDiveSiteName(name)) continue;
-      seen.add(name.toLowerCase());
-      candidates.push({ name, lat, lng, source: 'commons', rawContext: text.slice(Math.max(0, match.index - 50), match.index + match[0].length + 50) });
-    }
-  }
-
-  return candidates;
-}
-
-async function commonsDiscovery(region: MarineRegion): Promise<ExtractedCandidate[]> {
-  logger.info(`Commons geosearch: ${region.name}`);
-  const photos = await geosearchPhotos(region, MAX_PHOTOS_PER_REGION);
-  if (photos.length === 0) {
-    logger.info(`Commons: no geotagged photos in ${region.name}`);
-    return [];
-  }
-
-  const pageIds = photos.map((p) => p.pageid);
-  const details = await fetchImageDetails(pageIds);
-
-  const candidates: ExtractedCandidate[] = [];
-  let processed = 0;
-
-  for (const photo of photos) {
-    const info = details[String(photo.pageid)];
-    if (!info?.descriptionurl) continue;
-
-    // The Commons description page URL contains the description text.
-    // We fetch it as raw wikitext to extract dive site names.
-    const descUrl = info.descriptionurl;
-    try {
-      const params = new URLSearchParams({
-        action: 'raw',
-        title: photo.title.replace(/^File:/, ''),
-      });
-      const rawUrl = `${COMMONS_API}?${params}`;
-      const response = await limiter.fetch(rawUrl, {
-        headers: { 'User-Agent': USER_AGENT },
-      });
-      if (!response.ok) continue;
-      const wikitext = await response.text();
-
-      // Commons geosearch returns images with coordinates; extract lat/lng
-      // from the coordinate templates in the wikitext
-      const coordMatch = wikitext.match(/\{\{Location\|(-?[\d.]+)\|(-?[\d.]+)/);
-      const lat = coordMatch ? Number(coordMatch[2]) : 0;
-      const lng = coordMatch ? Number(coordMatch[1]) : 0;
-
-      if (lat === 0 && lng === 0) continue;
-
-      const extracted = extractCandidatesFromText(wikitext, lat, lng);
-      candidates.push(...extracted);
-      processed += 1;
-    } catch {
-      // skip failed fetches
-    }
-
-    if (processed >= 20) break; // limit per region to be kind to Commons API
-  }
-
-  logger.info(`Commons ${region.name}: ${candidates.length} candidates from ${processed} photos`);
-  return candidates;
-}
-
-// ── Approach 2: DuckDuckGo text search ──────────────────────────────
-
-interface DdgSearchResult {
-  title: string;
-  snippet: string;
-  url: string;
-}
-
-/**
- * DuckDuckGo Lite HTML search (no API key, no JS).
- * Returns up to ~20 text results with title/snippet/url.
- */
-async function duckDuckGoSearch(query: string, maxResults: number): Promise<DdgSearchResult[]> {
-  const params = new URLSearchParams({ q: query });
-  const url = `${DDG_SEARCH}?${params}`;
-  const response = await ddgLimiter.fetch(url, {
-    headers: {
-      'User-Agent': USER_AGENT,
-      'Accept': 'text/html',
-    },
-  });
-  if (!response.ok) return [];
-  const html = await response.text();
-
-  // Parse DuckDuckGo Lite results (simple HTML structure)
-  const results: DdgSearchResult[] = [];
-  // Match result rows: <a rel="nofollow" href="URL">Title</a><br>Snippet
-  const rowRegex = /<a\s+rel="nofollow"\s+(?:class="result-link"\s+)?href="([^"]+)"[^>]*>([^<]+)<\/a>\s*(?:<br\s*\/?>\s*)?(?:<span[^>]*>)?([^<]*?)(?:<\/span>)?\s*(?:<br|<table|<\/td)/gi;
-  let match: RegExpExecArray | null;
-  while ((match = rowRegex.exec(html)) !== null) {
-    const [, rawUrl, rawTitle, snippet] = match;
-    // DuckDuckGo Lite redirects through /l/?uddg=REAL_URL
-    const urlMatch = rawUrl.match(/uddg=([^&]+)/);
-    const cleanUrl = urlMatch ? decodeURIComponent(urlMatch[1]) : rawUrl;
-    results.push({
-      title: rawTitle.replace(/<[^>]*>/g, '').trim(),
-      snippet: snippet.replace(/<[^>]*>/g, '').trim(),
-      url: cleanUrl,
-    });
-    if (results.length >= maxResults) break;
-  }
-
-  return results;
-}
-
-async function ddgTextDiscovery(region: MarineRegion): Promise<ExtractedCandidate[]> {
-  // Multiple search queries to maximize coverage
-  const queries = [
-    `dive sites ${region.name.replace(/_/g, ' ')} list`,
-    `best scuba diving spots ${region.name.replace(/_/g, ' ')}`,
-    `underwater sites ${region.name.replace(/_/g, ' ')} diving`,
-  ];
-
-  const candidates: ExtractedCandidate[] = [];
-  const seenNames = new Set<string>();
-
-  for (const query of queries) {
-    logger.info(`DDG search: "${query}"`);
-    const results = await duckDuckGoSearch(query, MAX_SEARCH_RESULTS);
-
-    for (const result of results) {
-      const combined = `${result.title} ${result.snippet}`;
-      const extracted = extractCandidatesFromText(combined, 0, 0); // no coords yet
-      for (const cand of extracted) {
-        const key = cand.name.toLowerCase();
-        if (seenNames.has(key)) continue;
-        seenNames.add(key);
-        // Attach the search snippet as context for later enrichment
-        cand.rawContext = combined;
-        cand.source = 'ddg';
-        candidates.push(cand);
-      }
-    }
-  }
-
-  logger.info(`DDG ${region.name}: ${candidates.length} unique candidates`);
-  return candidates;
-}
-
-// ── Approach 3: LLM enrichment (optional) ──────────────────────────
-
-interface EnrichedSite {
-  name: string;
-  lat?: number;
-  lng?: number;
-  depth_min?: number;
-  depth_max?: number;
-  difficulty?: string;
-  site_type?: string;
-  description?: string;
-  country_code?: string;
-}
-
-async function ollamaComplete(prompt: string): Promise<string> {
-  const response = await fetch(`${OLLAMA_URL}/api/generate`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: OLLAMA_MODEL,
-      prompt,
-      stream: false,
-      options: { temperature: 0.1, num_predict: 500 },
-    }),
-  });
-  if (!response.ok) throw new Error(`Ollama HTTP ${response.status}`);
-  const data = (await response.json()) as { response: string };
-  return data.response;
-}
-
-async function groqComplete(prompt: string): Promise<string> {
-  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${GROQ_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: GROQ_MODEL,
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.1,
-      max_tokens: 800,
-    }),
-  });
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`Groq HTTP ${response.status}: ${body.slice(0, 200)}`);
-  }
-  const data = (await response.json()) as { choices: Array<{ message: { content: string } }> };
-  return data.choices[0]?.message?.content ?? '';
-}
-
-/**
- * Call DeepSeek via OpenCode Zen (OpenAI-compatible).
- * Same format as callOpenAI in Fluxychat ai-agent.
- */
-async function deepseekComplete(prompt: string): Promise<string> {
-  const response = await fetch(`${DEEPSEEK_BASE_URL}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${DEEPSEEK_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: DEEPSEEK_MODEL,
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.1,
-      max_tokens: 800,
-    }),
-  });
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`DeepSeek HTTP ${response.status}: ${body.slice(0, 200)}`);
-  }
-  const data = (await response.json()) as { choices: Array<{ message: { content: string } }> };
-  return data.choices[0]?.message?.content ?? '';
-}
-
-async function enrichWithLLM(candidate: ExtractedCandidate): Promise<EnrichedSite | null> {
-  // Try Ollama first (local, zero-cost), fall back to Groq
-  const prompt = `Extract structured dive site information from the following context. Return ONLY valid JSON, no explanation.
-
-Context: "${candidate.rawContext || candidate.name}"
-
-{
-  "name": "exact dive site name",
-  "lat": number or null,
-  "lng": number or null,
-  "depth_min": number or null,
-  "depth_max": number or null,
-  "difficulty": "beginner" | "intermediate" | "advanced" | "technical" | null,
-  "site_type": "reef" | "wall" | "wreck" | "cave" | "pinnacle" | "muck" | "other" | null,
-  "description": "short description or null",
-  "country_code": "2-letter ISO code or null"
-}`;
-
   try {
-    let raw: string;
-    if (LLM_MODE === 'groq' && GROQ_API_KEY) {
-      raw = await groqComplete(prompt);
-    } else if (LLM_MODE === 'deepseek' && DEEPSEEK_API_KEY) {
-      raw = await deepseekComplete(prompt);
-    } else {
-      raw = await ollamaComplete(prompt);
-    }
-
-    // Extract JSON from the response (LLMs often wrap in markdown)
-    const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
-    const parsed = JSON.parse(jsonMatch[0]) as EnrichedSite;
-    if (!parsed.name) return null;
-    return parsed;
+    const data = await commonsLimiter.fetchJson<{ query?: { geosearch?: CommonsPage[] } }>(
+      `${COMMONS_API}?${params}`,
+      { headers: { 'User-Agent': USER_AGENT } },
+    );
+    const titles = (data.query?.geosearch ?? [])
+      .map((p) => p.title.replace(/^File:/, '').replace(/\.[a-z0-9]+$/i, ''))
+      .filter((t) => /dive|dived|diving|scuba|reef|wreck|underwater/i.test(t));
+    return [...new Set(titles)];
   } catch (err) {
-    logger.warn(`LLM enrichment failed for "${candidate.name}": ${err instanceof Error ? err.message : String(err)}`);
-    return null;
+    logger.warn(`Commons geosearch failed for ${region.name}: ${err instanceof Error ? err.message : String(err)}`);
+    return [];
   }
 }
 
@@ -454,113 +204,138 @@ Context: "${candidate.rawContext || candidate.name}"
 
 export async function runDiveSiteDiscoveryEtl(): Promise<void> {
   const startedAt = Date.now();
-  logger.info('Starting multi-source dive site discovery ETL');
-  if (LLM_MODE) {
-    const modelLabel = LLM_MODE === 'ollama' ? OLLAMA_MODEL : LLM_MODE === 'groq' ? GROQ_MODEL : DEEPSEEK_MODEL;
-    logger.info(`LLM enrichment: ${LLM_MODE} (${modelLabel})`);
-  } else {
-    logger.info('LLM enrichment: off (set DISCOVERY_USE_LLM=ollama, =groq, or =deepseek to enable)');
+  logger.info('Starting dive site discovery ETL (v2 — LLM enumeration + Nominatim)');
+
+  if (!isLlmConfigured()) {
+    logger.warn(
+      'Skipping dive-site-discovery: OPENCODE_ZEN_API_KEY not set. ' +
+        'Set it to enable LLM-backed site discovery.',
+    );
+    logJobSummary('dive-site-discovery', { processed: 0, upserted: 0, skipped: 0, errors: [] });
+    return;
   }
+  logger.info(`LLM: ${llmLabel()}`);
 
   const supabase = getSupabase();
   const regions = resolveRegions('DISCOVERY_REGIONS');
   logger.info(`Discovery regions: ${regions.map((r) => r.name).join(', ')}`);
 
-  // Load existing site slugs for dedup
-  const { data: existingSites } = await supabase
-    .from('dive_sites')
-    .select('slug, name');
-  const existingSlugs = new Set((existingSites ?? []).map((s) => s.slug as string));
-  const existingNames = new Set(
+  // Load existing sites for dedup (by slug and normalised name).
+  const { data: existingSites } = await supabase.from('dive_sites').select('slug, name');
+  const seenSlugs = new Set((existingSites ?? []).map((s) => s.slug as string));
+  const seenNames = new Set(
     (existingSites ?? []).map((s) => (s.name as string).toLowerCase().trim()),
   );
-  logger.info(`Existing: ${existingSlugs.size} dive sites already in DB`);
+  logger.info(`Existing: ${seenSlugs.size} dive sites already in DB`);
 
-  const allCandidates: ExtractedCandidate[] = [];
-  const seenCandidateNames = new Set<string>();
+  // Phase 1 + 2: enumerate candidates.
+  const candidates: SiteCandidate[] = [];
+  const errors: string[] = [];
 
   for (const region of regions) {
-    // Phase 1: Commons geosearch
+    let destinations: Array<{ name: string; country: string }> = [];
     try {
-      const commonsCandidates = await commonsDiscovery(region);
-      for (const c of commonsCandidates) {
-        const key = c.name.toLowerCase().trim();
-        if (seenCandidateNames.has(key) || existingNames.has(key)) continue;
-        seenCandidateNames.add(key);
-        allCandidates.push(c);
-      }
+      destinations = await enumerateDestinations(region);
+      logger.info(`${region.name}: ${destinations.length} destinations`);
     } catch (err) {
-      logger.warn(`Commons discovery failed for ${region.name}: ${err instanceof Error ? err.message : String(err)}`);
+      const msg = `enumerateDestinations(${region.name}): ${err instanceof Error ? err.message : String(err)}`;
+      errors.push(msg);
+      logger.warn(msg);
+      continue;
     }
 
-    // Phase 2: DuckDuckGo text search
-    try {
-      const ddgCandidates = await ddgTextDiscovery(region);
-      for (const c of ddgCandidates) {
-        const key = c.name.toLowerCase().trim();
-        if (seenCandidateNames.has(key) || existingNames.has(key)) continue;
-        seenCandidateNames.add(key);
-        allCandidates.push(c);
+    for (const dest of destinations) {
+      try {
+        const sites = await enumerateSites(dest.name, dest.country, region);
+        for (const c of sites) {
+          const key = c.name.toLowerCase().trim();
+          if (seenNames.has(key)) continue;
+          seenNames.add(key);
+          candidates.push(c);
+        }
+      } catch (err) {
+        errors.push(`enumerateSites(${dest.name}): ${err instanceof Error ? err.message : String(err)}`);
       }
-    } catch (err) {
-      logger.warn(`DDG discovery failed for ${region.name}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+
+    // Optional: augment with Wikimedia Commons candidate names.
+    if (USE_COMMONS) {
+      const names = await commonsCandidateNames(region);
+      for (const name of names) {
+        const key = name.toLowerCase().trim();
+        if (seenNames.has(key)) continue;
+        seenNames.add(key);
+        candidates.push({
+          name,
+          destination: region.name.replace(/_/g, ' '),
+          country: '',
+          region,
+          llm: null,
+          discoverySource: 'commons',
+        });
+      }
     }
   }
 
-  logger.info(`Total unique new candidates: ${allCandidates.length}`);
+  logger.info(`Total unique candidate sites: ${candidates.length}`);
 
-  // Phase 3: Enrichment + upsert
+  // Phase 3: geocode + build rows.
   const siteRows: DiveSiteRow[] = [];
-  const seenSlugs = new Set(existingSlugs);
-  let enriched = 0;
-  let skipped = 0;
+  let geocoded = 0;
+  let skippedNoCoords = 0;
 
-  for (const candidate of allCandidates) {
-    let enrichedData: EnrichedSite | null = null;
+  for (const cand of candidates) {
+    const query = cand.country
+      ? `${cand.name}, ${cand.destination}, ${cand.country}`
+      : `${cand.name}, ${cand.destination}`;
+    const place = await geocode(query, cand.region.bbox);
 
-    if (LLM_MODE) {
-      enrichedData = await enrichWithLLM(candidate);
-      if (enrichedData) enriched += 1;
+    if (!place) {
+      // Without coordinates the site is not useful for map / proximity search.
+      skippedNoCoords += 1;
+      continue;
     }
+    geocoded += 1;
 
-    const baseSlug = slugify(enrichedData?.name ?? candidate.name);
-    const slug = uniqueSlug(`disc-${baseSlug}`, String(siteRows.length), seenSlugs);
-
-    const hint = [
-      candidate.rawContext,
-      enrichedData?.description,
-      enrichedData?.site_type,
-    ].filter(Boolean).join(' ');
+    const baseSlug = slugify(`disc-${cand.name}`);
+    const slug = uniqueSlug(baseSlug, String(siteRows.length), seenSlugs);
+    const hint = [cand.llm?.description, cand.llm?.site_type, cand.destination]
+      .filter(Boolean)
+      .join(' ');
 
     siteRows.push({
-      name: enrichedData?.name ?? candidate.name,
+      name: cand.name,
       slug,
-      description: enrichedData?.description ?? null,
-      location: enrichedData?.lat && enrichedData?.lng
-        ? geographyPoint(enrichedData.lng, enrichedData.lat)
-        : geographyPoint(candidate.lng || 0, candidate.lat || 0),
-      country_code: normalizeCountryCode(enrichedData?.country_code),
-      region: null,
-      depth_min: enrichedData?.depth_min ?? 0,
-      depth_max: enrichedData?.depth_max ?? 30,
-      difficulty: normalizeDifficulty(enrichedData?.difficulty, hint),
-      site_type: normalizeSiteType(enrichedData?.site_type ?? 'other'),
-      access_type: normalizeAccessType(undefined, hint),
+      description: cand.llm?.description ?? null,
+      location: geographyPoint(place.lng, place.lat),
+      country_code: normalizeCountryCode(place.countryCode ?? undefined),
+      region: cand.destination,
+      depth_min: cand.llm?.depth_min ?? 0,
+      depth_max: cand.llm?.depth_max ?? 30,
+      difficulty: normalizeDifficulty(cand.llm?.difficulty ?? undefined, hint),
+      site_type: normalizeSiteType(cand.llm?.site_type ?? 'other'),
+      access_type: normalizeAccessType(cand.llm?.access_type ?? undefined, hint),
       verified: false,
       metadata: {
         source: 'dive_site_discovery',
-        discovery_source: candidate.source,
-        raw_context: candidate.rawContext?.slice(0, 500),
-        llm_enriched: !!enrichedData,
+        discovery_source: cand.discoverySource,
+        destination: cand.destination,
+        geocoded_name: place.displayName,
+        llm_enriched: cand.llm != null,
       },
     });
   }
 
-  logger.info(`LLM enriched: ${enriched}/${allCandidates.length} candidates`);
+  logger.info(`Geocoded ${geocoded}/${candidates.length} candidates (${skippedNoCoords} skipped: no coords)`);
 
   if (siteRows.length === 0) {
+    logJobSummary('dive-site-discovery', {
+      processed: candidates.length,
+      upserted: 0,
+      skipped: skippedNoCoords,
+      errors,
+    });
     logger.info('No new dive sites discovered');
-    logJobSummary('dive-site-discovery', { processed: allCandidates.length, upserted: 0, skipped: 0, errors: [] });
     return;
   }
 
@@ -571,10 +346,10 @@ export async function runDiveSiteDiscoveryEtl(): Promise<void> {
   );
 
   logJobSummary('dive-site-discovery', {
-    processed: allCandidates.length,
+    processed: candidates.length,
     upserted: result.upserted,
-    skipped: result.skipped,
-    errors: result.errors,
+    skipped: result.skipped + skippedNoCoords,
+    errors: [...errors, ...result.errors],
   });
 
   logger.info(`Dive site discovery ETL finished in ${Date.now() - startedAt}ms`);

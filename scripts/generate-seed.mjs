@@ -153,18 +153,23 @@ ON CONFLICT (slug) DO UPDATE SET
   depth_max = EXCLUDED.depth_max,
   updated_at = now();
 
-INSERT INTO species (scientific_name, common_name, common_name_it, common_name_es, family, genus, inat_taxon_id, worms_id, gbif_taxon_key, kingdom, metadata)
+-- NOTE: external taxon IDs (inat_taxon_id / worms_id / gbif_taxon_key) are
+-- intentionally NOT seeded here. The previous hardcoded values were fabricated
+-- (duplicated / sequential placeholders) and broke photo enrichment. They are
+-- now resolved from live APIs by the ETL steps (species-seed, worms,
+-- inat-taxon-lookup). This seed only provides curated names, which the ETL
+-- never overwrites (see COALESCE below).
+INSERT INTO species (scientific_name, common_name, common_name_it, common_name_es, family, genus, kingdom, metadata)
 VALUES
-${speciesAll.map(([sci, en, it, es, fam, gen, inat, worms, gbif]) =>
-  `  ('${esc(sci)}', '${esc(en)}', '${esc(it)}', '${esc(es)}', '${fam}', '${gen}', ${inat}, ${worms}, ${gbif}, 'Animalia', '{"seed": true}'::jsonb)`
+${speciesAll.map(([sci, en, it, es, fam, gen]) =>
+  `  ('${esc(sci)}', '${esc(en)}', '${esc(it)}', '${esc(es)}', '${fam}', '${gen}', 'Animalia', '{"seed": true}'::jsonb)`
 ).join(',\n')}
 ON CONFLICT (scientific_name) DO UPDATE SET
-  common_name = EXCLUDED.common_name,
-  common_name_it = EXCLUDED.common_name_it,
-  common_name_es = EXCLUDED.common_name_es,
-  inat_taxon_id = EXCLUDED.inat_taxon_id,
-  worms_id = EXCLUDED.worms_id,
-  gbif_taxon_key = EXCLUDED.gbif_taxon_key,
+  common_name = COALESCE(species.common_name, EXCLUDED.common_name),
+  common_name_it = COALESCE(species.common_name_it, EXCLUDED.common_name_it),
+  common_name_es = COALESCE(species.common_name_es, EXCLUDED.common_name_es),
+  family = COALESCE(species.family, EXCLUDED.family),
+  genus = COALESCE(species.genus, EXCLUDED.genus),
   updated_at = now();
 
 INSERT INTO operators (name, slug, country_code, operator_type, location, address, email, phone, website, subscription_tier, subscription_status, metadata)

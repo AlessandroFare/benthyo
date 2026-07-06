@@ -11,6 +11,8 @@ import { runSeamapEtl } from './seamap/index';
 import { runRlsEtl } from './rls/index';
 import { runOpenDiveMapEtl } from './opendivemap/index';
 import { runOverpassEtl } from './overpass/index';
+import { runDiveSiteDiscoveryEtl } from './dive-site-discovery/index';
+import { runSpeciesSeedEtl } from './species-seed/index';
 import { runTavilySpeciesEtl } from './tavily-species/index';
 import { runWikimediaImagesEtl } from './wikimedia-images/index';
 import { runWormsEtl } from './worms/index';
@@ -24,15 +26,19 @@ import { createClient } from '@supabase/supabase-js';
  * and docs/decisions.md (ADR-015) are kept in sync with it.
  *
  * Order is significant:
- *   1. WoRMS taxonomy first, so GBIF/OBIS occurrences can link to species
- *      by canonical scientific name.
+ *   1. Iconic species seed (real IDs + it/es names + photos from live APIs).
  *   2. Dive sites in parallel (opendivemap, overpass, divenumber), so
  *      occurrences can be matched to nearby sites.
- *   3. Apify Google Maps last in the site batch (slowest source).
- *   4. GBIF + OBIS occurrences IN PARALLEL (independent sources).
- *   5. Open-water reconciliation: placeholder sites for unmatched sightings.
- *   6. inat-taxon-lookup BEFORE the image backfills (images need inat_taxon_id).
- *   7. Image backfills in increasing cost / decreasing quality:
+ *   3. LLM dive-site discovery (OpenCode Zen enumeration + Nominatim), after
+ *      the map sources so it can dedup against them.
+ *   4. Apify Google Maps last in the site batch (slowest source).
+ *   5. GBIF + OBIS + SEAMAP + iNat occurrences IN PARALLEL (independent sources).
+ *   6. Open-water reconciliation: placeholder sites for unmatched sightings.
+ *   7. WoRMS enrichment AFTER occurrences, so it enriches freshly-imported
+ *      species with taxonomy + it/es/en common names (it used to run first,
+ *      which was a no-op on a fresh DB).
+ *   8. inat-taxon-lookup BEFORE the image backfills (images need inat_taxon_id).
+ *   9. Image backfills in increasing cost / decreasing quality:
  *      wikimedia -> inaturalist -> tavily.
  *
  * Each top-level step is isolated: a failure is logged and the pipeline
@@ -82,8 +88,12 @@ export async function runAllDataEtl(): Promise<void> {
     });
   }
 
-  // 1. Taxonomy first.
-  await step('worms', runWormsEtl);
+  // 1. Iconic species seed. Guarantees whale shark, manta, mola mola, sea
+  //    turtles, clownfish etc. always exist with REAL taxon IDs + it/es names
+  //    + a photo, resolved live from iNaturalist + WoRMS. Runs first so these
+  //    species are present and correctly linked before anything references
+  //    them, and independent of what the occurrence sources return.
+  await step('species-seed', runSpeciesSeedEtl);
 
   // 2. Dive site sources in parallel, each isolated so one source's
   //    failure does not discard the others' ingested sites.
@@ -93,7 +103,12 @@ export async function runAllDataEtl(): Promise<void> {
     { name: 'divenumber', fn: runDiveNumberEtl },
   ]);
 
-  // 3. Apify Google Maps crawl. Last in the site batch because it is the slowest.
+  // 3. LLM-driven discovery (OpenCode Zen enumeration + Nominatim geocoding).
+  //    Runs AFTER the map-based sources so it can dedup against everything they
+  //    ingested. No-ops gracefully if OPENCODE_ZEN_API_KEY is unset.
+  await step('dive-site-discovery', runDiveSiteDiscoveryEtl);
+
+  // 4. Apify Google Maps crawl. Last in the site batch because it is the slowest.
   await step('apify:google-maps', runApifyGoogleMapsEtl);
 
   // 4. GBIF + OBIS + SEAMAP + iNaturalist research-grade observations in
@@ -123,15 +138,22 @@ export async function runAllDataEtl(): Promise<void> {
   }
   await parallelSources(occurrenceSources);
 
-  // 5. Post-import reconciliation: create placeholder sites for any
+  // 6. Post-import reconciliation: create placeholder sites for any
   // sightings that didn't link to a known site within 30 km.
   await step('reconcile-unmatched-occurrences', runOpenWaterReconciliation);
 
-  // 6. Resolve iNaturalist taxon IDs for species missing one. MUST run
+  // 7. WoRMS taxonomy enrichment. Moved AFTER the occurrence imports (it used
+  // to run first, which did nothing on a fresh DB) so it enriches the freshly
+  // imported species with worms_id, canonical taxonomy, and — crucially —
+  // Italian/Spanish/English common names for search. Cursor-paginated and
+  // capped via WORMS_MAX so a single run stays bounded.
+  await step('worms', runWormsEtl);
+
+  // 8. Resolve iNaturalist taxon IDs for species missing one. MUST run
   // before the image backfills, because inaturalist-images uses inat_taxon_id.
   await step('inat:taxon-lookup', runInatTaxonLookupEtl);
 
-  // 7. Image backfills, in increasing cost / decreasing quality.
+  // 9. Image backfills, in increasing cost / decreasing quality.
   await step('wikimedia:images', runWikimediaImagesEtl);
   await step('inaturalist:images', runInaturalistImageEtl);
   await step('tavily:species', runTavilySpeciesEtl);
