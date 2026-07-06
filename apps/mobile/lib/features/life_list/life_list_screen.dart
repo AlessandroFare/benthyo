@@ -168,6 +168,14 @@ class _LifeListScreenState extends ConsumerState<LifeListScreen> {
                                           width: 72,
                                           height: 72,
                                           fit: BoxFit.cover,
+                                          placeholder: (_, __) => Container(
+                                            color: AppColors.surfaceDark,
+                                            child: const Center(child: CircularProgressIndicator()),
+                                          ),
+                                          errorWidget: (_, __, ___) => Container(
+                                            color: AppColors.surfaceDark,
+                                            child: const Icon(Icons.image_not_supported_outlined, color: Colors.white38),
+                                          ),
                                         )
                                       : Container(
                                           width: 72,

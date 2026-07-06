@@ -78,8 +78,7 @@ class BenthyoApp extends ConsumerWidget {
       darkTheme: darkTheme,
       themeMode: themeMode,
       routerConfig: router,
-      themeAnimationCurve: Curves.easeOutCubic,
-      themeAnimationDuration: const Duration(milliseconds: 220),
+      themeAnimationDuration: Duration.zero,
     );
   }
 }

@@ -1,3 +1,14 @@
+/**
+ * OBIS Occurrence ETL — v2 (global scope + marine taxa filtering).
+ *
+ * v2 changes:
+ *  - Replaced Mediterranean-only polygon with global marine regions.
+ *  - Added taxon filtering: only fetches known marine groups instead of
+ *    all organisms in the bounding box (the root cause of terrestrial
+ *    contamination in v1).
+ *  - Controlled by OBIS_REGIONS env var.
+ */
+
 import 'dotenv/config';
 import { logger, logJobSummary } from '../shared/logger';
 import { paginate, RateLimiter } from '../shared/rate-limiter';
@@ -9,6 +20,7 @@ import {
   normalizeDepth,
   normalizeObservedAt,
 } from '../shared/occurrence';
+import { resolveRegions } from '../shared/marine-regions';
 
 const OBIS_API = 'https://api.obis.org/v3';
 
@@ -35,12 +47,39 @@ interface ObisSearchResponse {
   results: ObisOccurrence[];
 }
 
-const MEDITERRANEAN_WKT = 'POLYGON((-6 30, 36 30, 36 46, -6 46, -6 30))';
+/**
+ * Marine higher-taxa to query OBIS with.
+ *
+ * OBIS v3 supports the `scientificname` parameter which filters to occurrences
+ * belonging to that taxon. Using this per-taxon approach instead of a single
+ * unfiltered query prevents terrestrial species from entering the pipeline.
+ *
+ * Elasmobranchii (sharks/rays) included separately because OBIS returns
+ * them under both Chondrichthyes and Elasmobranchii depending on the dataset.
+ */
+const MARINE_TAXA = [
+  'Actinopterygii',    // bony fish
+  'Elasmobranchii',    // sharks, rays
+  'Testudines',        // turtles (marine in coastal regions)
+  'Cetacea',           // whales & dolphins
+  'Cephalopoda',       // octopus, squid, cuttlefish
+  'Bivalvia',          // clams, mussels, scallops
+  'Echinodermata',     // sea stars, urchins, sea cucumbers
+  'Cnidaria',          // jellyfish, corals, anemones
+  'Malacostraca',      // crabs, lobsters, shrimp
+];
+
 const limiter = new RateLimiter({ minIntervalMs: 300 });
 
-async function fetchObisPage(offset: number, limit: number): Promise<ObisOccurrence[]> {
+async function fetchObisPage(
+  regionWkt: string,
+  taxon: string,
+  offset: number,
+  limit: number,
+): Promise<ObisOccurrence[]> {
   const params = new URLSearchParams({
-    geometry: MEDITERRANEAN_WKT,
+    geometry: regionWkt,
+    scientificname: taxon,
     size: String(limit),
     start: String(offset),
   });
@@ -52,30 +91,43 @@ async function fetchObisPage(offset: number, limit: number): Promise<ObisOccurre
 
 export async function runObisEtl(): Promise<void> {
   const startedAt = Date.now();
-  logger.info('Starting OBIS Mediterranean occurrence ETL');
+  logger.info('Starting OBIS global occurrence ETL (v2 — global + marine taxa)');
 
-  const maxRecords = Number(process.env.OBIS_MAX_RECORDS ?? 3000);
+  const regions = resolveRegions('OBIS_REGIONS');
+  logger.info(`OBIS regions: ${regions.map((r) => r.name).join(', ')}`);
+
+  const maxRecords = Number(process.env.OBIS_MAX_RECORDS ?? 8000);
   const pageSize = 200;
+  // Spread budget across regions × taxa
+  const perQuery = Math.max(pageSize, Math.ceil(maxRecords / (regions.length * MARINE_TAXA.length)));
 
-  const occurrences = await paginate(
-    async (offset, limit) => {
-      const page = await fetchObisPage(offset, Math.min(limit, pageSize));
-      if (offset + page.length >= maxRecords) {
-        return page.slice(0, Math.max(0, maxRecords - offset));
+  const byId = new Map<string, ObisOccurrence>();
+
+  for (const region of regions) {
+    for (const taxon of MARINE_TAXA) {
+      const page = await paginate(
+        async (offset, limit) => {
+          const rows = await fetchObisPage(region.wkt, taxon, offset, Math.min(limit, pageSize));
+          if (offset + rows.length >= perQuery) {
+            return rows.slice(0, Math.max(0, perQuery - offset));
+          }
+          return rows;
+        },
+        pageSize,
+        Math.ceil(perQuery / pageSize),
+      );
+      for (const occ of page) {
+        if (occ.id) byId.set(occ.id, occ);
       }
-      return page;
-    },
-    pageSize,
-    Math.ceil(maxRecords / pageSize),
-  );
+    }
+  }
 
-  logger.info(`Fetched ${occurrences.length} OBIS occurrences`);
+  const occurrences = [...byId.values()];
+  logger.info(`OBIS: fetched ${occurrences.length} unique occurrences across ${regions.length} regions`);
 
   const supabase = getSupabase();
   const systemUserId = process.env.ETL_SYSTEM_USER_ID;
-  if (!systemUserId) {
-    throw new Error('ETL_SYSTEM_USER_ID is required for sighting imports');
-  }
+  if (!systemUserId) throw new Error('ETL_SYSTEM_USER_ID is required');
   await assertSystemUserExists(supabase, systemUserId);
 
   const speciesRows: Record<string, unknown>[] = [];
@@ -83,17 +135,9 @@ export async function runObisEtl(): Promise<void> {
   const occById = new Map<string, ObisOccurrence>();
 
   for (const occ of occurrences) {
-    if (!occ.scientificName || occ.decimalLatitude == null || occ.decimalLongitude == null) {
-      continue;
-    }
+    if (!occ.scientificName || occ.decimalLatitude == null || occ.decimalLongitude == null) continue;
     occById.set(occ.id, occ);
 
-    // Parse the WoRMS AphiaID from the URN-style taxonID when present.
-    // OBIS exposes the WoRMS taxon identifier as a URN like
-    //   urn:lsid:marinespecies.org:taxname:123456
-    // The trailing digits are the AphiaID. This lets us write to
-    // species.worms_id at the same time as scientific_name, so a
-    // subsequent WoRMS upsert by scientific_name still works.
     const aphiaMatch = (occ.taxonID ?? '').match(/taxname:(\d+)/);
     const wormsId = aphiaMatch ? Number(aphiaMatch[1]) : undefined;
 
@@ -111,24 +155,21 @@ export async function runObisEtl(): Promise<void> {
     const { data: nearestSite } = await supabase.rpc('nearby_dive_sites', {
       p_lat: occ.decimalLatitude,
       p_lng: occ.decimalLongitude,
-      p_radius_km: 20, // tightened: reduces false site-matches for distant coarse-resolution records
+      p_radius_km: 20,
     });
 
     const siteId = nearestSite?.[0]?.id;
-    if (!siteId) continue;
 
     const observedAt = normalizeObservedAt(occ.date_start);
-    if (!observedAt) continue; // observed_at is NOT NULL; skip undatable rows
+    if (!observedAt) continue;
 
     const depth = normalizeDepth(
-      occ.minimumDepthInMeters != null
-        ? occ.minimumDepthInMeters
-        : occ.maximumDepthInMeters,
+      occ.minimumDepthInMeters != null ? occ.minimumDepthInMeters : occ.maximumDepthInMeters,
     );
 
-    sightingRows.push({
+    const sighting: Record<string, unknown> = {
       user_id: systemUserId,
-      dive_site_id: siteId,
+      dive_site_id: siteId ?? null,
       species_id: null,
       observed_at: observedAt,
       depth_m: depth,
@@ -137,7 +178,11 @@ export async function runObisEtl(): Promise<void> {
       source: 'obis',
       external_id: occ.id,
       notes: `Imported from OBIS ${occ.id}`,
-    });
+    };
+    if (!siteId) {
+      sighting.location = `SRID=4326;POINT(${occ.decimalLongitude} ${occ.decimalLatitude})`;
+    }
+    sightingRows.push(sighting);
   }
 
   const speciesResult = await upsertBatch('species', speciesRows, 'scientific_name');
@@ -152,14 +197,6 @@ export async function runObisEtl(): Promise<void> {
     (speciesLookup ?? []).map((s) => [s.scientific_name as string, s.id as string]),
   );
 
-  // FIX (P-Data-2 from the audit):
-  //   The previous implementation used `speciesRows.find(...)` inside a
-  //   `.map()` over `sightingRows` — an O(N²) scan that always returned
-  //   the FIRST species row in the array, regardless of which sighting
-  //   we were processing. That was a real correctness bug: most OBIS
-  //   sightings were being dropped because their species was not the
-  //   first one in the array. We now resolve via the pre-built
-  //   `occById` map in O(1) per row.
   const resolvedSightings = sightingRows
     .map((row) => {
       const occ = occById.get(row.external_id as string);
@@ -169,11 +206,7 @@ export async function runObisEtl(): Promise<void> {
     })
     .filter(Boolean) as Record<string, unknown>[];
 
-  const sightingResult = await upsertBatch(
-    'sightings',
-    resolvedSightings,
-    'source,external_id',
-  );
+  const sightingResult = await upsertBatch('sightings', resolvedSightings, 'source,external_id');
 
   logJobSummary('obis', {
     processed: occurrences.length,

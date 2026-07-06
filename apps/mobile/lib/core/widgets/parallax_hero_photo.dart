@@ -35,8 +35,14 @@ class ParallaxHeroPhoto extends StatelessWidget {
             CachedNetworkImage(
               imageUrl: imageUrl!,
               fit: BoxFit.cover,
-              placeholder: (_, __) => Container(color: AppColors.surfaceDark),
-              errorWidget: (_, __, ___) => Container(color: AppColors.surfaceDark),
+              placeholder: (_, __) => Container(
+                color: AppColors.surfaceDark,
+                child: const Center(child: CircularProgressIndicator()),
+              ),
+              errorWidget: (_, __, ___) => Container(
+                color: AppColors.surfaceDark,
+                child: const Icon(Icons.image_not_supported_outlined, color: Colors.white38),
+              ),
             )
           else
             Container(

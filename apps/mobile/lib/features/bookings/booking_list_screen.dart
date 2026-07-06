@@ -22,9 +22,9 @@ final myBookingsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) asyn
   if (res.statusCode != 200) {
     throw Exception('Failed to load bookings (${res.statusCode})');
   }
-  final body = jsonDecode(res.body) as Map<String, dynamic>?;
-  final list = body?['data'] as List<dynamic>? ?? [];
-  return list.cast<Map<String, dynamic>>();
+
+  final decoded = jsonDecode(res.body) as List<dynamic>;
+  return decoded.cast<Map<String, dynamic>>();
 });
 
 class BookingListScreen extends ConsumerWidget {

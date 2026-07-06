@@ -148,7 +148,7 @@ export interface CreateDiveLogDto {
 
 /** Create sighting DTO. */
 export interface CreateSightingDto {
-  dive_site_id: Uuid;
+  dive_site_id?: Uuid | null;
   species_id: Uuid;
   dive_log_id?: Uuid;
   observed_at: string;

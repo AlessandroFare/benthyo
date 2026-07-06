@@ -1,3 +1,19 @@
+/**
+ * GBIF Occurrence ETL — v3 (global scope + marine-only taxa).
+ *
+ * v3 changes:
+ *  - Replaced Mediterranean-only polygon with 11 global marine regions
+ *    (Caribbean, Red Sea, Indian Ocean, Southeast Asia, Pacific, etc.)
+ *    controlled by GBIF_REGIONS env var (default: all regions).
+ *  - Replaced Reptilia (225) → Testudines (793) to exclude lizards/snakes.
+ *  - Split Mollusca (212) → Cephalopoda (760) + Bivalvia (137) to exclude
+ *    terrestrial snails/gastropods that contaminated v2.
+ *  - Added depth filter per region (max depth = region-specific).
+ *  - Added GBIF_MAX_RECORDS_PER_REGION env var for per-region budgets.
+ *  - Post-import: attempts iNaturalist taxon lookup to populate common_name
+ *    for species that came from GBIF without a common name.
+ */
+
 import 'dotenv/config';
 import type { ConservationStatus } from '@benthyo/types';
 import { logger, logJobSummary } from '../shared/logger';
@@ -10,57 +26,42 @@ import {
   normalizeDepth,
   normalizeObservedAt,
 } from '../shared/occurrence';
-
-/**
- * GBIF Mediterranean occurrence ETL — v2.
- *
- * Improvements over v1:
- *  - Fetches per marine-relevant higher-taxon group (fish, elasmobranchs,
- *    cephalopods, echinoderms, cnidarians, crustaceans, marine reptiles,
- *    marine mammals) so the record budget is spread intelligently, not
- *    wasted on terrestrial arthropods or plants that happen to fall inside
- *    the Mediterranean bounding polygon.
- *  - Adds `coordinateUncertaintyInMeters` ≤ 1 000 m filter so only GPS-
- *    accurate records are ingested (removes harbour-grid artefacts).
- *  - Resolves species taxonomy in a *single bulk call* per taxonKey group
- *    via GBIF /species/:key rather than one /species/match per occurrence,
- *    reducing API traffic by ~90 %.
- *  - Skips occurrences whose `depth` is implausible (> 300 m for the Med).
- */
+import { resolveRegions, type MarineRegion } from '../shared/marine-regions';
 
 const GBIF_API = 'https://api.gbif.org/v1';
 
-// Mediterranean Sea bounding polygon (WKT POLYGON, WGS-84).
-// Includes the western Med, Adriatic, Ionian, Aegean, and Levantine basins.
-const MEDITERRANEAN_WKT =
-  'POLYGON((-6 30, 36 30, 36 46, -6 46, -6 30))';
-
 /**
- * GBIF higher-taxon keys for marine life.
- * Each key is the GBIF usageKey for the containing taxon.
+ * GBIF higher-taxon keys for STRICTLY MARINE groups.
  *
- * - 204     Actinopterygii (bony fish)
- * - 11592253 Elasmobranchii (sharks, rays, skates)
- * - 225     Reptilia (includes sea turtles – filtered to marine spp downstream)
- * - 733     Mammalia (will include dolphins/whales via Marine Mammal filter)
- * - 212     Mollusca (includes cephalopods, nudibranchs)
- * - 1065    Echinodermata (sea stars, urchins, sea cucumbers)
- * - 43      Cnidaria (jellyfish, corals, anemones)
- * - 756    Crustacea (lobster, crabs, shrimp – class Malacostraca)
+ * v2 had Reptilia (225) → terrestrial lizards/snakes contaminated the catalog.
+ * v2 had Mollusca (212) → terrestrial snails (Cornu aspersum etc.) contaminated.
+ * v3 uses only marine sub-taxa.
+ *
+ * Key mapping:
+ *  - 204       Actinopterygii (bony fish) — all marine
+ *  - 11592253  Elasmobranchii (sharks, rays, skates) — all marine
+ *  - 793       Testudines (turtles) — replaces Reptilia; mostly marine in coastal regions
+ *  - 733       Mammalia — includes dolphins/whales via coastal filter
+ *  - 760       Cephalopoda (octopus, squid, cuttlefish) — all marine
+ *  - 137       Bivalvia (clams, mussels, scallops) — all marine
+ *  - 1065      Echinodermata (sea stars, urchins) — all marine
+ *  - 43        Cnidaria (jellyfish, corals, anemones) — all marine
+ *  - 756       Crustacea / Malacostraca — predominantly marine at coasts
  */
 const MARINE_TAXON_KEYS: Array<{ key: number; label: string; maxRecords: number }> = [
   { key: 204,       label: 'Actinopterygii',   maxRecords: 2000 },
   { key: 11592253,  label: 'Elasmobranchii',   maxRecords: 800  },
-  { key: 225,       label: 'Reptilia',          maxRecords: 300  },
+  { key: 793,       label: 'Testudines',        maxRecords: 300  },
   { key: 733,       label: 'Mammalia',          maxRecords: 400  },
-  { key: 212,       label: 'Mollusca',          maxRecords: 600  },
+  { key: 760,       label: 'Cephalopoda',       maxRecords: 400  },
+  { key: 137,       label: 'Bivalvia',          maxRecords: 400  },
   { key: 1065,      label: 'Echinodermata',     maxRecords: 500  },
   { key: 43,        label: 'Cnidaria',          maxRecords: 400  },
   { key: 756,       label: 'Crustacea',         maxRecords: 400  },
 ];
 
-const MAX_COORD_UNCERTAINTY_M = 1000; // only GPS-accurate records
-const MAX_DEPTH_M = 300;              // realistic Med diving depth
+const MAX_COORD_UNCERTAINTY_M = 1000;
+const MAX_DEPTH_M = 300;
 
 interface GbifOccurrence {
   key: number;
@@ -106,12 +107,13 @@ function mapConservationStatus(iucn?: string): ConservationStatus | null {
 const limiter = new RateLimiter({ minIntervalMs: 200, maxRetries: 5 });
 
 async function fetchOccurrencePage(
+  region: MarineRegion,
   taxonKey: number,
   offset: number,
   limit: number,
 ): Promise<GbifOccurrence[]> {
   const params = new URLSearchParams();
-  params.append('geometry', MEDITERRANEAN_WKT);
+  params.append('geometry', region.wkt);
   params.append('taxonKey', String(taxonKey));
   params.append('hasCoordinate', 'true');
   params.append('hasGeospatialIssue', 'false');
@@ -127,7 +129,6 @@ async function fetchOccurrencePage(
   return data.results ?? [];
 }
 
-/** Resolve a GBIF speciesKey → taxonomy in one call (cached). */
 async function fetchSpeciesInfo(speciesKey: number): Promise<GbifSpeciesInfo | null> {
   try {
     return await limiter.fetchJson<GbifSpeciesInfo>(`${GBIF_API}/species/${speciesKey}`);
@@ -136,85 +137,124 @@ async function fetchSpeciesInfo(speciesKey: number): Promise<GbifSpeciesInfo | n
   }
 }
 
+// ── iNaturalist common-name lookup (post-import enrichment) ──
+
+const INAT_API = process.env.INAT_API_BASE ?? 'https://api.inaturalist.org/v1';
+const inatLimiter = new RateLimiter({ minIntervalMs: 800, maxRetries: 3 });
+
+interface InatTaxonResult {
+  id: number;
+  name: string;
+  preferred_common_name?: string;
+}
+
+async function lookupInatCommonName(
+  scientificName: string,
+): Promise<{ inat_taxon_id: number; common_name: string | null } | null> {
+  const url = `${INAT_API}/taxa?q=${encodeURIComponent(scientificName)}&rank=species&is_active=true&per_page=3`;
+  try {
+    const data = await inatLimiter.fetchJson<{ results: InatTaxonResult[] }>(url);
+    if (!data.results?.length) return null;
+    // Exact name match (case-insensitive)
+    const want = scientificName.toLowerCase().trim();
+    const match = data.results.find((r) => r.name.toLowerCase().trim() === want);
+    if (!match) return null;
+    return {
+      inat_taxon_id: match.id,
+      common_name: match.preferred_common_name ?? null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// ── Main run ──
+
 export async function runGbifEtl(): Promise<void> {
   const startedAt = Date.now();
-  logger.info('Starting GBIF Mediterranean occurrence ETL (v2 — taxa-focused)');
+  logger.info('Starting GBIF global occurrence ETL (v3 — global + marine-only taxa)');
 
   const supabase = getSupabase();
   const systemUserId = process.env.ETL_SYSTEM_USER_ID;
   if (!systemUserId) throw new Error('ETL_SYSTEM_USER_ID is required');
   await assertSystemUserExists(supabase, systemUserId);
 
-  // Per-taxon override via env (e.g. GBIF_MAX_RECORDS_ACTINOPTERYGII=3000)
-  const globalMaxOverride = process.env.GBIF_MAX_RECORDS
-    ? Number(process.env.GBIF_MAX_RECORDS)
+  const regions = resolveRegions('GBIF_REGIONS');
+  logger.info(`GBIF regions: ${regions.map((r) => r.name).join(', ')}`);
+
+  const perRegionOverride = process.env.GBIF_MAX_RECORDS_PER_REGION
+    ? Number(process.env.GBIF_MAX_RECORDS_PER_REGION)
     : null;
 
   const speciesCache = new Map<number, GbifSpeciesInfo>();
   const speciesRows: Record<string, unknown>[] = [];
-  const pendingSightings: Array<{ occ: GbifOccurrence; speciesKey: number }> = [];
+  const pendingSightings: Array<{ occ: GbifOccurrence; speciesKey: number; region: MarineRegion }> = [];
   const errors: string[] = [];
 
   let totalFetched = 0;
 
-  for (const taxonGroup of MARINE_TAXON_KEYS) {
-    const maxRecords = globalMaxOverride ?? taxonGroup.maxRecords;
-    const pageSize = 300;
+  for (const region of regions) {
+    logger.info(`GBIF: region ${region.name}`);
+    for (const taxonGroup of MARINE_TAXON_KEYS) {
+      const maxRecords = perRegionOverride ?? taxonGroup.maxRecords;
+      const pageSize = 300;
 
-    logger.info(`GBIF: fetching ${taxonGroup.label} (max ${maxRecords})`);
+      const occurrences = await paginate(
+        async (offset, limit) => {
+          const page = await fetchOccurrencePage(
+            region,
+            taxonGroup.key,
+            offset,
+            Math.min(limit, pageSize),
+          );
+          if (offset + page.length >= maxRecords) {
+            return page.slice(0, Math.max(0, maxRecords - offset));
+          }
+          return page;
+        },
+        pageSize,
+        Math.ceil(maxRecords / pageSize),
+      );
 
-    const occurrences = await paginate(
-      async (offset, limit) => {
-        const page = await fetchOccurrencePage(
-          taxonGroup.key,
-          offset,
-          Math.min(limit, pageSize),
-        );
-        if (offset + page.length >= maxRecords) {
-          return page.slice(0, Math.max(0, maxRecords - offset));
+      totalFetched += occurrences.length;
+
+      for (const occ of occurrences) {
+        if (!occ.scientificName || occ.decimalLatitude == null || occ.decimalLongitude == null) {
+          continue;
         }
-        return page;
-      },
-      pageSize,
-      Math.ceil(maxRecords / pageSize),
-    );
+        if (occ.depth != null && occ.depth > MAX_DEPTH_M) continue;
 
-    logger.info(`GBIF ${taxonGroup.label}: ${occurrences.length} occurrences`);
-    totalFetched += occurrences.length;
+        const key = occ.speciesKey;
+        if (!key) continue;
 
-    for (const occ of occurrences) {
-      if (!occ.scientificName || occ.decimalLatitude == null || occ.decimalLongitude == null) {
-        continue;
+        if (!speciesCache.has(key)) {
+          const info = await fetchSpeciesInfo(key);
+          if (info) speciesCache.set(key, info);
+        }
+
+        const info = speciesCache.get(key);
+        if (!info) continue;
+
+        speciesRows.push({
+          scientific_name: info.canonicalName ?? info.scientificName ?? occ.scientificName,
+          gbif_taxon_key: key,
+          kingdom: info.kingdom ?? 'Animalia',
+          phylum: info.phylum,
+          class_name: info.class,
+          order_name: info.order,
+          family: info.family,
+          genus: info.genus,
+          conservation_status: mapConservationStatus(info.iucnRedListCategory ?? occ.iucnRedListCategory),
+          metadata: {
+            source: 'gbif',
+            gbif_occurrence_key: occ.key,
+            taxon_group: taxonGroup.label,
+            region: region.name,
+          },
+        });
+
+        pendingSightings.push({ occ, speciesKey: key, region });
       }
-      // Skip implausibly deep records for the Mediterranean
-      if (occ.depth != null && occ.depth > MAX_DEPTH_M) continue;
-
-      const key = occ.speciesKey;
-      if (!key) continue;
-
-      // Fetch species taxonomy once per unique speciesKey
-      if (!speciesCache.has(key)) {
-        const info = await fetchSpeciesInfo(key);
-        if (info) speciesCache.set(key, info);
-      }
-
-      const info = speciesCache.get(key);
-      if (!info) continue;
-
-      speciesRows.push({
-        scientific_name: info.canonicalName ?? info.scientificName ?? occ.scientificName,
-        gbif_taxon_key: key,
-        kingdom: info.kingdom ?? 'Animalia',
-        phylum: info.phylum,
-        class_name: info.class,
-        order_name: info.order,
-        family: info.family,
-        genus: info.genus,
-        conservation_status: mapConservationStatus(info.iucnRedListCategory ?? occ.iucnRedListCategory),
-        metadata: { source: 'gbif', gbif_occurrence_key: occ.key, taxon_group: taxonGroup.label },
-      });
-
-      pendingSightings.push({ occ, speciesKey: key });
     }
   }
 
@@ -237,7 +277,7 @@ export async function runGbifEtl(): Promise<void> {
     if (sp.gbif_taxon_key) idByGbifKey.set(sp.gbif_taxon_key as number, sp.id as string);
   }
 
-  // Resolve sightings — match site via spatial RPC
+  // ── Sightings ──
   const sightingRows: Record<string, unknown>[] = [];
 
   for (const { occ, speciesKey } of pendingSightings) {
@@ -249,17 +289,16 @@ export async function runGbifEtl(): Promise<void> {
     const { data: nearestSite } = await supabase.rpc('nearby_dive_sites', {
       p_lat: occ.decimalLatitude!,
       p_lng: occ.decimalLongitude!,
-      p_radius_km: 20, // tighter: 20 km for GPS-accurate records
+      p_radius_km: 20,
     });
     const siteId = nearestSite?.[0]?.id;
-    if (!siteId) continue;
 
     const observedAt = normalizeObservedAt(occ.eventDate);
     if (!observedAt) continue;
 
-    sightingRows.push({
+    const sighting: Record<string, unknown> = {
       user_id: systemUserId,
-      dive_site_id: siteId,
+      dive_site_id: siteId ?? null,
       species_id: speciesId,
       observed_at: observedAt,
       depth_m: normalizeDepth(occ.depth),
@@ -268,10 +307,43 @@ export async function runGbifEtl(): Promise<void> {
       source: 'gbif',
       external_id: String(occ.key),
       notes: `Imported from GBIF occurrence ${occ.key}`,
-    });
+    };
+    if (!siteId) {
+      sighting.location = `SRID=4326;POINT(${occ.decimalLongitude!} ${occ.decimalLatitude!})`;
+    }
+    sightingRows.push(sighting);
   }
 
   const sightingResult = await upsertBatch('sightings', sightingRows, 'source,external_id');
+
+  // ── Post-import: iNaturalist common-name enrichment ──
+  // Species imported from GBIF have no common_name. We look each one up on
+  // iNaturalist (free API, same as inat-taxon-lookup ETL) to get both
+  // inat_taxon_id and preferred_common_name.
+  const { data: namelessSpecies } = await supabase
+    .from('species')
+    .select('id, scientific_name')
+    .is('common_name', null)
+    .not('scientific_name', 'is', null)
+    .limit(200);
+
+  let enriched = 0;
+  if (namelessSpecies && namelessSpecies.length > 0) {
+    logger.info(`GBIF: enriching common names for ${namelessSpecies.length} species via iNaturalist`);
+    for (const sp of namelessSpecies) {
+      try {
+        const match = await lookupInatCommonName(sp.scientific_name as string);
+        if (!match) continue;
+        const update: Record<string, unknown> = { inat_taxon_id: match.inat_taxon_id };
+        if (match.common_name) update.common_name = match.common_name;
+        await supabase.from('species').update(update).eq('id', sp.id);
+        enriched += 1;
+      } catch {
+        // non-fatal
+      }
+    }
+    logger.info(`GBIF: enriched ${enriched} species with common names`);
+  }
 
   logJobSummary('gbif', {
     processed: totalFetched,

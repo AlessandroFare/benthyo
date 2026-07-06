@@ -361,14 +361,25 @@ class _DiveLogCreateScreenState extends ConsumerState<DiveLogCreateScreen> {
                           if (picked != null) setState(() => _current = picked);
                         },
                       ),
+                      // Buddy
                       Padding(
                         padding: const EdgeInsets.all(AppSpacing.md),
                         child: TextField(
                           controller: _buddyController,
                           style: const TextStyle(color: Colors.white),
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             labelText: 'Buddy (optional)',
-                            labelStyle: TextStyle(color: Colors.white54),
+                            labelStyle: const TextStyle(color: Colors.white54),
+                            floatingLabelStyle: const TextStyle(color: AppColors.accent),
+                            filled: false,
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Colors.white24),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
+                            ),
                           ),
                         ),
                       ),
@@ -395,13 +406,24 @@ class _DiveLogCreateScreenState extends ConsumerState<DiveLogCreateScreen> {
                       );
                     }),
                   ),
+                  // Notes
                   TextField(
                     controller: _notesController,
                     maxLines: 4,
                     style: const TextStyle(color: Colors.white),
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Notes (optional)',
-                      labelStyle: TextStyle(color: Colors.white54),
+                      labelStyle: const TextStyle(color: Colors.white54),
+                      floatingLabelStyle: const TextStyle(color: AppColors.accent),
+                      filled: false,
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Colors.white24),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
+                      ),
                     ),
                   ),
                   if (_errors['general'] != null || _errors['dive_date'] != null) ...[

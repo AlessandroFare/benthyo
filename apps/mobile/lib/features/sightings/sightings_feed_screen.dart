@@ -78,6 +78,7 @@ class SightingsFeedScreen extends ConsumerWidget {
                       child: s.isRemoved
                           ? const _RemovedSightingCard()
                           : _SightingCardContent(
+                              id: s.id,
                               imageUrl: s.speciesImageUrl,
                               title: s.speciesName ?? s.speciesScientificName ?? 'Unknown',
                               subtitle:
@@ -252,12 +253,14 @@ class _HoverCardState extends State<_HoverCard> {
 
 class _SightingCardContent extends StatelessWidget {
   const _SightingCardContent({
+    required this.id,
     required this.imageUrl,
     required this.title,
     required this.subtitle,
     required this.confidence,
   });
 
+  final String id;
   final String? imageUrl;
   final String title;
   final String subtitle;
@@ -285,7 +288,7 @@ class _SightingCardContent extends StatelessWidget {
         child: Row(
           children: [
             Hero(
-              tag: 'sighting-photo-$title',
+              tag: 'sighting-photo-$id',
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: SizedBox(
@@ -296,11 +299,12 @@ class _SightingCardContent extends StatelessWidget {
                           imageUrl: imageUrl!,
                           fit: BoxFit.cover,
                           placeholder: (_, __) => Container(
-                            color: Colors.white.withValues(alpha: 0.06),
+                            color: AppColors.surfaceDark,
+                            child: const Center(child: CircularProgressIndicator()),
                           ),
                           errorWidget: (_, __, ___) => Container(
-                            color: Colors.white.withValues(alpha: 0.06),
-                            child: const Icon(Icons.pets, color: Colors.white54),
+                            color: AppColors.surfaceDark,
+                            child: const Icon(Icons.image_not_supported_outlined, color: Colors.white38),
                           ),
                         )
                       : Container(

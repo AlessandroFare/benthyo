@@ -65,7 +65,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         return location == '/' ? null : '/';
       }
 
-      final authenticated = ref.read(isAuthenticatedProvider);
+      final authenticated = authState.valueOrNull?.session != null;
       final isAuthRoute =
           location == '/login' ||
           location == '/register' ||

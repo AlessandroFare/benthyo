@@ -147,16 +147,15 @@ export async function runSeamapEtl(): Promise<void> {
     });
 
     const siteId = nearestSite?.[0]?.id;
-    if (!siteId) continue;
 
     const observedAt = normalizeObservedAt(occ.date_start);
     if (!observedAt) continue;
 
     const depth = normalizeDepth(occ.minimumDepthInMeters ?? occ.maximumDepthInMeters);
 
-    sightingRows.push({
+    const sighting: Record<string, unknown> = {
       user_id: systemUserId,
-      dive_site_id: siteId,
+      dive_site_id: siteId ?? null,
       species_id: null,
       observed_at: observedAt,
       depth_m: depth,
@@ -165,7 +164,11 @@ export async function runSeamapEtl(): Promise<void> {
       source: 'seamap',
       external_id: occ.id,
       notes: `Imported from SEAMAP ${occ.id}`,
-    });
+    };
+    if (!siteId) {
+      sighting.location = `SRID=4326;POINT(${occ.decimalLongitude} ${occ.decimalLatitude})`;
+    }
+    sightingRows.push(sighting);
   }
 
   const speciesResult = await upsertBatch('species', speciesRows, 'scientific_name');

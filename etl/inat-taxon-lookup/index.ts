@@ -17,6 +17,7 @@ interface InatTaxon {
   rank: string;
   is_active: boolean;
   matched_term: string;
+  preferred_common_name?: string;
 }
 
 interface InatTaxaResponse {
@@ -27,6 +28,7 @@ interface InatTaxaResponse {
 interface Match {
   inat_taxon_id: number;
   scientific_name: string;
+  common_name: string | null;
   score: number;
 }
 
@@ -54,6 +56,7 @@ async function lookupTaxa(scientificName: string): Promise<Match | null> {
     return {
       inat_taxon_id: bestExact.id,
       scientific_name: bestExact.name,
+      common_name: bestExact.preferred_common_name ?? null,
       score: bestScore,
     };
   } catch {
@@ -87,9 +90,11 @@ export async function runInatTaxonLookupEtl(): Promise<void> {
         skipped += 1;
         continue;
       }
+      const update: Record<string, unknown> = { inat_taxon_id: match.inat_taxon_id };
+      if (match.common_name) update.common_name = match.common_name;
       const { error: updateError } = await supabase
         .from('species')
-        .update({ inat_taxon_id: match.inat_taxon_id })
+        .update(update)
         .eq('id', row.id);
       if (updateError) {
         errors.push(`${scientificName}: ${updateError.message}`);

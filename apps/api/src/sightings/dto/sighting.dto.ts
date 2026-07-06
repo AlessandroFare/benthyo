@@ -29,9 +29,10 @@ export class ListSightingsDto extends PaginationDto {
 }
 
 export class CreateSightingDto {
-  @ApiProperty()
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsUUID()
-  dive_site_id!: string;
+  dive_site_id?: string;
 
   @ApiProperty()
   @IsUUID()

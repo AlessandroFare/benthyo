@@ -19,6 +19,12 @@
 -- we guard for its presence and fall back to a salted SHA-256 digest if a
 -- target lacks it.
 --
+-- NOTE: pgcrypto is installed in the "extensions" schema on Supabase, not
+-- "public". Every function below that calls pgp_sym_*/hmac/digest sets
+-- search_path explicitly to public, extensions -- otherwise Postgres
+-- raises "function ... does not exist" even though the function is
+-- present (see 030 postmortem).
+--
 -- Backfill: existing ciphertext was produced with the legacy md5 key. We
 -- re-encrypt it under the new key in an idempotent block:
 --   * no-op on empty tables (fresh db reset),
@@ -66,6 +72,7 @@ CREATE OR REPLACE FUNCTION medical_derive_key_v2(p_scope TEXT, p_id UUID)
 RETURNS TEXT
 LANGUAGE plpgsql
 IMMUTABLE
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_msg   TEXT := p_scope || ':' || p_id::text || ':' || medical_key_salt();
@@ -103,22 +110,30 @@ $$;
 -- working; only the passphrase derivation changes.
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION encrypt_medical_answers(p_operator_id UUID, p_answers JSONB)
-RETURNS BYTEA LANGUAGE sql IMMUTABLE AS $$
+RETURNS BYTEA LANGUAGE sql IMMUTABLE
+SET search_path = public, extensions
+AS $$
   SELECT pgp_sym_encrypt(p_answers::text, medical_operator_key_v2(p_operator_id), 'cipher-algo=aes256')
 $$;
 
 CREATE OR REPLACE FUNCTION decrypt_medical_answers(p_operator_id UUID, p_ciphertext BYTEA)
-RETURNS JSONB LANGUAGE sql IMMUTABLE AS $$
+RETURNS JSONB LANGUAGE sql IMMUTABLE
+SET search_path = public, extensions
+AS $$
   SELECT pgp_sym_decrypt(p_ciphertext, medical_operator_key_v2(p_operator_id))::jsonb
 $$;
 
 CREATE OR REPLACE FUNCTION encrypt_medical_answers_user(p_user_id UUID, p_answers JSONB)
-RETURNS BYTEA LANGUAGE sql IMMUTABLE AS $$
+RETURNS BYTEA LANGUAGE sql IMMUTABLE
+SET search_path = public, extensions
+AS $$
   SELECT pgp_sym_encrypt(p_answers::text, medical_user_key_v2(p_user_id), 'cipher-algo=aes256')
 $$;
 
 CREATE OR REPLACE FUNCTION decrypt_medical_answers_user(p_user_id UUID, p_ciphertext BYTEA)
-RETURNS JSONB LANGUAGE sql IMMUTABLE AS $$
+RETURNS JSONB LANGUAGE sql IMMUTABLE
+SET search_path = public, extensions
+AS $$
   SELECT pgp_sym_decrypt(p_ciphertext, medical_user_key_v2(p_user_id))::jsonb
 $$;
 
@@ -142,6 +157,10 @@ $$;
 --     (so we never silently corrupt data with the dev placeholder in prod).
 --   * Processes only rows whose answers_key_version is NULL or 1.
 --   * Marks each row answers_key_version = 2, so a second run is a no-op.
+--
+-- A DO block can't take a function-level SET clause, so we SET LOCAL as
+-- the first statement inside BEGIN -- this scopes pgp_sym_*/hmac/digest
+-- resolution to the extensions schema for the duration of this block only.
 -- ---------------------------------------------------------------------------
 DO $$
 DECLARE
@@ -150,6 +169,8 @@ DECLARE
   v_plain   JSONB;
   v_count   INTEGER := 0;
 BEGIN
+  SET LOCAL search_path = public, extensions;
+
   IF NOT v_key_set THEN
     RAISE NOTICE 'app.medical_master_key not set; skipping v2 backfill. Run the rotation recipe in docs/runbook.md with the key available. New writes already use v2.';
     RETURN;

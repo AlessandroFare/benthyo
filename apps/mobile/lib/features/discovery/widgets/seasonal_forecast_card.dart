@@ -20,6 +20,7 @@ class SeasonalForecastCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final forecastAsync = ref.watch(
       speciesSeasonalForecastProvider((speciesId: speciesId, siteId: siteId)),
     );
@@ -42,7 +43,7 @@ class SeasonalForecastCard extends ConsumerWidget {
               Text(
                 forecast.bestSeasonLabel(),
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      color: AppColors.primary,
+                      color: isDark ? AppColors.accent : AppColors.primary,
                     ),
               ),
               const SizedBox(height: AppSpacing.xs),

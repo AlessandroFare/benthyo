@@ -65,7 +65,7 @@ export interface Species {
 export interface Sighting {
   id: Uuid;
   user_id: Uuid;
-  dive_site_id: Uuid;
+  dive_site_id: Uuid | null;
   species_id: Uuid;
   observed_at: string;
   depth_m: number | null;

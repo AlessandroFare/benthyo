@@ -120,7 +120,7 @@ export function KpiCard({
             </div>
             <div
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1"
-              style={{ backgroundColor: `${color}18`, ringColor: `${color}30` }}
+              style={{ backgroundColor: `${color}18`, boxShadow: `0 0 0 1px ${color}30` }}
             >
               <Icon className="h-5 w-5" style={{ color }} />
             </div>

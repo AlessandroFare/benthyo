@@ -4,7 +4,7 @@ import '../../../core/config/map_config.dart';
 import '../../../core/models/species.dart';
 import '../../../core/theme/app_theme.dart';
 
-class MapLayerSheet extends StatelessWidget {
+class MapLayerSheet extends StatefulWidget {
   const MapLayerSheet({
     super.key,
     required this.basemap,
@@ -38,7 +38,12 @@ class MapLayerSheet extends StatelessWidget {
   final ValueChanged<bool> onLiveCurrentsChanged;
   final ValueChanged<bool> onSpeciesHeatmapChanged;
   final ValueChanged<bool> onOfflineCacheChanged;
-  final VoidCallback onPickSpecies;
+
+  /// Opens the species picker and returns the chosen species (or null if
+  /// cancelled). The sheet uses the return value to update its own local
+  /// state immediately; the caller may also persist/update its own state
+  /// as a side effect.
+  final Future<Species?> Function() onPickSpecies;
 
   static Future<void> show(
     BuildContext context, {
@@ -56,7 +61,7 @@ class MapLayerSheet extends StatelessWidget {
     required ValueChanged<bool> onLiveCurrentsChanged,
     required ValueChanged<bool> onSpeciesHeatmapChanged,
     required ValueChanged<bool> onOfflineCacheChanged,
-    required VoidCallback onPickSpecies,
+    required Future<Species?> Function() onPickSpecies,
   }) {
     return showModalBottomSheet<void>(
       context: context,
@@ -80,6 +85,61 @@ class MapLayerSheet extends StatelessWidget {
         onPickSpecies: onPickSpecies,
       ),
     );
+  }
+
+  @override
+  State<MapLayerSheet> createState() => _MapLayerSheetState();
+}
+
+class _MapLayerSheetState extends State<MapLayerSheet> {
+  // Local mirror of the layer state so the sheet's own UI (switches,
+  // selected basemap chip) reflects taps immediately. The bottom sheet is
+  // a separate route from MapScreen, so a setState() on the parent does
+  // NOT rebuild this widget — without local state the switches/chips
+  // would look "stuck" even though the filtering itself works fine.
+  late DiveMapBasemap _basemap;
+  late bool _showContours;
+  late bool _showSeamarks;
+  late bool _showLiveCurrents;
+  late bool _showSpeciesHeatmap;
+  late bool _offlineCache;
+  Species? _heatmapSpecies;
+
+  @override
+  void initState() {
+    super.initState();
+    _basemap = widget.basemap;
+    _showContours = widget.showContours;
+    _showSeamarks = widget.showSeamarks;
+    _showLiveCurrents = widget.showLiveCurrents;
+    _showSpeciesHeatmap = widget.showSpeciesHeatmap;
+    _offlineCache = widget.offlineCache;
+    _heatmapSpecies = widget.heatmapSpecies;
+  }
+
+  Future<void> _handleSpeciesHeatmapToggle(bool value) async {
+    if (value && _heatmapSpecies == null) {
+      final picked = await widget.onPickSpecies();
+      if (picked == null) return;
+      setState(() {
+        _showSpeciesHeatmap = true;
+        _heatmapSpecies = picked;
+      });
+      widget.onSpeciesHeatmapChanged(true);
+      return;
+    }
+    setState(() => _showSpeciesHeatmap = value);
+    widget.onSpeciesHeatmapChanged(value);
+  }
+
+  Future<void> _handlePickSpecies() async {
+    final picked = await widget.onPickSpecies();
+    if (picked == null) return;
+    setState(() {
+      _heatmapSpecies = picked;
+      _showSpeciesHeatmap = true;
+    });
+    widget.onSpeciesHeatmapChanged(true);
   }
 
   @override
@@ -165,9 +225,12 @@ class MapLayerSheet extends StatelessWidget {
                 runSpacing: AppSpacing.sm,
                 children: DiveMapBasemap.values.map((mode) {
                   final preset = MapConfig.basemap(mode);
-                  final selected = basemap == mode;
+                  final selected = _basemap == mode;
                   return GestureDetector(
-                    onTap: () => onBasemapChanged(mode),
+                    onTap: () {
+                      setState(() => _basemap = mode);
+                      widget.onBasemapChanged(mode);
+                    },
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 180),
                       padding: const EdgeInsets.symmetric(
@@ -216,40 +279,49 @@ class MapLayerSheet extends StatelessWidget {
                 icon: Icons.waves_outlined,
                 title: 'Depth isolines',
                 subtitle: 'EMODnet — slope & wall planning',
-                value: showContours,
-                onChanged: onContoursChanged,
+                value: _showContours,
+                onChanged: (v) {
+                  setState(() => _showContours = v);
+                  widget.onContoursChanged(v);
+                },
               ),
               _OverlayTile(
                 icon: Icons.anchor,
                 title: 'Nautical marks',
                 subtitle: 'OpenSeaMap moorings & hazards',
-                value: showSeamarks,
-                onChanged: onSeamarksChanged,
+                value: _showSeamarks,
+                onChanged: (v) {
+                  setState(() => _showSeamarks = v);
+                  widget.onSeamarksChanged(v);
+                },
               ),
               _OverlayTile(
                 icon: Icons.air,
                 title: 'Live ocean currents',
                 subtitle: 'NOAA/GFS via Open-Meteo — cyan arrows',
-                value: showLiveCurrents,
-                onChanged: onLiveCurrentsChanged,
+                value: _showLiveCurrents,
+                onChanged: (v) {
+                  setState(() => _showLiveCurrents = v);
+                  widget.onLiveCurrentsChanged(v);
+                },
               ),
               _OverlayTile(
                 icon: Icons.thermostat_outlined,
                 title: 'Species heatmap',
                 subtitle:
-                    heatmapSpecies?.displayName() ?? 'Pick a species to overlay',
-                value: showSpeciesHeatmap,
-                onChanged: onSpeciesHeatmapChanged,
+                    _heatmapSpecies?.displayName() ?? 'Pick a species to overlay',
+                value: _showSpeciesHeatmap,
+                onChanged: _handleSpeciesHeatmapToggle,
               ),
 
-              if (showSpeciesHeatmap)
+              if (_showSpeciesHeatmap)
                 Padding(
                   padding: const EdgeInsets.only(
                     left: AppSpacing.lg,
                     bottom: AppSpacing.sm,
                   ),
                   child: GestureDetector(
-                    onTap: onPickSpecies,
+                    onTap: _handlePickSpecies,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: AppSpacing.md,
@@ -270,7 +342,7 @@ class MapLayerSheet extends StatelessWidget {
                               size: 14, color: AppColors.accent),
                           const SizedBox(width: 6),
                           Text(
-                            heatmapSpecies == null
+                            _heatmapSpecies == null
                                 ? 'Choose species'
                                 : 'Change species',
                             style: TextStyle(
@@ -299,9 +371,12 @@ class MapLayerSheet extends StatelessWidget {
                 icon: Icons.save_outlined,
                 title: 'Offline tile cache',
                 subtitle:
-                    '$cacheStats · pan/zoom to cache ${MapConfig.tileCacheMaxTiles} tiles max',
-                value: offlineCache,
-                onChanged: onOfflineCacheChanged,
+                    '${widget.cacheStats} · pan/zoom to cache ${MapConfig.tileCacheMaxTiles} tiles max',
+                value: _offlineCache,
+                onChanged: (v) {
+                  setState(() => _offlineCache = v);
+                  widget.onOfflineCacheChanged(v);
+                },
               ),
 
               const SizedBox(height: AppSpacing.sm),

@@ -72,8 +72,8 @@ class DiveLogListScreen extends ConsumerWidget {
                 title: 'No dives logged yet',
                 subtitle:
                     'Start tracking your underwater adventures.\nEvery dive tells a story.',
-                cta: 'Log your first dive',
-                onCta: () => context.push('/dive-logs/create'),
+                actionLabel: 'Log your first dive',
+                onAction: () => context.push('/dive-logs/create'),
               ),
               data: (logs) => RefreshIndicator(
                 onRefresh: () async => ref.invalidate(diveLogsProvider),

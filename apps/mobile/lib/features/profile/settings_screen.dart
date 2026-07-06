@@ -88,6 +88,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               children: AppThemeMode.values
                   .map(
                     (mode) => RadioListTile<AppThemeMode>(
+                      key: ValueKey('theme_${mode.name}'),
                       title: Text(
                         mode.name[0].toUpperCase() + mode.name.substring(1),
                       ),
@@ -105,21 +106,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               leading: const Icon(Icons.sync),
               title: const Text('Pending changes'),
               subtitle: Text('$count items in queue'),
-              trailing: FilledButton(
-                onPressed: count == 0
-                    ? null
-                    : () async {
-                        final synced =
-                            await ref.read(syncManagerProvider).syncPending();
-                        ref.invalidate(pendingSyncCountProvider);
-                        ref.invalidate(pendingSyncItemsProvider);
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Synced $synced items')),
-                          );
-                        }
-                      },
-                child: const Text('Sync now'),
+              trailing: SizedBox(
+                width: 96,
+                child: ElevatedButton(
+                  onPressed: count == 0
+                      ? null
+                      : () async {
+                          final synced =
+                              await ref.read(syncManagerProvider).syncPending();
+                          ref.invalidate(pendingSyncCountProvider);
+                          ref.invalidate(pendingSyncItemsProvider);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Synced $synced items')),
+                            );
+                          }
+                        },
+                  child: const Text('Sync now'),
+                ),
               ),
             ),
           ),

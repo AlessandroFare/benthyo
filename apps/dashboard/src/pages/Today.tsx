@@ -122,7 +122,7 @@ export default function Today() {
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          className="rounded-xl border border-border bg-card px-3 py-2 text-sm text-foreground"
+          className="rounded-xl border border-border bg-card px-3 py-2 text-sm text-foreground [color-scheme:light] dark:[color-scheme:dark]"
           aria-label="Roster date"
         />
       </header>

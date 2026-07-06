@@ -168,19 +168,12 @@ class _PhotoThumbnail extends StatelessWidget {
                 height: 110,
                 fit: BoxFit.cover,
                 placeholder: (_, __) => Container(
-                  width: 110,
-                  height: 110,
                   color: AppColors.surfaceDark,
-                  child: const Center(
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
+                  child: const Center(child: CircularProgressIndicator()),
                 ),
                 errorWidget: (_, __, ___) => Container(
-                  width: 110,
-                  height: 110,
                   color: AppColors.surfaceDark,
-                  child: const Icon(Icons.broken_image_outlined,
-                      color: Colors.white30),
+                  child: const Icon(Icons.image_not_supported_outlined, color: Colors.white38),
                 ),
               ),
             ),
@@ -245,6 +238,14 @@ class _Lightbox extends StatelessWidget {
                     child: CachedNetworkImage(
                       imageUrl: url,
                       fit: BoxFit.contain,
+                      placeholder: (_, __) => Container(
+                        color: AppColors.surfaceDark,
+                        child: const Center(child: CircularProgressIndicator()),
+                      ),
+                      errorWidget: (_, __, ___) => Container(
+                        color: AppColors.surfaceDark,
+                        child: const Icon(Icons.image_not_supported_outlined, color: Colors.white38),
+                      ),
                     ),
                   ),
                 ),

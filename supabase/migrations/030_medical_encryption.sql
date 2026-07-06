@@ -15,20 +15,11 @@
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
--- ---------------------------------------------------------------------------
--- Per-operator derived key.
--- ---------------------------------------------------------------------------
--- The master key is stored in the MEDICAL_ENCRYPTION_MASTER_KEY env
--- var; we accept it as a session GUC so the migration is reproducible
--- and we never log the master key. In production, the value is set by
--- the API process on boot.
---
--- NOTE: we use md5() (core PostgreSQL) instead of pgcrypto's hmac/digest
--- because Supabase's pgcrypto only ships the PGP submodule.
 CREATE OR REPLACE FUNCTION medical_operator_key(p_operator_id UUID)
 RETURNS TEXT
 LANGUAGE sql
 IMMUTABLE
+SET search_path = public, extensions
 AS $$
   SELECT md5(
     p_operator_id::text ||
@@ -39,9 +30,6 @@ AS $$
   )
 $$;
 
--- ---------------------------------------------------------------------------
--- Encrypt / decrypt helpers.
--- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION encrypt_medical_answers(
   p_operator_id UUID,
   p_answers     JSONB
@@ -49,6 +37,7 @@ CREATE OR REPLACE FUNCTION encrypt_medical_answers(
 RETURNS BYTEA
 LANGUAGE sql
 IMMUTABLE
+SET search_path = public, extensions
 AS $$
   SELECT pgp_sym_encrypt(
     p_answers::text,
@@ -64,6 +53,7 @@ CREATE OR REPLACE FUNCTION decrypt_medical_answers(
 RETURNS JSONB
 LANGUAGE sql
 IMMUTABLE
+SET search_path = public, extensions
 AS $$
   SELECT pgp_sym_decrypt(
     p_ciphertext,
@@ -71,7 +61,6 @@ AS $$
   )::jsonb
 $$;
 
--- User-key variant for global template submissions (operator_id IS NULL).
 CREATE OR REPLACE FUNCTION decrypt_medical_answers_user(
   p_user_id     UUID,
   p_ciphertext  BYTEA
@@ -79,6 +68,7 @@ CREATE OR REPLACE FUNCTION decrypt_medical_answers_user(
 RETURNS JSONB
 LANGUAGE sql
 IMMUTABLE
+SET search_path = public, extensions
 AS $$
   SELECT pgp_sym_decrypt(
     p_ciphertext,
@@ -89,7 +79,6 @@ AS $$
   )::jsonb
 $$;
 
--- Encrypt helper for user key (global template submissions).
 CREATE OR REPLACE FUNCTION encrypt_medical_answers_user(
   p_user_id    UUID,
   p_answers    JSONB
@@ -97,6 +86,7 @@ CREATE OR REPLACE FUNCTION encrypt_medical_answers_user(
 RETURNS BYTEA
 LANGUAGE sql
 IMMUTABLE
+SET search_path = public, extensions
 AS $$
   SELECT pgp_sym_encrypt(
     p_answers::text,

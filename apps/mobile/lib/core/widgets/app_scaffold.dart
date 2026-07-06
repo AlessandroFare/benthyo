@@ -42,7 +42,7 @@ class AppScaffold extends StatelessWidget {
                   color: AppColors.borderDark.withValues(alpha: 0.6),
                 ),
               ),
-              leading: showBack && canPop
+              leading: showBack
                   ? IconButton(
                       icon: const Icon(Icons.arrow_back),
                       onPressed: () => context.pop(),

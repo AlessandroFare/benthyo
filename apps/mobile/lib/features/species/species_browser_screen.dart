@@ -149,8 +149,8 @@ class _SpeciesBrowserScreenState extends ConsumerState<SpeciesBrowserScreen> {
                     ? 'No species match "$_query"'
                     : 'No species yet',
                 subtitle: 'Try identifying from a photo with the AI engine.',
-                cta: 'Identify from photo',
-                onCta: _identifyFromPhoto,
+                actionLabel: 'Identify from photo',
+                onAction: _identifyFromPhoto,
               ),
               data: (species) => StaggeredListAnimation(
                 children: species.map((s) {
@@ -213,10 +213,14 @@ class _SpeciesCard extends StatelessWidget {
                     ? CachedNetworkImage(
                         imageUrl: imageUrl!,
                         fit: BoxFit.cover,
-                        placeholder: (_, __) => ShimmerSkeleton(
-                          child: Container(color: Colors.white),
+                        placeholder: (_, __) => Container(
+                          color: AppColors.surfaceDark,
+                          child: const Center(child: CircularProgressIndicator()),
                         ),
-                        errorWidget: (_, __, ___) => _PlaceholderIcon(),
+                        errorWidget: (_, __, ___) => Container(
+                          color: AppColors.surfaceDark,
+                          child: const Icon(Icons.image_not_supported_outlined, color: Colors.white38),
+                        ),
                       )
                     : _PlaceholderIcon(),
               ),

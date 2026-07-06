@@ -12,7 +12,7 @@ import {
   Store,
   Users,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useOperator } from "@/hooks/useOperator";
 
@@ -78,6 +78,7 @@ function SidebarBody({
 
       {/* Nav items */}
       <nav className="relative flex flex-1 flex-col gap-1 overflow-y-auto p-3" aria-label="Primary navigation">
+        <LayoutGroup>
         {navGroups.map((group, gi) => (
           <div key={group.heading ?? `group-${gi}`} className="flex flex-col gap-0.5">
             {group.heading && (
@@ -150,6 +151,7 @@ function SidebarBody({
             ))}
           </div>
         ))}
+        </LayoutGroup>
       </nav>
 
       {/* Operator footer */}

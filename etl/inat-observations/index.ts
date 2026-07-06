@@ -1,3 +1,14 @@
+/**
+ * iNaturalist Research-Grade Observations ETL — v2 (global scope).
+ *
+ * v2 changes:
+ *  - Replaced Mediterranean-only bbox with 11 global marine regions.
+ *  - Fixed Echinodermata taxon ID (was incorrectly sharing Mollusca's 47549).
+ *  - Added iNat taxon IDs for marine gastropods (Nudibranchia, etc.) to
+ *    recover mollusk groups dropped by the Cephalopoda/Bivalvia-only GBIF fix.
+ *  - Controlled by INAT_OBS_REGIONS env var.
+ */
+
 import 'dotenv/config';
 import { logger, logJobSummary } from '../shared/logger';
 import { paginate, RateLimiter } from '../shared/rate-limiter';
@@ -9,70 +20,49 @@ import {
   normalizeDepth,
   normalizeObservedAt,
 } from '../shared/occurrence';
-
-/**
- * iNaturalist Research-Grade Observations ETL — Mediterranean marine species.
- *
- * Pulls only `quality_grade=research` observations (community-verified, GPS-
- * accurate, species-level ID) from the iNaturalist v1 REST API, restricted to:
- *
- *   - The Mediterranean bounding box (swlat=30, swlng=-6, nelat=46, nelng=36)
- *   - Marine / aquatic higher taxa (fish, elasmobranchi, cephalopods,
- *     echinoderms, cnidarians, nudibranchia, marine reptiles, marine mammals)
- *   - `photos=true` so every sighting has at least one image
- *   - `captive=false` (wild observations only)
- *
- * iNaturalist API: https://api.inaturalist.org/v1/observations
- * Rate limit: ≤ 100 req/min for anonymous, we use 1 500 ms inter-request gap.
- *
- * Data flow:
- *   1. For each marine taxon group, fetch pages of observations.
- *   2. Deduplicate by `uuid` (iNat's stable cross-call ID).
- *   3. Upsert species rows (scientific_name, inat_taxon_id, taxonomy).
- *   4. For each observation, call nearby_dive_sites() to find the closest site.
- *   5. Upsert sightings with source='inat' and external_id=obs.uuid.
- *
- * source='inat' keeps the dedup constraint (source, external_id) distinct from
- * GBIF/OBIS records that may share the same observation via cross-source linking.
- */
+import { resolveRegions } from '../shared/marine-regions';
 
 const INAT_API = process.env.INAT_API_BASE ?? 'https://api.inaturalist.org/v1';
 
-// Mediterranean bounding box
-const MED_BBOX = { swlat: 30, swlng: -6, nelat: 46, nelng: 36 };
-
 /**
- * iNaturalist taxon IDs for marine groups in the Mediterranean.
- * These are the stable numeric IDs from iNaturalist, not GBIF keys.
+ * iNaturalist taxon IDs for marine groups (global).
  *
+ * Fixes in v2:
+ *  - Echinodermata was 47549 (same as Mollusca! bug) → fixed to 47548.
+ *  - Added Nudibranchia (47113) to recover marine gastropod diversity.
+ *  - Added Cephalopoda (47459) as separate group.
+ *
+ * IDs:
  *   47178  Actinopterygii (ray-finned fish)
  *   505527 Elasmobranchii (sharks, rays)
- *   47549  Mollusca (cephalopods, nudibranchs, bivalves)
- *   1228   Echinodermata
+ *   47459  Cephalopoda (octopus, squid)
+ *   47113  Nudibranchia (nudibranchs)
+ *   47548  Echinodermata (sea stars, urchins) — was 47549 in v1 (bug)
  *   47534  Cnidaria (jellyfish, corals, anemones)
- *   47119  Mammalia (marine mammals subset via location filter)
+ *   47119  Mammalia (marine mammals via location filter)
  *   39532  Testudines (sea turtles)
- *   47158  Crustacea (malacostraca — lobster, crab, shrimp)
+ *   47158  Malacostraca (crabs, lobsters, shrimp)
  */
 const MARINE_TAXON_GROUPS: Array<{ id: number; label: string; maxRecords: number }> = [
   { id: 47178,  label: 'Actinopterygii',   maxRecords: 2000 },
   { id: 505527, label: 'Elasmobranchii',   maxRecords: 500  },
-  { id: 47549,  label: 'Mollusca',         maxRecords: 800  },
-  { id: 1228,   label: 'Echinodermata',    maxRecords: 600  },
+  { id: 47459,  label: 'Cephalopoda',      maxRecords: 400  },
+  { id: 47113,  label: 'Nudibranchia',     maxRecords: 400  },
+  { id: 47548,  label: 'Echinodermata',    maxRecords: 600  },
   { id: 47534,  label: 'Cnidaria',         maxRecords: 500  },
   { id: 47119,  label: 'Mammalia',         maxRecords: 300  },
   { id: 39532,  label: 'Testudines',       maxRecords: 200  },
-  { id: 47158,  label: 'Crustacea',        maxRecords: 600  },
+  { id: 47158,  label: 'Malacostraca',     maxRecords: 600  },
 ];
 
-const MAX_COORD_ACCURACY_M = 500; // research-grade iNat obs usually < 500 m
+const MAX_COORD_ACCURACY_M = 500;
 
 interface InatTaxon {
   id: number;
   name: string;
   rank: string;
   preferred_common_name?: string;
-  ancestry?: string; // slash-separated ancestor taxon IDs
+  ancestry?: string;
   iconic_taxon_name?: string;
   wikipedia_url?: string;
 }
@@ -99,11 +89,11 @@ interface InatObsResponse {
   results: InatObservation[];
 }
 
-// 1 500 ms gap to stay comfortably under anonymous rate limit (100 req/min)
 const limiter = new RateLimiter({ minIntervalMs: 1500, maxRetries: 5 });
 
 async function fetchObsPage(
   taxonId: number,
+  bbox: { swlat: number; swlng: number; nelat: number; nelng: number },
   page: number,
   perPage: number,
 ): Promise<InatObservation[]> {
@@ -112,10 +102,10 @@ async function fetchObsPage(
     quality_grade: 'research',
     captive: 'false',
     photos: 'true',
-    swlat: String(MED_BBOX.swlat),
-    swlng: String(MED_BBOX.swlng),
-    nelat: String(MED_BBOX.nelat),
-    nelng: String(MED_BBOX.nelng),
+    swlat: String(bbox.swlat),
+    swlng: String(bbox.swlng),
+    nelat: String(bbox.nelat),
+    nelng: String(bbox.nelng),
     per_page: String(perPage),
     page: String(page),
     order: 'desc',
@@ -129,57 +119,60 @@ async function fetchObsPage(
 
 export async function runInatObservationsEtl(): Promise<void> {
   const startedAt = Date.now();
-  logger.info('Starting iNaturalist research-grade observations ETL (Mediterranean)');
+  logger.info('Starting iNaturalist research-grade observations ETL (v2 — global)');
 
   const supabase = getSupabase();
   const systemUserId = process.env.ETL_SYSTEM_USER_ID;
   if (!systemUserId) throw new Error('ETL_SYSTEM_USER_ID is required');
   await assertSystemUserExists(supabase, systemUserId);
 
+  const regions = resolveRegions('INAT_OBS_REGIONS');
+  logger.info(`iNat regions: ${regions.map((r) => r.name).join(', ')}`);
+
   const globalMaxOverride = process.env.INAT_OBS_MAX_RECORDS
     ? Number(process.env.INAT_OBS_MAX_RECORDS)
     : null;
 
-  const PER_PAGE = 200; // iNat API max per_page
+  const PER_PAGE = 200;
   const byUuid = new Map<string, InatObservation>();
   let totalFetched = 0;
 
-  // Phase 1: collect all observations across taxon groups
-  for (const group of MARINE_TAXON_GROUPS) {
-    const maxRecords = globalMaxOverride ?? group.maxRecords;
-    const maxPages = Math.ceil(maxRecords / PER_PAGE);
-    logger.info(`iNat observations: fetching ${group.label} (max ${maxRecords})`);
+  // Phase 1: collect all observations across regions × taxon groups
+  for (const region of regions) {
+    for (const group of MARINE_TAXON_GROUPS) {
+      const maxRecords = globalMaxOverride ?? group.maxRecords;
+      const maxPages = Math.ceil(maxRecords / PER_PAGE);
 
-    let pageNum = 1;
-    const groupObs = await paginate(
-      async (offset) => {
-        const page = await fetchObsPage(group.id, pageNum, PER_PAGE);
-        pageNum += 1;
-        if (offset + page.length >= maxRecords) {
-          return page.slice(0, Math.max(0, maxRecords - offset));
+      let pageNum = 1;
+      const groupObs = await paginate(
+        async (offset) => {
+          const page = await fetchObsPage(group.id, region.bbox, pageNum, PER_PAGE);
+          pageNum += 1;
+          if (offset + page.length >= maxRecords) {
+            return page.slice(0, Math.max(0, maxRecords - offset));
+          }
+          return page;
+        },
+        PER_PAGE,
+        maxPages,
+      );
+
+      let skippedAccuracy = 0;
+      for (const obs of groupObs) {
+        if (!obs.latitude || !obs.longitude || !obs.taxon) continue;
+        if (obs.positional_accuracy != null && obs.positional_accuracy > MAX_COORD_ACCURACY_M) {
+          skippedAccuracy++;
+          continue;
         }
-        return page;
-      },
-      PER_PAGE,
-      maxPages,
-    );
-
-    let skippedAccuracy = 0;
-    for (const obs of groupObs) {
-      if (!obs.latitude || !obs.longitude || !obs.taxon) continue;
-      if (obs.positional_accuracy != null && obs.positional_accuracy > MAX_COORD_ACCURACY_M) {
-        skippedAccuracy++;
-        continue;
+        if (!obs.uuid) continue;
+        byUuid.set(obs.uuid, obs);
       }
-      if (!obs.uuid) continue;
-      byUuid.set(obs.uuid, obs);
+      totalFetched += groupObs.length;
     }
-    logger.info(`iNat ${group.label}: ${groupObs.length} fetched, ${skippedAccuracy} skipped (low accuracy)`);
-    totalFetched += groupObs.length;
   }
 
   const observations = [...byUuid.values()];
-  logger.info(`iNat: ${observations.length} unique research-grade observations after dedup`);
+  logger.info(`iNat: ${observations.length} unique research-grade observations across ${regions.length} regions`);
 
   // Phase 2: build species rows
   const speciesRows: Record<string, unknown>[] = [];
@@ -226,7 +219,7 @@ export async function runInatObservationsEtl(): Promise<void> {
     const { data: nearestSite } = await supabase.rpc('nearby_dive_sites', {
       p_lat: obs.latitude!,
       p_lng: obs.longitude!,
-      p_radius_km: 15, // iNat research-grade is GPS-accurate; 15 km is appropriate
+      p_radius_km: 15,
     });
     const siteId = nearestSite?.[0]?.id;
     if (!siteId) continue;
@@ -243,7 +236,7 @@ export async function runInatObservationsEtl(): Promise<void> {
       observed_at: observedAt,
       depth_m: normalizeDepth(obs.depth),
       count: normalizeCount(obs.individual_count),
-      confidence_level: 'verified', // research-grade = community-verified
+      confidence_level: 'verified',
       source: 'inat',
       external_id: obs.uuid,
       notes: `Imported from iNaturalist observation ${obs.id}`,

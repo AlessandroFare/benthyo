@@ -6,6 +6,8 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../core/models/citizen_science_impact.dart';
 import '../../core/models/dive_log.dart';
+import '../../core/models/enums.dart';
+import '../../core/models/user_profile.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_scaffold.dart';
 import '../../core/widgets/async_value_widget.dart';
@@ -108,6 +110,7 @@ class ProfileScreen extends ConsumerWidget {
     final impactAsync = ref.watch(citizenScienceImpactProvider);
 
     return AppScaffold(
+      title: 'Profile',
       showBack: false,
       actions: [
         IconButton(
@@ -353,7 +356,7 @@ class ProfileScreen extends ConsumerWidget {
 class _ProfileHeader extends StatelessWidget {
   const _ProfileHeader({required this.profile, required this.streakDays});
 
-  final dynamic profile;
+  final UserProfile profile;
   final int streakDays;
 
   @override
@@ -575,7 +578,9 @@ class _StatsGrid extends StatelessWidget {
               label: 'Dives',
               value: totalDives,
               icon: Icons.water,
-              color: AppColors.accent,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? AppColors.accent
+                  : AppColors.oceanMid,   // <-- cambiato da AppColors.accent fisso
             ),
           ),
           const SizedBox(width: AppSpacing.sm),
@@ -843,6 +848,9 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final iconColor = isDark ? AppColors.accent : AppColors.oceanMid;
+
     return OceanCard(
       onTap: onTap,
       margin: const EdgeInsets.symmetric(
@@ -853,10 +861,10 @@ class _NavItem extends StatelessWidget {
             width: 38,
             height: 38,
             decoration: BoxDecoration(
-              color: AppColors.accent.withValues(alpha: 0.1),
+              color: iconColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(AppRadius.md),
             ),
-            child: Icon(icon, size: 18, color: AppColors.accent),
+            child: Icon(icon, size: 18, color: iconColor),
           ),
           const SizedBox(width: AppSpacing.md),
           Expanded(
@@ -883,13 +891,13 @@ class _NavItem extends StatelessWidget {
               padding:
                   const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: AppColors.accent.withValues(alpha: 0.12),
+                color: iconColor.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(AppRadius.full),
               ),
               child: Text(
                 badge!,
-                style: const TextStyle(
-                  color: AppColors.accent,
+                style: TextStyle(
+                  color: iconColor,
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
                 ),

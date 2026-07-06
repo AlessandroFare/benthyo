@@ -177,32 +177,25 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         setState(() => _showLiveCurrents = value);
         _persistLayerPrefs();
       },
-      onSpeciesHeatmapChanged: (value) async {
-        if (value && _heatmapSpecies == null) {
-          final picked = await SpeciesPickerSheet.pick(context);
-          if (picked == null) return;
-          setState(() {
-            _showSpeciesHeatmap = true;
-            _heatmapSpecies = picked;
-          });
-        } else {
-          setState(() => _showSpeciesHeatmap = value);
-        }
-        unawaited(_persistLayerPrefs());
-      },
-      onOfflineCacheChanged: (value) {
-        setState(() => _offlineCache = value);
-        _persistLayerPrefs();
-      },
-      onPickSpecies: () async {
-        final picked = await SpeciesPickerSheet.pick(context);
-        if (picked == null) return;
-        setState(() {
-          _heatmapSpecies = picked;
-          _showSpeciesHeatmap = true;
-        });
-        unawaited(_persistLayerPrefs());
-      },
+      onSpeciesHeatmapChanged: (value) {
+  setState(() => _showSpeciesHeatmap = value);
+  unawaited(_persistLayerPrefs());
+},
+onOfflineCacheChanged: (value) {
+  setState(() => _offlineCache = value);
+  _persistLayerPrefs();
+},
+onPickSpecies: () async {
+  final picked = await SpeciesPickerSheet.pick(context);
+  if (picked != null) {
+    setState(() {
+      _heatmapSpecies = picked;
+      _showSpeciesHeatmap = true;
+    });
+    unawaited(_persistLayerPrefs());
+  }
+  return picked; 
+},
     );
   }
 
@@ -387,6 +380,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                                 fontSize: 15,
                               ),
                               border: InputBorder.none,
+                              filled: false,
                               contentPadding: const EdgeInsets.symmetric(
                                 vertical: 14,
                               ),
@@ -755,26 +749,36 @@ class _GlassPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final base = tintColor ?? AppColors.accent;
+
+    // Anche quando "tinted", lo sfondo resta scuro e opaco: mescoliamo solo
+    // una piccola percentuale del colore accent dentro il navy scuro, così
+    // il bottone non perde mai contrasto rispetto alla mappa sottostante
+    // (che può essere di qualsiasi colore, anche ciano chiaro).
     final bg = tinted
-        ? base.withValues(alpha: 0.14)
+        ? Color.alphaBlend(base.withValues(alpha: 0.30), _glassColor)
         : _glassColor;
+
     final border = tinted
-        ? base.withValues(alpha: 0.30)
+        ? base.withValues(alpha: 0.55)
         : Colors.white.withValues(alpha: 0.08);
+
+    final content = Container(
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(borderRadius),
+        border: Border.all(color: border, width: 0.8),
+      ),
+      child: child,
+    );
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(borderRadius),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: Container(
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(borderRadius),
-            border: Border.all(color: border, width: 0.8),
-          ),
-          child: child,
-        ),
-      ),
+      child: kIsWeb
+          ? content
+          : BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+              child: content,
+            ),
     );
   }
 }

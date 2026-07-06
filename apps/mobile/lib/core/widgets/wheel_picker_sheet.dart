@@ -53,8 +53,11 @@ Future<T?> showWheelPickerSheet<T>({
                         ),
                       ),
                       TextButton(
-                        onPressed: () =>
-                            Navigator.pop(context, values[selectedIndex]),
+                        onPressed: () => Navigator.pop(context, values[selectedIndex]),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.accent,
+                          textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                        ),
                         child: const Text('Done'),
                       ),
                     ],
@@ -121,6 +124,7 @@ Future<T?> showOptionSheet<T>({
   return showModalBottomSheet<T>(
     context: context,
     backgroundColor: AppColors.surfaceDark,
+    isScrollControlled: true,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
     ),
@@ -138,16 +142,20 @@ Future<T?> showOptionSheet<T>({
                     ),
               ),
             ),
-            ...options.map(
-              (option) => ListTile(
-                title: Text(
-                  labelBuilder(option),
-                  style: const TextStyle(color: Colors.white),
-                ),
-                trailing: selected == option
-                    ? const Icon(Icons.check, color: AppColors.accent)
-                    : null,
-                onTap: () => Navigator.pop(context, option),
+            Expanded(
+              child: ListView(
+                children: options.map(
+                  (option) => ListTile(
+                    title: Text(
+                      labelBuilder(option),
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                    trailing: selected == option
+                        ? const Icon(Icons.check, color: AppColors.accent)
+                        : null,
+                    onTap: () => Navigator.pop(context, option),
+                  ),
+                ).toList(),
               ),
             ),
             const SizedBox(height: AppSpacing.md),

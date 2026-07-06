@@ -21,6 +21,7 @@
     "wikimedia:images": "tsx wikimedia-images/index.ts",
     "inat:observations": "tsx inat-observations/index.ts",
     "inat:taxon-lookup": "tsx inat-taxon-lookup/index.ts",
+    "dive-site-discovery": "tsx dive-site-discovery/index.ts",
     "all-data": "tsx run-all-data.ts",
     "test": "vitest run",
     "test:watch": "vitest",

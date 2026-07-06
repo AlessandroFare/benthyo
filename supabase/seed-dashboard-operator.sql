@@ -7,7 +7,7 @@
 -- 3. psql "postgresql://postgres:postgres@127.0.0.1:54322/benthyo" -f supabase/seed-dashboard-operator.sql
 
 INSERT INTO operator_users (operator_id, user_id, role)
-SELECT id, '2ed73b83-abf0-4e4a-b30a-54680869f4a3'::uuid, 'owner'
+SELECT id, '4834e8cb-8459-4e76-b8eb-52ad091f0a06'::uuid, 'owner'
 FROM operators
 WHERE slug = 'diving-center-ustica'
 LIMIT 1

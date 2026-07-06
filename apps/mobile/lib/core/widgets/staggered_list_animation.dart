@@ -39,10 +39,17 @@ class StaggeredListAnimation extends StatelessWidget {
         children.add(SizedBox(height: spacing));
       }
     }
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: children,
+    return ListView.builder(
+      itemCount: this.children.length,
+      itemBuilder: (context, i) {
+        final child = this.children[i];
+        final delayMs = baseDelayMs + (i.clamp(0, maxStaggeredItems) * staggerMs);
+        return _StaggeredItem(
+          delayMs: delayMs,
+          durationMs: durationMs,
+          child: child,
+        );
+      },
     );
   }
 }

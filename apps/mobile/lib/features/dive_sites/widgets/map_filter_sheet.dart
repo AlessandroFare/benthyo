@@ -482,6 +482,7 @@ class _ApplyBar extends StatelessWidget {
                   : 'Apply $count filter${count == 1 ? '' : 's'}',
               style: theme.textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w600,
+                color: theme.colorScheme.onPrimary,
               ),
             ),
           ),

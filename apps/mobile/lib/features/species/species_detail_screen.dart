@@ -39,26 +39,33 @@ class SpeciesDetailScreen extends ConsumerWidget {
                       ClipRRect(
                         borderRadius: BorderRadius.circular(24),
                         child: CachedNetworkImage(
-                          imageUrl: species.imageUrl!,
-                          height: 220,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
+                        imageUrl: species.imageUrl!,
+                        height: 220,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => Container(
+                          color: AppColors.surfaceDark,
+                          child: const Center(child: CircularProgressIndicator()),
+                        ),
+                        errorWidget: (context, url, error) => Container(
+                          color: AppColors.surfaceDark,
+                          child: const Icon(Icons.image_not_supported_outlined, color: Colors.white38),
+                        ),
                         ),
                       ),
                     const SizedBox(height: AppSpacing.lg),
                     Text(
                       species.displayName(),
-                      style:
-                          Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.w700,
-                              ),
+                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                          ),
                     ),
                     Text(
                       species.scientificName,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             fontStyle: FontStyle.italic,
-                            color: AppColors.textSecondary,
+                            color: Colors.white70,
                           ),
                     ),
                     const SizedBox(height: AppSpacing.md),
@@ -107,6 +114,14 @@ class SpeciesDetailScreen extends ConsumerWidget {
                                   width: 160,
                                   height: 120,
                                   fit: BoxFit.cover,
+                                  placeholder: (context, url) => Container(
+                                    color: AppColors.surfaceDark,
+                                    child: const Center(child: CircularProgressIndicator()),
+                                  ),
+                                  errorWidget: (context, url, error) => Container(
+                                    color: AppColors.surfaceDark,
+                                    child: const Icon(Icons.image_not_supported_outlined, color: Colors.white38),
+                                  ),
                                 ),
                               ),
                             ],
@@ -149,12 +164,10 @@ class SpeciesDetailScreen extends ConsumerWidget {
                           style: FilledButton.styleFrom(
                             minimumSize: const Size.fromHeight(52),
                             backgroundColor: AppColors.primary,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(999),
-                            ),
+                            foregroundColor: Colors.white,   // <-- aggiunto
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
                           ),
-                          onPressed: () => context
-                              .push('/sightings/add?speciesId=$speciesId'),
+                          onPressed: () => context.push('/sightings/add?speciesId=$speciesId'),
                           child: const Text('Add to Life List'),
                         ),
                       ),
@@ -197,7 +210,13 @@ class _SectionCard extends StatelessWidget {
                 ),
           ),
           const SizedBox(height: AppSpacing.md),
-          child,
+          // Forza un tema "chiaro" locale per tutto il contenuto della card,
+          // così i Text senza colore esplicito (qui e in eventuali child
+          // futuri) non ereditano più il bianco del tema dark ambiente.
+          DefaultTextStyle.merge(
+            style: const TextStyle(color: AppColors.oceanDeep),
+            child: child,
+          ),
         ],
       ),
     );
@@ -230,6 +249,7 @@ class _TaxonomyRow extends StatelessWidget {
             child: Text(
               value,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.oceanDeep,   // <-- aggiunto, esplicito e scuro
                     fontWeight: FontWeight.w600,
                   ),
             ),

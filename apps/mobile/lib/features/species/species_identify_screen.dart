@@ -268,6 +268,14 @@ class _InatMatchView extends StatelessWidget {
                     height: 240,
                     width: double.infinity,
                     fit: BoxFit.cover,
+                    placeholder: (_, __) => Container(
+                      color: AppColors.surfaceDark,
+                      child: const Center(child: CircularProgressIndicator()),
+                    ),
+                    errorWidget: (_, __, ___) => Container(
+                      color: AppColors.surfaceDark,
+                      child: const Icon(Icons.image_not_supported_outlined, color: Colors.white38),
+                    ),
                   ),
                 ),
               const SizedBox(height: AppSpacing.lg),
@@ -337,6 +345,14 @@ class _EmptyPhotoResult extends StatelessWidget {
                   height: 180,
                   width: double.infinity,
                   fit: BoxFit.cover,
+                  placeholder: (_, __) => Container(
+                    color: AppColors.surfaceDark,
+                    child: const Center(child: CircularProgressIndicator()),
+                  ),
+                  errorWidget: (_, __, ___) => Container(
+                    color: AppColors.surfaceDark,
+                    child: const Icon(Icons.image_not_supported_outlined, color: Colors.white38),
+                  ),
                 ),
               ),
             const SizedBox(height: AppSpacing.lg),
@@ -406,6 +422,14 @@ class _HeroPhoto extends StatelessWidget {
                   height: 240,
                   width: double.infinity,
                   fit: BoxFit.cover,
+                  placeholder: (_, __) => Container(
+                    color: AppColors.surfaceDark,
+                    child: const Center(child: CircularProgressIndicator()),
+                  ),
+                  errorWidget: (_, __, ___) => Container(
+                    color: AppColors.surfaceDark,
+                    child: const Icon(Icons.image_not_supported_outlined, color: Colors.white38),
+                  ),
                 )
               : Container(
                   height: 240,
