@@ -12,6 +12,8 @@ import { runRlsEtl } from './rls/index';
 import { runOpenDiveMapEtl } from './opendivemap/index';
 import { runOverpassEtl } from './overpass/index';
 import { runDiveSiteDiscoveryEtl } from './dive-site-discovery/index';
+import { runDiveMapVisionEtl } from './dive-map-vision/index';
+import { runWikivoyageEtl } from './wikivoyage/index';
 import { runSpeciesSeedEtl } from './species-seed/index';
 import { runTavilySpeciesEtl } from './tavily-species/index';
 import { runWikimediaImagesEtl } from './wikimedia-images/index';

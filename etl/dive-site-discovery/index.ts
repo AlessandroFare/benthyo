@@ -50,6 +50,7 @@ import {
   type DiveSiteRow,
 } from '../shared/dive-site-utils';
 import { resolveRegions, type MarineRegion } from '../shared/marine-regions';
+import { enumerateDestinations } from '../shared/destinations';
 
 // ── Config ──────────────────────────────────────────────────────────
 
@@ -61,36 +62,7 @@ const USER_AGENT =
   process.env.WIKIMEDIA_USER_AGENT ?? 'Benthyo/1.0 (https://benthyo.com; contact@benthyo.com)';
 const MAX_COMMONS_PHOTOS = Number(process.env.DISCOVERY_COMMONS_PHOTOS ?? 40);
 
-/**
- * Human-readable context for each region so the LLM enumerates the right
- * geography. Keyed by MarineRegion.name (see shared/marine-regions.ts).
- */
-const REGION_HINTS: Record<string, string> = {
-  caribbean: 'the Caribbean Sea (Cozumel, Bonaire, Roatán, Belize, Cayman Islands, Bahamas, Turks & Caicos)',
-  red_sea: 'the Red Sea (Egypt — Sharm el-Sheikh, Dahab, Marsa Alam, Hurghada; Sudan)',
-  indian_ocean: 'the tropical Indian Ocean (Maldives, Sri Lanka, Andaman Islands, Thailand — Similan/Phuket)',
-  southeast_asia: 'Southeast Asia (Indonesia — Bali, Komodo, Raja Ampat, Lembeh; Philippines — Malapascua, Anilao, Tubbataha; Malaysia — Sipadan)',
-  australia_nz: 'Australia & New Zealand (Great Barrier Reef, Ningaloo, Poor Knights Islands)',
-  pacific: 'the tropical Pacific (Palau, Micronesia — Chuuk/Truk, Fiji, French Polynesia, Hawaii, Galápagos)',
-  mediterranean: 'the Mediterranean Sea (Italy, Malta, Croatia, Greece, Spain, France, Cyprus, Egypt north coast)',
-  north_atlantic: 'the North Atlantic (Azores, Canary Islands, Florida, Caribbean fringe, US East Coast wrecks)',
-  nordic: 'Nordic & northern European waters (Norway, Iceland — Silfra, Scotland — Scapa Flow)',
-  east_africa: 'East Africa & western Indian Ocean (Mozambique, Tanzania — Zanzibar/Mafia, Kenya, South Africa — Sodwana/Aliwal, Seychelles, Mauritius)',
-  japan_korea: 'Japan & Korea (Okinawa, Izu Peninsula, Jeju)',
-};
-
 // ── LLM schemas ─────────────────────────────────────────────────────
-
-const DestinationsSchema = z.object({
-  destinations: z
-    .array(
-      z.object({
-        name: z.string().describe('Dive destination / area, e.g. "Malapascua"'),
-        country: z.string().describe('Country name'),
-      }),
-    )
-    .describe('Well-known scuba diving destinations in the region'),
-});
 
 const SitesSchema = z.object({
   sites: z
@@ -124,21 +96,6 @@ interface SiteCandidate {
 }
 
 // ── Approach 1: LLM enumeration ─────────────────────────────────────
-
-async function enumerateDestinations(region: MarineRegion): Promise<Array<{ name: string; country: string }>> {
-  const hint = REGION_HINTS[region.name] ?? region.name.replace(/_/g, ' ');
-  const result = await generateJson(DestinationsSchema, {
-    system:
-      'You are a scuba-diving domain expert with encyclopedic knowledge of dive travel. ' +
-      'You only list REAL, well-documented diving destinations. Never invent places.',
-    prompt:
-      `List up to ${MAX_DESTINATIONS} well-known scuba diving destinations or areas in ${hint}. ` +
-      'Prefer destinations famous for named dive sites. Return distinct places (towns, islands, ' +
-      'marine parks), not individual dive sites.',
-    temperature: 0.3,
-  });
-  return result.destinations.slice(0, MAX_DESTINATIONS);
-}
 
 async function enumerateSites(
   destination: string,
@@ -235,7 +192,7 @@ export async function runDiveSiteDiscoveryEtl(): Promise<void> {
   for (const region of regions) {
     let destinations: Array<{ name: string; country: string }> = [];
     try {
-      destinations = await enumerateDestinations(region);
+      destinations = await enumerateDestinations(region, MAX_DESTINATIONS);
       logger.info(`${region.name}: ${destinations.length} destinations`);
     } catch (err) {
       const msg = `enumerateDestinations(${region.name}): ${err instanceof Error ? err.message : String(err)}`;
