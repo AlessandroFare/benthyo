@@ -74,14 +74,14 @@ export async function generateJson<T>(
   const temperature = opts.temperature ?? 0.2;
 
   try {
-    const { object } = await generateObject<T>({
+    const { object } = await generateObject({
       model,
       schema,
       system: opts.system,
       prompt: opts.prompt,
       temperature,
     });
-    return object;
+    return object as T;
   } catch (err) {
     logger.warn(
       `generateObject failed, falling back to text+parse: ${
