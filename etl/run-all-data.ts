@@ -11,6 +11,7 @@ import { runSeamapEtl } from './seamap/index';
 import { runRlsEtl } from './rls/index';
 import { runOpenDiveMapEtl } from './opendivemap/index';
 import { runOverpassEtl } from './overpass/index';
+import { runWikidataEtl } from './wikidata/index';
 import { runDiveSiteDiscoveryEtl } from './dive-site-discovery/index';
 import { runDiveMapVisionEtl } from './dive-map-vision/index';
 import { runWikivoyageEtl } from './wikivoyage/index';
@@ -18,6 +19,7 @@ import { runSpeciesSeedEtl } from './species-seed/index';
 import { runTavilySpeciesEtl } from './tavily-species/index';
 import { runWikimediaImagesEtl } from './wikimedia-images/index';
 import { runWormsEtl } from './worms/index';
+import { runFishbaseEtl } from './fishbase/index';
 import { isMainModule } from './shared/cli';
 import { createClient } from '@supabase/supabase-js';
 
@@ -103,6 +105,9 @@ export async function runAllDataEtl(): Promise<void> {
     { name: 'opendivemap', fn: runOpenDiveMapEtl },
     { name: 'overpass', fn: runOverpassEtl },
     { name: 'divenumber', fn: runDiveNumberEtl },
+    // Wikidata SPARQL: hand-curated, exact coordinates for shipwrecks, reefs,
+    // cenotes, blue holes, and seamounts. Runs alongside the other map sources.
+    { name: 'wikidata', fn: runWikidataEtl },
   ]);
 
   // 3. LLM-driven discovery (OpenCode Zen enumeration + Nominatim geocoding).
@@ -150,6 +155,13 @@ export async function runAllDataEtl(): Promise<void> {
   // Italian/Spanish/English common names for search. Cursor-paginated and
   // capped via WORMS_MAX so a single run stays bounded.
   await step('worms', runWormsEtl);
+
+  // 7b. FishBase/SeaLifeBase enrichment. Runs after WoRMS (which sets canonical
+  // taxonomy + vernaculars) and adds real depth ranges, habitat descriptors,
+  // max length, and any missing EN/IT/ES common names from the FishBase and
+  // SeaLifeBase static Parquet snapshots. Fill-when-empty, so it never clobbers
+  // curated seed or WoRMS names.
+  await step('fishbase', runFishbaseEtl);
 
   // 8. Resolve iNaturalist taxon IDs for species missing one. MUST run
   // before the image backfills, because inaturalist-images uses inat_taxon_id.
