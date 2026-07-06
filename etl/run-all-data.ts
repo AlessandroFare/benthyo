@@ -111,7 +111,7 @@ export async function runAllDataEtl(): Promise<void> {
   // 4. Apify Google Maps crawl. Last in the site batch because it is the slowest.
   await step('apify:google-maps', runApifyGoogleMapsEtl);
 
-  // 4. GBIF + OBIS + SEAMAP + iNaturalist research-grade observations in
+  // 5. GBIF + OBIS + SEAMAP + iNaturalist research-grade observations in
   // parallel. All are independent occurrence sources that link to species
   // via scientific name and to dive sites via nearby_dive_sites.
   //
