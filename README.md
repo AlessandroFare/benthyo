@@ -162,13 +162,27 @@ rationale.
 
 ```
 1. worms                              ─ canonical taxonomy (EN/IT/ES vernaculars); first so occurrences can link by scientific name
-2. dive sites (parallel):             ─ opendivemap & overpass & divenumber
-3. apify:google-maps                  ─ Google Maps (slowest; runs last in the site batch)
-4. occurrences (parallel): gbif & obis ─ independent sources; run concurrently
-5. reconcile_unmatched_occurrences    ─ open-water placeholder sites (gbif then obis)
-6. inat:taxon-lookup                  ─ resolve inat_taxon_id; MUST precede the image backfills
-7. images (sequential):               ─ wikimedia:images → inaturalist:images → tavily:species
+2. fishbase                           ─ FishBase/SeaLifeBase enrichment: depth range, habitat, max length, missing EN/IT/ES names (fill-when-empty)
+3. dive sites (parallel):             ─ opendivemap & overpass & divenumber & wikidata
+4. apify:google-maps                  ─ Google Maps (slowest; runs last in the site batch)
+5. occurrences (parallel): gbif & obis ─ independent sources; run concurrently
+6. reconcile_unmatched_occurrences    ─ open-water placeholder sites (gbif then obis)
+7. inat:taxon-lookup                  ─ resolve inat_taxon_id; MUST precede the image backfills
+8. images (sequential):               ─ wikimedia:images → inaturalist:images → tavily:species
 ```
+
+Two zero-budget, high-correctness sources were added:
+
+- **wikidata** — a SPARQL query against the Wikidata Query Service pulls
+  dive-relevant features (shipwrecks, reefs, cenotes, blue holes,
+  seamounts) that carry exact `P625` coordinates. Hand-curated data, so
+  coordinates are reliable and each row keeps its `Q…` id for provenance.
+- **fishbase** — reads the static FishBase and SeaLifeBase Parquet
+  snapshots (hosted on source.coop, no API key) to enrich existing
+  species rows with real `depth_min`/`depth_max`, habitat descriptors,
+  max length, and any missing English/Italian/Spanish common names. It
+  only fills empty columns, so curated seed and WoRMS names are never
+  overwritten.
 
 The `all-data` script runs the chain in this order. Each step is
 idempotent on its `onConflict` key, so re-runs are safe. Each top-level

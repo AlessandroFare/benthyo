@@ -6,7 +6,6 @@ import 'package:image_picker/image_picker.dart';
 import '../uploads/uploads_repository.dart';
 import '../../core/ml/clip_providers.dart';
 import 'species_api_repository.dart';
-import 'species_providers.dart';
 import '../../core/models/species.dart';
 
 class SpeciesIdentifyResult {
@@ -14,18 +13,25 @@ class SpeciesIdentifyResult {
     required this.matches,
     this.imageUrl,
     this.inatResults = const [],
+    this.ai,
+    this.created = false,
   });
 
   final List<Species> matches;
   final String? imageUrl;
   final List<InatIdentification> inatResults;
+
+  /// The AI vision proposal (Groq), when available.
+  final AiVisionProposal? ai;
+
+  /// True when the matched species was created on the fly from the AI result.
+  final bool created;
 }
 
 final speciesPhotoIdentifyProvider =
     FutureProvider.family<SpeciesIdentifyResult, String>((ref, localPath) async {
   final uploads = ref.read(uploadsRepositoryProvider);
   final api = ref.read(speciesApiRepositoryProvider);
-  final speciesRepo = ref.read(speciesRepositoryProvider);
 
   final bytes = await XFile(localPath).readAsBytes();
   final contentType = _guessContentType(localPath);
@@ -37,36 +43,16 @@ final speciesPhotoIdentifyProvider =
   // Pre-compute CLIP embedding for vector search (cached locally until sighting saved).
   unawaited(ref.read(clipEmbeddingServiceProvider).embedBytes(bytes));
 
-  final inatResults = await api.identifyFromImageUrl(publicUrl);
-  if (inatResults.isEmpty) {
-    return SpeciesIdentifyResult(
-      matches: const [],
-      imageUrl: publicUrl,
-      inatResults: inatResults,
-    );
-  }
-
-  final allSpecies = await speciesRepo.fetchAll(limit: 500);
-  final matches = <Species>[];
-  for (final hit in inatResults) {
-    final name = hit.scientificName.toLowerCase();
-    final found = allSpecies.where(
-      (s) =>
-          s.scientificName.toLowerCase() == name ||
-          s.scientificName.toLowerCase().startsWith(name.split(' ').first),
-    );
-    matches.addAll(found);
-  }
-
-  final unique = <String, Species>{};
-  for (final s in matches) {
-    unique[s.id] = s;
-  }
+  // The server does the heavy lifting: Groq vision + iNaturalist, reconciled
+  // against the catalog, creating the species on the fly when missing.
+  final result = await api.identifyWithAi(publicUrl);
 
   return SpeciesIdentifyResult(
-    matches: unique.values.toList(),
+    matches: result.matches,
     imageUrl: publicUrl,
-    inatResults: inatResults,
+    inatResults: result.inatResults,
+    ai: result.ai,
+    created: result.created,
   );
 });
 

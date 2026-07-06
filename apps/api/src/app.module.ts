@@ -6,6 +6,7 @@ import { join } from 'path';
 import supabaseConfig from './config/supabase.config';
 import r2Config from './config/r2.config';
 import resendConfig from './config/resend.config';
+import aiVisionConfig from './config/ai-vision.config';
 import { DatabaseModule } from './database/database.module';
 import { StorageModule } from './storage/storage.module';
 import { AuthModule } from './auth/auth.module';
@@ -48,7 +49,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
         join(process.cwd(), '..', '.env'),
         join(__dirname, '..', '..', '.env'),
       ],
-      load: [supabaseConfig, r2Config, resendConfig],
+      load: [supabaseConfig, r2Config, resendConfig, aiVisionConfig],
     }),
     ThrottlerModule.forRoot([
       {

@@ -12,7 +12,9 @@
     "seamap": "tsx seamap/index.ts",
     "rls": "tsx rls/index.ts",
     "worms": "tsx worms/index.ts",
+    "fishbase": "tsx fishbase/index.ts",
     "overpass": "tsx overpass/index.ts",
+    "wikidata": "tsx wikidata/index.ts",
     "opendivemap": "tsx opendivemap/index.ts",
     "divenumber": "tsx divenumber/index.ts",
     "apify:google-maps": "tsx apify-google-maps/index.ts",
@@ -28,9 +30,13 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@ai-sdk/openai-compatible": "^3.0.5",
     "@benthyo/types": "workspace:*",
     "@supabase/supabase-js": "^2.47.10",
-    "dotenv": "^16.4.7"
+    "ai": "^7.0.15",
+    "dotenv": "^16.4.7",
+    "hyparquet": "^1.26.2",
+    "zod": "^3.24.2"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",

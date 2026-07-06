@@ -59,68 +59,95 @@ export async function runWormsEtl(): Promise<void> {
 
   const supabase = getSupabase();
 
-  const { data: species, error } = await supabase
-    .from('species')
-    .select('id, scientific_name, worms_id')
-    .is('worms_id', null)
-    .limit(500);
+  // Cap and batch size are configurable. WoRMS is polite-rate-limited, so the
+  // default cap keeps a single nightly run bounded while still covering the
+  // whole freshly-imported catalog over a couple of runs.
+  const maxSpecies = Number(process.env.WORMS_MAX ?? 4000);
+  const batchSize = Number(process.env.WORMS_BATCH_SIZE ?? 500);
 
-  if (error) {
-    throw new Error(`Failed to load species: ${error.message}`);
-  }
-
-  if (!species || species.length === 0) {
-    logger.info('No species missing worms_id — nothing to do');
-    logJobSummary('worms', { processed: 0, upserted: 0, skipped: 0, errors: [] });
-    return;
-  }
-
-  logger.info(`WoRMS: looking up ${species.length} species without worms_id`);
-
-  const speciesRows: Record<string, unknown>[] = [];
   const errors: string[] = [];
+  let processed = 0;
+  let upserted = 0;
+  let notFound = 0;
 
-  for (const sp of species) {
-    const record = await searchByScientificName(sp.scientific_name);
-    if (!record) {
-      errors.push(`${sp.scientific_name}: not found on WoRMS`);
-      continue;
+  // Cursor pagination by id. We advance past every row we look at (found or
+  // not) so "not found on WoRMS" rows — which keep worms_id NULL — never cause
+  // an infinite loop, unlike a fixed `.limit()` that would re-select them.
+  let cursor = '00000000-0000-0000-0000-000000000000';
+
+  while (processed < maxSpecies) {
+    const remaining = Math.min(batchSize, maxSpecies - processed);
+    const { data: species, error } = await supabase
+      .from('species')
+      .select('id, scientific_name, worms_id')
+      .is('worms_id', null)
+      .gt('id', cursor)
+      .order('id', { ascending: true })
+      .limit(remaining);
+
+    if (error) throw new Error(`Failed to load species: ${error.message}`);
+    if (!species || species.length === 0) break;
+
+    const speciesRows: Record<string, unknown>[] = [];
+
+    for (const sp of species) {
+      cursor = sp.id as string;
+      processed += 1;
+
+      const record = await searchByScientificName(sp.scientific_name);
+      if (!record) {
+        notFound += 1;
+        errors.push(`${sp.scientific_name}: not found on WoRMS`);
+        continue;
+      }
+
+      let vernaculars: WormsVernacular[] = [];
+      try {
+        vernaculars = await fetchVernaculars(record.AphiaID);
+      } catch {
+        // non-fatal
+      }
+
+      speciesRows.push({
+        scientific_name: sp.scientific_name,
+        worms_id: record.AphiaID,
+        kingdom: record.kingdom ?? 'Animalia',
+        phylum: record.phylum,
+        class_name: record.class,
+        order_name: record.order,
+        family: record.family,
+        genus: record.genus,
+        common_name: pickVernacular(vernaculars, 'eng') ?? pickVernacular(vernaculars, 'en'),
+        common_name_it: pickVernacular(vernaculars, 'ita') ?? pickVernacular(vernaculars, 'it'),
+        common_name_es: pickVernacular(vernaculars, 'spa') ?? pickVernacular(vernaculars, 'es'),
+        metadata: {
+          source: 'worms',
+          valid_aphia_id: record.valid_AphiaID,
+          valid_name: record.valid_name,
+        },
+      });
     }
 
-    let vernaculars: WormsVernacular[] = [];
-    try {
-      vernaculars = await fetchVernaculars(record.AphiaID);
-    } catch {
-      // non-fatal
+    if (speciesRows.length > 0) {
+      const result = await upsertBatch('species', speciesRows, 'scientific_name');
+      upserted += result.upserted;
+      errors.push(...result.errors);
     }
 
-    speciesRows.push({
-      scientific_name: sp.scientific_name,
-      worms_id: record.AphiaID,
-      kingdom: record.kingdom ?? 'Animalia',
-      phylum: record.phylum,
-      class_name: record.class,
-      order_name: record.order,
-      family: record.family,
-      genus: record.genus,
-      common_name: pickVernacular(vernaculars, 'eng') ?? pickVernacular(vernaculars, 'en'),
-      common_name_it: pickVernacular(vernaculars, 'ita') ?? pickVernacular(vernaculars, 'it'),
-      common_name_es: pickVernacular(vernaculars, 'spa') ?? pickVernacular(vernaculars, 'es'),
-      metadata: {
-        source: 'worms',
-        valid_aphia_id: record.valid_AphiaID,
-        valid_name: record.valid_name,
-      },
-    });
+    logger.info(`WoRMS progress: ${processed} processed, ${upserted} enriched, ${notFound} not-found`);
+
+    if (species.length < remaining) break; // reached the end of the null set
   }
 
-  const result = await upsertBatch('species', speciesRows, 'scientific_name');
+  if (processed === 0) {
+    logger.info('No species missing worms_id — nothing to do');
+  }
 
   logJobSummary('worms', {
-    processed: speciesRows.length,
-    upserted: result.upserted,
-    skipped: result.skipped,
-    errors: [...result.errors, ...errors],
+    processed,
+    upserted,
+    skipped: notFound,
+    errors,
   });
 
   logger.info(`WoRMS ETL finished in ${Date.now() - startedAt}ms`);

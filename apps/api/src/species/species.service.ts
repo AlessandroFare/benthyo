@@ -12,6 +12,7 @@ import { Species, Sighting } from '../database/database.types';
 import { assertNoError } from '../common/utils/supabase-error.util';
 import { paginated, PaginatedResult } from '../common/dto/pagination.dto';
 import { IdentifySpeciesDto, ListSpeciesDto, SetEmbeddingDto, SimilarSpeciesQueryDto } from './dto/species.dto';
+import { AiVisionService, AiVisionResult } from './ai-vision.service';
 
 /**
  * Number of dimensions produced by all-MiniLM-L6-v2 (the on-device TFLite
@@ -38,6 +39,22 @@ export interface InatIdentification {
   image_url: string | null;
 }
 
+/**
+ * Rich response for the AI-assisted photo identification endpoint. Combines
+ * the AI vision proposal, iNaturalist's vision candidates, and the reconciled
+ * catalog species (which may have been created on the fly).
+ */
+export interface AiIdentifyResult {
+  /** The AI vision proposal (Groq), or null when disabled/unsure. */
+  ai: AiVisionResult | null;
+  /** Catalog species matched to the identification (best first). */
+  matches: Species[];
+  /** Raw iNaturalist vision candidates (kept for transparency/fallback). */
+  inat: InatIdentification[];
+  /** True when we created a new catalog species from the AI result. */
+  created: boolean;
+}
+
 @Injectable()
 export class SpeciesService {
   private readonly logger = new Logger(SpeciesService.name);
@@ -45,6 +62,7 @@ export class SpeciesService {
 
   constructor(
     private readonly supabase: SupabaseService,
+    private readonly aiVision: AiVisionService,
     configService: ConfigService,
   ) {
     this.inatBase =
@@ -218,6 +236,185 @@ export class SpeciesService {
     });
 
     return results;
+  }
+
+  /**
+   * AI-assisted photo identification.
+   *
+   * Pipeline:
+   *   1. Run iNaturalist vision (existing, cached) AND Groq vision in parallel.
+   *      iNat is a purpose-built species classifier; Groq adds robust common
+   *      names (it/en/es) + reasoning and covers cases iNat misses.
+   *   2. Reconcile both signals into an ordered list of candidate scientific
+   *      names and match them against our catalog (scientific + common names).
+   *   3. If the confident AI species is NOT yet in the catalog, create a
+   *      minimal species row on the fly (metadata.source = 'ai_identify',
+   *      needs_enrichment = true) so future searches find it and the ETLs
+   *      (iNat/WoRMS) can enrich it later. Then it appears in `matches`.
+   *
+   * Never throws on AI/iNat provider errors — always returns the best result
+   * it can assemble so the diver still gets an answer.
+   */
+  async identifyAi(dto: IdentifySpeciesDto): Promise<AiIdentifyResult> {
+    const [inatSettled, aiSettled] = await Promise.allSettled([
+      this.identify(dto),
+      this.aiVision.identify(dto.image_url),
+    ]);
+
+    const inat: InatIdentification[] =
+      inatSettled.status === 'fulfilled' ? inatSettled.value : [];
+    const ai: AiVisionResult | null =
+      aiSettled.status === 'fulfilled' ? aiSettled.value : null;
+
+    if (inatSettled.status === 'rejected') {
+      this.logger.warn(
+        `iNat identify failed during AI flow: ${String(inatSettled.reason)}`,
+      );
+    }
+
+    // Build an ordered, de-duplicated list of candidate scientific names.
+    // AI proposal first (it carries the richest metadata), then iNat by score.
+    const candidateNames: string[] = [];
+    const pushName = (name: string | null | undefined) => {
+      const clean = name?.trim();
+      if (clean && !candidateNames.some((n) => n.toLowerCase() === clean.toLowerCase())) {
+        candidateNames.push(clean);
+      }
+    };
+    if (ai?.scientific_name) pushName(ai.scientific_name);
+    for (const hit of inat) pushName(hit.scientific_name);
+
+    // Collect common names the AI proposed so we can also match those.
+    const commonNames = [ai?.common_name, ai?.common_name_it, ai?.common_name_es]
+      .map((n) => n?.trim())
+      .filter((n): n is string => !!n);
+
+    let matches = await this.matchCatalog(candidateNames, commonNames);
+
+    // On-the-fly creation: the confident AI species is not in the catalog yet.
+    let created = false;
+    const AI_CREATE_THRESHOLD = 0.55;
+    if (
+      ai?.scientific_name &&
+      ai.is_marine &&
+      ai.confidence >= AI_CREATE_THRESHOLD &&
+      !matches.some(
+        (m) =>
+          m.scientific_name.toLowerCase() ===
+          ai.scientific_name!.toLowerCase(),
+      )
+    ) {
+      const createdRow = await this.createSpeciesFromAi(ai);
+      if (createdRow) {
+        matches = [createdRow, ...matches];
+        created = true;
+      }
+    }
+
+    return { ai, matches, inat, created };
+  }
+
+  /**
+   * Find catalog species matching any of the candidate scientific names
+   * (exact or genus-prefix) or any of the AI-proposed common names.
+   */
+  private async matchCatalog(
+    scientificNames: string[],
+    commonNames: string[],
+  ): Promise<Species[]> {
+    if (scientificNames.length === 0 && commonNames.length === 0) return [];
+
+    const admin = this.supabase.serviceRole();
+    const ors: string[] = [];
+
+    for (const name of scientificNames) {
+      const safe = this.sanitiseForOr(name);
+      if (!safe) continue;
+      // Exact scientific name OR genus prefix (e.g. "Amphiprion%").
+      ors.push(`scientific_name.ilike.${safe}`);
+      const genus = safe.split(' ')[0];
+      if (genus && genus !== safe) ors.push(`scientific_name.ilike.${genus} %`);
+    }
+    for (const name of commonNames) {
+      const safe = this.sanitiseForOr(name);
+      if (!safe) continue;
+      ors.push(`common_name.ilike.%${safe}%`);
+      ors.push(`common_name_it.ilike.%${safe}%`);
+      ors.push(`common_name_es.ilike.%${safe}%`);
+    }
+    if (ors.length === 0) return [];
+
+    const { data, error } = await admin
+      .from('species')
+      .select('*')
+      .or(ors.join(','))
+      .limit(10);
+
+    if (error) {
+      this.logger.warn(`matchCatalog query failed: ${error.message}`);
+      return [];
+    }
+
+    const rows = (data ?? []) as Species[];
+    // Order results by candidate priority: exact scientific-name matches first.
+    const order = new Map(
+      scientificNames.map((n, i) => [n.toLowerCase(), i]),
+    );
+    return rows.sort((a, b) => {
+      const ra = order.get(a.scientific_name.toLowerCase()) ?? 999;
+      const rb = order.get(b.scientific_name.toLowerCase()) ?? 999;
+      return ra - rb;
+    });
+  }
+
+  /**
+   * Create a minimal catalog species from an AI vision result. Idempotent:
+   * upserts on scientific_name so concurrent identifications don't duplicate.
+   * The row is intentionally sparse — the ETLs (iNat/WoRMS) enrich it later.
+   */
+  private async createSpeciesFromAi(ai: AiVisionResult): Promise<Species | null> {
+    if (!ai.scientific_name) return null;
+    const admin = this.supabase.serviceRole();
+
+    const row = {
+      scientific_name: ai.scientific_name,
+      common_name: ai.common_name,
+      common_name_it: ai.common_name_it,
+      common_name_es: ai.common_name_es,
+      family: ai.family,
+      genus: ai.genus ?? ai.scientific_name.split(' ')[0],
+      metadata: {
+        source: 'ai_identify',
+        ai_model: ai.source,
+        ai_confidence: ai.confidence,
+        needs_enrichment: true,
+      },
+    };
+
+    const { data, error } = await admin
+      .from('species')
+      .upsert(row, { onConflict: 'scientific_name' })
+      .select('*')
+      .maybeSingle();
+
+    if (error) {
+      this.logger.warn(
+        `createSpeciesFromAi failed for ${ai.scientific_name}: ${error.message}`,
+      );
+      return null;
+    }
+    return (data as Species) ?? null;
+  }
+
+  /**
+   * Strip characters that are significant in PostgREST `.or()` filter
+   * grammar (commas, parentheses) to avoid breaking the query or injecting
+   * extra conditions. Percent/underscore are left intact (callers add their
+   * own wildcards deliberately).
+   */
+  private sanitiseForOr(value: string): string | null {
+    const cleaned = value.replace(/[(),]/g, ' ').trim();
+    return cleaned.length ? cleaned : null;
   }
 
   /**

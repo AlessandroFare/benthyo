@@ -22,6 +22,7 @@ import { getSupabase, upsertBatch } from '../shared/supabase';
 import { isMainModule } from '../shared/cli';
 import {
   assertSystemUserExists,
+  matchSightingsToSites,
   normalizeCount,
   normalizeDepth,
   normalizeObservedAt,
@@ -48,16 +49,20 @@ const GBIF_API = 'https://api.gbif.org/v1';
  *  - 43        Cnidaria (jellyfish, corals, anemones) — all marine
  *  - 756       Crustacea / Malacostraca — predominantly marine at coasts
  */
+// Per-region record budgets per taxon group. Roughly doubled from v3 now
+// that site-linking is a single set-based query (migration 063) instead of
+// one REST round-trip per occurrence — the previous bottleneck that made
+// larger budgets impractical. Override globally with GBIF_MAX_RECORDS_PER_REGION.
 const MARINE_TAXON_KEYS: Array<{ key: number; label: string; maxRecords: number }> = [
-  { key: 204,       label: 'Actinopterygii',   maxRecords: 2000 },
-  { key: 11592253,  label: 'Elasmobranchii',   maxRecords: 800  },
-  { key: 793,       label: 'Testudines',        maxRecords: 300  },
-  { key: 733,       label: 'Mammalia',          maxRecords: 400  },
-  { key: 760,       label: 'Cephalopoda',       maxRecords: 400  },
-  { key: 137,       label: 'Bivalvia',          maxRecords: 400  },
-  { key: 1065,      label: 'Echinodermata',     maxRecords: 500  },
-  { key: 43,        label: 'Cnidaria',          maxRecords: 400  },
-  { key: 756,       label: 'Crustacea',         maxRecords: 400  },
+  { key: 204,       label: 'Actinopterygii',   maxRecords: 4000 },
+  { key: 11592253,  label: 'Elasmobranchii',   maxRecords: 1500 },
+  { key: 793,       label: 'Testudines',        maxRecords: 600  },
+  { key: 733,       label: 'Mammalia',          maxRecords: 800  },
+  { key: 760,       label: 'Cephalopoda',       maxRecords: 800  },
+  { key: 137,       label: 'Bivalvia',          maxRecords: 800  },
+  { key: 1065,      label: 'Echinodermata',     maxRecords: 1000 },
+  { key: 43,        label: 'Cnidaria',          maxRecords: 800  },
+  { key: 756,       label: 'Crustacea',         maxRecords: 800  },
 ];
 
 const MAX_COORD_UNCERTAINTY_M = 1000;
@@ -286,19 +291,16 @@ export async function runGbifEtl(): Promise<void> {
     const speciesId = idByGbifKey.get(speciesKey) ?? idByName.get(name);
     if (!speciesId) continue;
 
-    const { data: nearestSite } = await supabase.rpc('nearby_dive_sites', {
-      p_lat: occ.decimalLatitude!,
-      p_lng: occ.decimalLongitude!,
-      p_radius_km: 20,
-    });
-    const siteId = nearestSite?.[0]?.id;
-
     const observedAt = normalizeObservedAt(occ.eventDate);
     if (!observedAt) continue;
 
-    const sighting: Record<string, unknown> = {
+    // Site linking is deferred: we always store the raw location and set
+    // dive_site_id = null. A single set-based query (matchSightingsToSites)
+    // links every row to its nearest dive site after the bulk insert,
+    // instead of one nearby_dive_sites RPC per occurrence.
+    sightingRows.push({
       user_id: systemUserId,
-      dive_site_id: siteId ?? null,
+      dive_site_id: null,
       species_id: speciesId,
       observed_at: observedAt,
       depth_m: normalizeDepth(occ.depth),
@@ -306,15 +308,16 @@ export async function runGbifEtl(): Promise<void> {
       confidence_level: 'likely',
       source: 'gbif',
       external_id: String(occ.key),
+      location: `SRID=4326;POINT(${occ.decimalLongitude!} ${occ.decimalLatitude!})`,
       notes: `Imported from GBIF occurrence ${occ.key}`,
-    };
-    if (!siteId) {
-      sighting.location = `SRID=4326;POINT(${occ.decimalLongitude!} ${occ.decimalLatitude!})`;
-    }
-    sightingRows.push(sighting);
+    });
   }
 
   const sightingResult = await upsertBatch('sightings', sightingRows, 'source,external_id');
+
+  // Link all freshly-imported GBIF sightings to nearby dive sites in one
+  // indexed query (replaces per-occurrence RPC calls).
+  await matchSightingsToSites(supabase, 'gbif', 20);
 
   // ── Post-import: iNaturalist common-name enrichment ──
   // Species imported from GBIF have no common_name. We look each one up on
