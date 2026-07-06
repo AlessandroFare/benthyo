@@ -59,6 +59,16 @@ export class SpeciesController {
     return this.speciesService.identify(dto);
   }
 
+  @Post('identify/ai')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary:
+      'AI-assisted identification: Groq vision + iNaturalist reconciled against the catalog, creating the species on the fly when missing',
+  })
+  identifyAi(@Body() dto: IdentifySpeciesDto) {
+    return this.speciesService.identifyAi(dto);
+  }
+
   /**
    * Upload a 384-dim embedding for a species. Computed on-device by the
    * Flutter app (TFLite all-MiniLM-L6-v2). Persists via the SECURITY

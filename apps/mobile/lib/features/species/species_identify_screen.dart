@@ -57,6 +57,8 @@ class _SpeciesIdentifyScreenState extends ConsumerState<SpeciesIdentifyScreen> {
                 matches: result.matches,
                 heroImageUrl: result.imageUrl,
                 matchIndex: _matchIndex,
+                ai: result.ai,
+                created: result.created,
                 onMatchIndexChanged: (index) =>
                     setState(() => _matchIndex = index),
               );
@@ -66,11 +68,15 @@ class _SpeciesIdentifyScreenState extends ConsumerState<SpeciesIdentifyScreen> {
                 results: result.inatResults,
                 heroImageUrl: result.imageUrl,
                 matchIndex: _matchIndex,
+                ai: result.ai,
                 onMatchIndexChanged: (index) =>
                     setState(() => _matchIndex = index),
               );
             }
-            return _EmptyPhotoResult(imageUrl: result.imageUrl);
+            return _EmptyPhotoResult(
+              imageUrl: result.imageUrl,
+              ai: result.ai,
+            );
           },
         ),
       );
@@ -100,12 +106,16 @@ class _SpeciesMatchView extends StatelessWidget {
     required this.matchIndex,
     required this.onMatchIndexChanged,
     this.heroImageUrl,
+    this.ai,
+    this.created = false,
   });
 
   final List<Species> matches;
   final int matchIndex;
   final ValueChanged<int> onMatchIndexChanged;
   final String? heroImageUrl;
+  final AiVisionProposal? ai;
+  final bool created;
 
   @override
   Widget build(BuildContext context) {
@@ -117,6 +127,10 @@ class _SpeciesMatchView extends StatelessWidget {
           child: ListView(
             padding: const EdgeInsets.all(AppSpacing.lg),
             children: [
+              if (ai != null) ...[
+                _AiBanner(ai: ai!, created: created),
+                const SizedBox(height: AppSpacing.lg),
+              ],
               _MatchDots(
                 count: matches.length.clamp(0, 5),
                 activeIndex: matchIndex,
@@ -238,12 +252,14 @@ class _InatMatchView extends StatelessWidget {
     required this.matchIndex,
     required this.onMatchIndexChanged,
     this.heroImageUrl,
+    this.ai,
   });
 
   final List<InatIdentification> results;
   final int matchIndex;
   final ValueChanged<int> onMatchIndexChanged;
   final String? heroImageUrl;
+  final AiVisionProposal? ai;
 
   @override
   Widget build(BuildContext context) {
@@ -255,6 +271,10 @@ class _InatMatchView extends StatelessWidget {
           child: ListView(
             padding: const EdgeInsets.all(AppSpacing.lg),
             children: [
+              if (ai != null) ...[
+                _AiBanner(ai: ai!, created: false),
+                const SizedBox(height: AppSpacing.lg),
+              ],
               _MatchDots(
                 count: results.length.clamp(0, 5),
                 activeIndex: matchIndex,
@@ -325,45 +345,139 @@ class _InatMatchView extends StatelessWidget {
 }
 
 class _EmptyPhotoResult extends StatelessWidget {
-  const _EmptyPhotoResult({this.imageUrl});
+  const _EmptyPhotoResult({this.imageUrl, this.ai});
 
   final String? imageUrl;
+  final AiVisionProposal? ai;
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (imageUrl != null)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: CachedNetworkImage(
-                  imageUrl: imageUrl!,
-                  height: 180,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  placeholder: (_, __) => Container(
-                    color: AppColors.surfaceDark,
-                    child: const Center(child: CircularProgressIndicator()),
-                  ),
-                  errorWidget: (_, __, ___) => Container(
-                    color: AppColors.surfaceDark,
-                    child: const Icon(Icons.image_not_supported_outlined, color: Colors.white38),
-                  ),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          if (imageUrl != null)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: CachedNetworkImage(
+                imageUrl: imageUrl!,
+                height: 180,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                placeholder: (_, __) => Container(
+                  color: AppColors.surfaceDark,
+                  child: const Center(child: CircularProgressIndicator()),
+                ),
+                errorWidget: (_, __, ___) => Container(
+                  color: AppColors.surfaceDark,
+                  child: const Icon(Icons.image_not_supported_outlined, color: Colors.white38),
                 ),
               ),
+            ),
+          const SizedBox(height: AppSpacing.lg),
+          if (ai != null) ...[
+            _AiBanner(ai: ai!, created: false),
             const SizedBox(height: AppSpacing.lg),
+          ] else
             const Text('No species matches for this photo'),
-            const SizedBox(height: AppSpacing.md),
-            FilledButton(
-              onPressed: () => context.pop(),
-              child: const Text('Try another photo'),
+          const SizedBox(height: AppSpacing.md),
+          FilledButton(
+            onPressed: () => context.pop(),
+            child: const Text('Try another photo'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Banner that surfaces the AI vision proposal above the catalog matches.
+class _AiBanner extends StatelessWidget {
+  const _AiBanner({required this.ai, required this.created});
+
+  final AiVisionProposal ai;
+  final bool created;
+
+  @override
+  Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context).languageCode;
+    final confidencePct = (ai.confidence * 100).round();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.auto_awesome,
+                  size: 18, color: AppColors.primary),
+              const SizedBox(width: AppSpacing.sm),
+              Text(
+                'AI identification',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+              const Spacer(),
+              Text(
+                '$confidencePct%',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            ai.displayName(locale: locale),
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+          if (ai.scientificName != null)
+            Text(
+              ai.scientificName!,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textSecondary,
+                    fontStyle: FontStyle.italic,
+                  ),
+            ),
+          if (ai.rationale != null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              ai.rationale!,
+              style: Theme.of(context).textTheme.bodyMedium,
             ),
           ],
-        ),
+          if (created) ...[
+            const SizedBox(height: AppSpacing.md),
+            Row(
+              children: [
+                const Icon(Icons.add_circle_outline,
+                    size: 16, color: AppColors.success),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Text(
+                    'Added to the Benthyo catalog — details will improve soon.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
       ),
     );
   }
