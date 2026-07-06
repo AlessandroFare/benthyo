@@ -16,6 +16,7 @@ import { getSupabase, upsertBatch } from '../shared/supabase';
 import { isMainModule } from '../shared/cli';
 import {
   assertSystemUserExists,
+  matchSightingsToSites,
   normalizeCount,
   normalizeDepth,
   normalizeObservedAt,
@@ -96,7 +97,10 @@ export async function runObisEtl(): Promise<void> {
   const regions = resolveRegions('OBIS_REGIONS');
   logger.info(`OBIS regions: ${regions.map((r) => r.name).join(', ')}`);
 
-  const maxRecords = Number(process.env.OBIS_MAX_RECORDS ?? 8000);
+  // Raised from 8000 now that site-linking is a single set-based query
+  // (migration 063) rather than one RPC per occurrence. Override with
+  // OBIS_MAX_RECORDS.
+  const maxRecords = Number(process.env.OBIS_MAX_RECORDS ?? 24000);
   const pageSize = 200;
   // Spread budget across regions × taxa
   const perQuery = Math.max(pageSize, Math.ceil(maxRecords / (regions.length * MARINE_TAXA.length)));
@@ -152,14 +156,6 @@ export async function runObisEtl(): Promise<void> {
       metadata: { source: 'obis', obis_id: occ.id, taxon_id: occ.taxonID },
     });
 
-    const { data: nearestSite } = await supabase.rpc('nearby_dive_sites', {
-      p_lat: occ.decimalLatitude,
-      p_lng: occ.decimalLongitude,
-      p_radius_km: 20,
-    });
-
-    const siteId = nearestSite?.[0]?.id;
-
     const observedAt = normalizeObservedAt(occ.date_start);
     if (!observedAt) continue;
 
@@ -167,9 +163,12 @@ export async function runObisEtl(): Promise<void> {
       occ.minimumDepthInMeters != null ? occ.minimumDepthInMeters : occ.maximumDepthInMeters,
     );
 
-    const sighting: Record<string, unknown> = {
+    // Site linking deferred to a single set-based query after insert
+    // (matchSightingsToSites). Always store location so both the batch
+    // matcher and open-water reconciliation can link the row.
+    sightingRows.push({
       user_id: systemUserId,
-      dive_site_id: siteId ?? null,
+      dive_site_id: null,
       species_id: null,
       observed_at: observedAt,
       depth_m: depth,
@@ -177,12 +176,9 @@ export async function runObisEtl(): Promise<void> {
       confidence_level: 'likely',
       source: 'obis',
       external_id: occ.id,
+      location: `SRID=4326;POINT(${occ.decimalLongitude} ${occ.decimalLatitude})`,
       notes: `Imported from OBIS ${occ.id}`,
-    };
-    if (!siteId) {
-      sighting.location = `SRID=4326;POINT(${occ.decimalLongitude} ${occ.decimalLatitude})`;
-    }
-    sightingRows.push(sighting);
+    });
   }
 
   const speciesResult = await upsertBatch('species', speciesRows, 'scientific_name');
@@ -207,6 +203,9 @@ export async function runObisEtl(): Promise<void> {
     .filter(Boolean) as Record<string, unknown>[];
 
   const sightingResult = await upsertBatch('sightings', resolvedSightings, 'source,external_id');
+
+  // Link all freshly-imported OBIS sightings to nearby dive sites in one query.
+  await matchSightingsToSites(supabase, 'obis', 20);
 
   logJobSummary('obis', {
     processed: occurrences.length,

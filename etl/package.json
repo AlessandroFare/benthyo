@@ -28,9 +28,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@ai-sdk/openai-compatible": "^3.0.5",
     "@benthyo/types": "workspace:*",
     "@supabase/supabase-js": "^2.47.10",
-    "dotenv": "^16.4.7"
+    "ai": "^7.0.15",
+    "dotenv": "^16.4.7",
+    "zod": "^3.24.2"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",

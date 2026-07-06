@@ -16,6 +16,7 @@ import { getSupabase, upsertBatch } from '../shared/supabase';
 import { isMainModule } from '../shared/cli';
 import {
   assertSystemUserExists,
+  matchSightingsToSites,
   normalizeCount,
   normalizeDepth,
   normalizeObservedAt,
@@ -209,20 +210,16 @@ export async function runInatObservationsEtl(): Promise<void> {
     (speciesLookup ?? []).map((s) => [s.inat_taxon_id as number, s.id as string]),
   );
 
-  // Phase 3: match to dive sites + build sighting rows
+  // Phase 3: build sighting rows. Site linking is deferred to a single
+  // set-based query (matchSightingsToSites) instead of one nearby_dive_sites
+  // RPC per observation. Crucially, observations WITHOUT a nearby dive site
+  // are no longer discarded — they keep their GPS-accurate location and are
+  // linked in bulk (or clustered into open-water sites by reconciliation).
   const sightingRows: Record<string, unknown>[] = [];
 
   for (const obs of observations) {
     const speciesId = idByInatId.get(obs.taxon!.id);
     if (!speciesId) continue;
-
-    const { data: nearestSite } = await supabase.rpc('nearby_dive_sites', {
-      p_lat: obs.latitude!,
-      p_lng: obs.longitude!,
-      p_radius_km: 15,
-    });
-    const siteId = nearestSite?.[0]?.id;
-    if (!siteId) continue;
 
     const observedAt = normalizeObservedAt(obs.observed_on);
     if (!observedAt) continue;
@@ -231,7 +228,7 @@ export async function runInatObservationsEtl(): Promise<void> {
 
     sightingRows.push({
       user_id: systemUserId,
-      dive_site_id: siteId,
+      dive_site_id: null,
       species_id: speciesId,
       observed_at: observedAt,
       depth_m: normalizeDepth(obs.depth),
@@ -239,12 +236,16 @@ export async function runInatObservationsEtl(): Promise<void> {
       confidence_level: 'verified',
       source: 'inat',
       external_id: obs.uuid,
+      location: `SRID=4326;POINT(${obs.longitude!} ${obs.latitude!})`,
       notes: `Imported from iNaturalist observation ${obs.id}`,
       ...(photoUrl ? { photo_urls: [photoUrl] } : {}),
     });
   }
 
   const sightingResult = await upsertBatch('sightings', sightingRows, 'source,external_id');
+
+  // Link all freshly-imported iNaturalist sightings to nearby dive sites.
+  await matchSightingsToSites(supabase, 'inat', 15);
 
   logJobSummary('inat-observations', {
     processed: totalFetched,

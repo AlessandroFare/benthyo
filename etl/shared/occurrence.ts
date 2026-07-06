@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { logger } from './logger';
 
 /**
  * Normalisation helpers shared by the occurrence-based ETL sources
@@ -91,4 +92,34 @@ export async function assertSystemUserExists(
         'seed a system user (see scripts/seed-etl-system-user.sql) before running occurrence imports',
     );
   }
+}
+
+/**
+ * Link every unmatched sighting of a given source to its nearest dive site
+ * within `radiusKm`, in a SINGLE set-based SQL query.
+ *
+ * This replaces the old per-occurrence `nearby_dive_sites` RPC calls (one
+ * network round-trip per row). The occurrence ETLs now insert sightings with
+ * only their `location` and a NULL `dive_site_id`, then call this helper once
+ * at the end. See migration 063_batch_match_sightings.sql.
+ *
+ * Non-fatal: a failure is logged and swallowed so the import is not lost —
+ * run-all-data's reconciliation step will still pick up unmatched rows.
+ */
+export async function matchSightingsToSites(
+  supabase: SupabaseClient,
+  source: string,
+  radiusKm: number,
+): Promise<number> {
+  const { data, error } = await supabase.rpc('match_sightings_to_nearby_sites', {
+    p_source: source,
+    p_radius_km: radiusKm,
+  });
+  if (error) {
+    logger.warn(`match_sightings_to_nearby_sites(${source}) failed: ${error.message}`);
+    return 0;
+  }
+  const matched = typeof data === 'number' ? data : Number(data ?? 0);
+  logger.info(`Batch-matched ${matched} ${source} sightings to nearby dive sites`);
+  return matched;
 }
