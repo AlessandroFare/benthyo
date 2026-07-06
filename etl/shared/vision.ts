@@ -88,7 +88,7 @@ export async function fetchImageAsDataUrl(url: string): Promise<string | null> {
  * or null on any failure (download, HTTP, parse, or schema mismatch).
  */
 export async function extractJsonFromImage<T>(
-  schema: z.ZodType<T>,
+  schema: z.ZodType<T, z.ZodTypeDef, unknown>,
   imageUrl: string,
   opts: { system: string; prompt: string; temperature?: number; maxTokens?: number },
 ): Promise<T | null> {
