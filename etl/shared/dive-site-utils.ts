@@ -56,6 +56,13 @@ export function normalizeSiteType(value: string | undefined): string {
   if (lower === 'kelp forest'     || lower === 'kelp_forest')     return 'reef';
   if (lower === 'channel')                                        return 'other';
   if (lower === 'open water'      || lower === 'open_water')      return 'other';
+  // LLM-generated values not in SITE_TYPES
+  if (lower === 'drift')                                          return 'reef';
+  if (lower === 'arch')                                           return 'other';
+  if (lower === 'swim-through'    || lower === 'swimthrough')     return 'other';
+  if (lower === 'sandy'           || lower === 'sand')            return 'muck';
+  if (lower === 'sloping reef'    || lower === 'slope')           return 'reef';
+  if (lower === 'garden')                                         return 'reef';
   // Generic keyword matching
   if (lower.includes('wreck'))                                    return 'wreck';
   if (lower.includes('wall') || lower.includes('drop'))          return 'wall';
@@ -84,6 +91,8 @@ export function normalizeDifficulty(value: string | undefined, fallbackText = ''
 
 export function normalizeAccessType(value: string | undefined, fallbackText = ''): string {
   const lower = (value ?? '').toLowerCase();
+  // 'both' means shore+boat — normalise to 'boat' (more specific than 'shore')
+  if (lower === 'both') return 'boat';
   if (ACCESS_TYPES.has(lower)) return lower;
   const hint = fallbackText.toLowerCase();
   if (hint.includes('liveaboard')) return 'liveaboard';

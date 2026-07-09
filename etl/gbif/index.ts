@@ -109,7 +109,7 @@ function mapConservationStatus(iucn?: string): ConservationStatus | null {
   return map[iucn.toUpperCase()] ?? null;
 }
 
-const limiter = new RateLimiter({ minIntervalMs: 200, maxRetries: 5 });
+const limiter = new RateLimiter({ minIntervalMs: 200, maxRetries: 5, timeoutMs: 120_000 });
 
 async function fetchOccurrencePage(
   region: MarineRegion,
@@ -145,7 +145,7 @@ async function fetchSpeciesInfo(speciesKey: number): Promise<GbifSpeciesInfo | n
 // ── iNaturalist common-name lookup (post-import enrichment) ──
 
 const INAT_API = process.env.INAT_API_BASE ?? 'https://api.inaturalist.org/v1';
-const inatLimiter = new RateLimiter({ minIntervalMs: 800, maxRetries: 3 });
+const inatLimiter = new RateLimiter({ minIntervalMs: 800, maxRetries: 3, timeoutMs: 120_000 });
 
 interface InatTaxonResult {
   id: number;

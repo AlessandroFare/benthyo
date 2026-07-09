@@ -24,12 +24,15 @@
     "inat:observations": "tsx inat-observations/index.ts",
     "inat:taxon-lookup": "tsx inat-taxon-lookup/index.ts",
     "dive-site-discovery": "tsx dive-site-discovery/index.ts",
+    "dive-map-vision": "tsx dive-map-vision/index.ts",
+    "wikivoyage": "tsx wikivoyage/index.ts",
     "all-data": "tsx run-all-data.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@ai-sdk/google": "^4.0.9",
     "@ai-sdk/openai-compatible": "^3.0.5",
     "@benthyo/types": "workspace:*",
     "@supabase/supabase-js": "^2.47.10",

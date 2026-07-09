@@ -54,13 +54,13 @@ import { enumerateDestinations } from '../shared/destinations';
 
 // ── Config ──────────────────────────────────────────────────────────
 
-const MAX_DESTINATIONS = Number(process.env.DISCOVERY_MAX_DESTINATIONS ?? 25);
+const MAX_DESTINATIONS = Number(process.env.DISCOVERY_MAX_DESTINATIONS ?? 100);
 const MAX_SITES_PER_DEST = Number(process.env.DISCOVERY_MAX_SITES_PER_DEST ?? 20);
 const USE_COMMONS = process.env.DISCOVERY_USE_COMMONS === '1';
 const COMMONS_API = process.env.COMMONS_API_URL ?? 'https://commons.wikimedia.org/w/api.php';
 const USER_AGENT =
   process.env.WIKIMEDIA_USER_AGENT ?? 'Benthyo/1.0 (https://benthyo.com; contact@benthyo.com)';
-const MAX_COMMONS_PHOTOS = Number(process.env.DISCOVERY_COMMONS_PHOTOS ?? 40);
+const MAX_COMMONS_PHOTOS = Number(process.env.DISCOVERY_COMMONS_PHOTOS ?? 100);
 
 // ── LLM schemas ─────────────────────────────────────────────────────
 
@@ -70,14 +70,14 @@ const SitesSchema = z.object({
       z.object({
         name: z.string().describe('The specific named dive site'),
         site_type: z
-          .enum(['reef', 'wall', 'wreck', 'cave', 'pinnacle', 'muck', 'other'])
+          .enum(['reef', 'wall', 'wreck', 'cave', 'pinnacle', 'muck', 'drift', 'arch', 'artificial reef', 'sandy', 'swim-through', 'other'])
           .nullable(),
         difficulty: z
           .enum(['beginner', 'intermediate', 'advanced', 'technical'])
           .nullable(),
         depth_min: z.number().nullable(),
         depth_max: z.number().nullable(),
-        access_type: z.enum(['shore', 'boat', 'liveaboard']).nullable(),
+        access_type: z.enum(['shore', 'boat', 'liveaboard', 'both']).nullable(),
         description: z.string().nullable(),
       }),
     )
@@ -165,8 +165,8 @@ export async function runDiveSiteDiscoveryEtl(): Promise<void> {
 
   if (!isLlmConfigured()) {
     logger.warn(
-      'Skipping dive-site-discovery: OPENCODE_ZEN_API_KEY not set. ' +
-        'Set it to enable LLM-backed site discovery.',
+      'Skipping dive-site-discovery: no LLM API key set. ' +
+        'Set GROQ_API_KEY (preferred) or OPENCODE_ZEN_API_KEY to enable.',
     );
     logJobSummary('dive-site-discovery', { processed: 0, upserted: 0, skipped: 0, errors: [] });
     return;
@@ -245,13 +245,29 @@ export async function runDiveSiteDiscoveryEtl(): Promise<void> {
     const query = cand.country
       ? `${cand.name}, ${cand.destination}, ${cand.country}`
       : `${cand.name}, ${cand.destination}`;
-    const place = await geocode(query, cand.region.bbox);
+    let place = await geocode(query, cand.region.bbox);
 
-    if (!place) {
-      // Without coordinates the site is not useful for map / proximity search.
-      skippedNoCoords += 1;
-      continue;
+    // If the site name didn't resolve (common for obscure sites not in OSM),
+    // fall back to geocoding just the destination + country so the site is
+    // anchored near the correct area rather than skipped entirely.
+    if (!place && cand.destination) {
+      const destQuery = cand.country
+        ? `${cand.destination}, ${cand.country}`
+        : cand.destination;
+      place = await geocode(destQuery, cand.region.bbox);
     }
+
+    // Last resort: use the centre of the region bounding box.
+    if (!place) {
+      place = {
+        lat: (cand.region.bbox.nelat + cand.region.bbox.swlat) / 2,
+        lng: (cand.region.bbox.nelng + cand.region.bbox.swlng) / 2,
+        displayName: cand.region.name.replace(/_/g, ' '),
+        countryCode: null,
+        importance: 0,
+      };
+    }
+
     geocoded += 1;
 
     const baseSlug = slugify(`disc-${cand.name}`);

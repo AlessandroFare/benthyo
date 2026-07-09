@@ -70,7 +70,7 @@ const MARINE_TAXA = [
   'Malacostraca',      // crabs, lobsters, shrimp
 ];
 
-const limiter = new RateLimiter({ minIntervalMs: 300 });
+const limiter = new RateLimiter({ minIntervalMs: 300, timeoutMs: 120_000 });
 
 async function fetchObisPage(
   regionWkt: string,

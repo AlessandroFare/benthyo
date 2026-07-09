@@ -7,6 +7,8 @@ export interface RateLimiterOptions {
   maxRetries?: number;
   /** Base backoff in ms for exponential retry. */
   baseBackoffMs?: number;
+  /** HTTP request timeout in ms (AbortSignal). Default no timeout. */
+  timeoutMs?: number;
 }
 
 export class RateLimiter {
@@ -14,11 +16,13 @@ export class RateLimiter {
   private readonly minIntervalMs: number;
   private readonly maxRetries: number;
   private readonly baseBackoffMs: number;
+  private readonly timeoutMs: number;
 
   constructor(options: RateLimiterOptions = {}) {
     this.minIntervalMs = options.minIntervalMs ?? 200;
     this.maxRetries = options.maxRetries ?? 5;
     this.baseBackoffMs = options.baseBackoffMs ?? 500;
+    this.timeoutMs = options.timeoutMs ?? 0;
   }
 
   private async waitForSlot(): Promise<void> {
@@ -37,7 +41,10 @@ export class RateLimiter {
       await this.waitForSlot();
 
       try {
-        const response = await fetch(url, init);
+        const signal = this.timeoutMs > 0
+          ? AbortSignal.timeout(this.timeoutMs)
+          : undefined;
+        const response = await fetch(url, { ...init, signal });
 
         if (response.status === 429 || response.status === 503) {
           if (attempt >= this.maxRetries) {

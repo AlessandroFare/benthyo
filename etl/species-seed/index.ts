@@ -53,7 +53,7 @@ const ICONIC_SPECIES: string[] = [
   'Taeniura lymma', // bluespotted ribbontail ray
   'Mobula mobular', // devil ray
   // Bony fish — famous reef & pelagic
-  'Mola mola', // ocean sunfish
+  'Mola mola', // ocean sunfish — NOTE: iNat taxon search sometimes returns the plant Liquidambar styraciflua (also called "sweetgum" / "American sweetgum"). The exact-name match filter in resolveInat should prevent this, but as a safeguard we verify the class is Actinopterygii or Tetraodontiformes.
   'Cheilinus undulatus', // humphead / Napoleon wrasse
   'Amphiprion ocellaris', // clown anemonefish
   'Amphiprion percula', // orange clownfish
@@ -89,7 +89,7 @@ const ICONIC_SPECIES: string[] = [
   'Megaptera novaeangliae', // humpback whale
   'Physeter macrocephalus', // sperm whale
   'Dugong dugon', // dugong
-  'Monachus monachus', // mediterranean monk seal
+  'Monachus monachus', // mediterranean monk seal — NOTE: iNat sometimes returns Myiopsitta monachus (Monk Parakeet). The exact-name match should prevent this.
   // Cephalopods
   'Octopus vulgaris', // common octopus
   'Hapalochlaena lunulata', // blue-ringed octopus
@@ -151,12 +151,24 @@ async function resolveInat(scientificName: string): Promise<{
   try {
     const data = await inatLimiter.fetchJson<{ results: InatTaxonResult[] }>(url);
     const want = scientificName.toLowerCase().trim();
-    const match =
-      data.results?.find((r) => r.name.toLowerCase().trim() === want) ?? data.results?.[0];
+    // Require exact name match — iNaturalist's fuzzy search sometimes returns
+    // completely unrelated taxa (e.g. Mola mola → Liquidambar styraciflua,
+    // Monachus monachus → Myiopsitta monachus) that share common-name words.
+    const match = data.results?.find((r) => r.name.toLowerCase().trim() === want);
     if (!match) return null;
 
     const byRank = (rank: string): string | null =>
       match.ancestors?.find((a) => a.rank === rank)?.name ?? null;
+
+    // Sanity check: reject obviously wrong taxa (plants, birds for marine mammals, etc.)
+    const className = byRank('class');
+    const phylum = byRank('phylum');
+    if (phylum === 'Tracheophyta' || className === 'Aves') {
+      logger.warn(
+        `iNat match for ${scientificName} returned wrong taxon (phylum=${phylum}, class=${className}) — skipping`,
+      );
+      return null;
+    }
 
     return {
       inat_taxon_id: match.id,
@@ -164,9 +176,9 @@ async function resolveInat(scientificName: string): Promise<{
       image_url: match.default_photo?.medium_url ?? match.default_photo?.square_url ?? null,
       family: byRank('family'),
       genus: byRank('genus') ?? scientificName.split(' ')[0],
-      class_name: byRank('class'),
+      class_name: className,
       order_name: byRank('order'),
-      phylum: byRank('phylum'),
+      phylum,
     };
   } catch (err) {
     logger.warn(`iNat resolve failed for ${scientificName}: ${err instanceof Error ? err.message : String(err)}`);

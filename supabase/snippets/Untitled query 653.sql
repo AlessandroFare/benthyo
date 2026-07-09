@@ -1,6 +1,4 @@
-INSERT INTO operator_users (operator_id, user_id, role)
-SELECT id, '4834e8cb-8459-4e76-b8eb-52ad091f0a06'::uuid, 'owner'
-FROM operators
-WHERE slug = 'diving-center-ustica'
-LIMIT 1
-ON CONFLICT (operator_id, user_id) DO UPDATE SET role = EXCLUDED.role;
+-- Verifica prima
+SELECT id, scientific_name, common_name FROM species WHERE common_name IN ('American sweetgum', 'Monk Parakeet');
+-- Poi correggi il common_name a NULL per riresolverlo alla prossima run
+UPDATE species SET common_name = NULL, image_url = NULL WHERE common_name IN ('American sweetgum', 'Monk Parakeet');

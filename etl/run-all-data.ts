@@ -108,12 +108,18 @@ export async function runAllDataEtl(): Promise<void> {
     // Wikidata SPARQL: hand-curated, exact coordinates for shipwrecks, reefs,
     // cenotes, blue holes, and seamounts. Runs alongside the other map sources.
     { name: 'wikidata', fn: runWikidataEtl },
+    // Wikivoyage: human-curated dive guides (CC BY-SA) with exact coordinates,
+    // depth, and conditions. Runs alongside other site sources for dedup.
+    { name: 'wikivoyage', fn: runWikivoyageEtl },
   ]);
 
-  // 3. LLM-driven discovery (OpenCode Zen enumeration + Nominatim geocoding).
-  //    Runs AFTER the map-based sources so it can dedup against everything they
-  //    ingested. No-ops gracefully if OPENCODE_ZEN_API_KEY is unset.
+  // 3. LLM-driven discovery. Runs AFTER the map-based sources so they can
+  //    dedup against everything already ingested.
+  //    3a. OpenCode Zen enumeration + Nominatim geocoding.
+  //    3b. Dive-map vision: image search + Llama 4 Scout OCR for dive maps.
+  //    Both no-op gracefully if their API keys are unset.
   await step('dive-site-discovery', runDiveSiteDiscoveryEtl);
+  await step('dive-map-vision', runDiveMapVisionEtl);
 
   // 4. Apify Google Maps crawl. Last in the site batch because it is the slowest.
   await step('apify:google-maps', runApifyGoogleMapsEtl);

@@ -17,7 +17,16 @@ import {
 import { upsertBatch } from '../shared/supabase';
 import { isMainModule } from '../shared/cli';
 
-const OVERPASS_API = process.env.OVERPASS_API_URL ?? 'https://overpass-api.de/api/interpreter';
+/**
+ * Overpass API endpoints. The primary is tried first; on HTTP 504/429 we
+ * retry on the next mirror. All are free public instances.
+ */
+const OVERPASS_MIRRORS = [
+  process.env.OVERPASS_API_URL ?? 'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://overpass.private.coffee/api/interpreter',
+];
 
 interface OverpassElement {
   type: 'node' | 'way' | 'relation';
@@ -32,7 +41,23 @@ interface OverpassResponse {
   elements: OverpassElement[];
 }
 
-const limiter = new RateLimiter({ minIntervalMs: 3000 });
+/**
+ * Some Overpass regions span huge bounding boxes that cause HTTP 504 timeouts
+ * on the public Overpass servers. Split them into smaller sub-bboxes that are
+ * queried independently and their results merged.
+ */
+function splitRegionIfNeeded(region: OverpassRegion): OverpassRegion[] {
+  // Pacific: 140°→-120° longitude = 260° span. Split into 3 vertical slices.
+  if (region.name === 'pacific') {
+    return [
+      { name: 'pacific_west',  south: -30, west: 140, north: 30, east: 180 },
+      { name: 'pacific_central', south: -30, west: -180, north: 30, east: -150 },
+      { name: 'pacific_east',  south: -30, west: -150, north: 30, east: -120 },
+    ];
+  }
+  // Caribbean can also be slow on some servers, but 504 is rare there.
+  return [region];
+}
 
 function countryFromTags(tags: Record<string, string>): string {
   const iso = tags['ISO3166-1:alpha2'] ?? tags['addr:country'];
@@ -103,23 +128,69 @@ function mapElement(
   };
 }
 
+/**
+ * Overpass limiter: 3s between requests, NO retries on 429/503.
+ * The fetchWithRetry function handles mirror failover instead.
+ */
+const limiter = new RateLimiter({ minIntervalMs: 3000, maxRetries: 0, baseBackoffMs: 0 });
+
 async function fetchRegion(region: OverpassRegion): Promise<OverpassElement[]> {
-  const query = buildOverpassQuery(region);
-  logger.info(`Overpass query: ${region.name}`);
+  const subRegions = splitRegionIfNeeded(region);
+  const allElements: OverpassElement[] = [];
 
-  const response = await limiter.fetch(OVERPASS_API, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `data=${encodeURIComponent(query)}`,
-  });
-
-  if (!response.ok) {
-    throw new Error(`Overpass API error (${region.name}): HTTP ${response.status}`);
+  for (const sub of subRegions) {
+    const label = subRegions.length > 1 ? `${region.name} (${sub.name})` : region.name;
+    const elements = await fetchWithRetry(sub, label);
+    allElements.push(...elements);
   }
 
-  const data = (await response.json()) as OverpassResponse;
-  logger.info(`Overpass ${region.name}: ${data.elements.length} elements`);
-  return data.elements;
+  if (subRegions.length > 1) {
+    logger.info(`Overpass ${region.name}: ${allElements.length} total elements (${subRegions.length} sub-queries)`);
+  }
+  return allElements;
+}
+
+/**
+ * Fetch a single sub-region, retrying on alternative Overpass mirrors in
+ * case of HTTP 504 (gateway timeout) or 429 (rate limited).
+ */
+async function fetchWithRetry(region: OverpassRegion, label: string): Promise<OverpassElement[]> {
+  const query = buildOverpassQuery(region);
+  logger.info(`Overpass query: ${label}`);
+
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt < OVERPASS_MIRRORS.length; attempt++) {
+    const endpoint = OVERPASS_MIRRORS[attempt];
+    try {
+      const response = await limiter.fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `data=${encodeURIComponent(query)}`,
+      });
+
+      if (response.status === 504 || response.status === 429) {
+        logger.warn(`Overpass ${label}: HTTP ${response.status} on ${endpoint}, trying next mirror…`);
+        lastError = new Error(`Overpass API error (${label}): HTTP ${response.status}`);
+        continue;
+      }
+
+      if (!response.ok) {
+        throw new Error(`Overpass API error (${label}): HTTP ${response.status}`);
+      }
+
+      const data = (await response.json()) as OverpassResponse;
+      logger.info(`Overpass ${label}: ${data.elements.length} elements`);
+      return data.elements;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      logger.warn(`Overpass ${label}: failed on ${endpoint}: ${message}, trying next mirror…`);
+      lastError = err instanceof Error ? err : new Error(message);
+      // Continue to next mirror
+    }
+  }
+
+  throw lastError ?? new Error(`Overpass ${label}: all mirrors failed`);
 }
 
 export async function runOverpassEtl(): Promise<void> {

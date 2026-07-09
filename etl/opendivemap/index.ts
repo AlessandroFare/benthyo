@@ -17,6 +17,20 @@ const API_BASE = process.env.OPENDIVEMAP_API_URL ?? 'https://api.opendivemap.com
 const PAGE_SIZE = Number(process.env.OPENDIVEMAP_PAGE_SIZE ?? 500);
 const MAX_SITES = Number(process.env.OPENDIVEMAP_MAX_SITES ?? 10000);
 
+// Safety check: if someone accidentally sets OPENDIVEMAP_API_URL to the
+// DiveNumber endpoint (a common copy-paste mistake since both are dive-site
+// APIs), the /sites path gets duplicated and every request 404s.
+if (API_BASE.includes('divenumber.com')) {
+  logger.warn(
+    'OPENDIVEMAP_API_URL is set to divenumber.com — this looks like a misconfiguration. ' +
+    'Resetting to https://api.opendivemap.com/v1. ' +
+    'Set DIVENUMBER_API_URL instead for Dive Number.',
+  );
+}
+const RESOLVED_API_BASE = API_BASE.includes('divenumber.com')
+  ? 'https://api.opendivemap.com/v1'
+  : API_BASE;
+
 // Fetch marine sites only: ocean environment + all saltwater topologies.
 // Setting environment=ocean excludes lakes, rivers, springs, quarries, pools.
 // Not filtering by topology so we get all marine types (reef, wall, wreck, etc.)
@@ -56,7 +70,7 @@ async function fetchPage(offset: number, limit: number): Promise<OpenDiveMapFeat
   if (country) params.set('country', country);
   if (bbox) params.set('bbox', bbox);
 
-  const url = `${API_BASE}/sites?${params}`;
+  const url = `${RESOLVED_API_BASE}/sites?${params}`;
   const data = await limiter.fetchJson<OpenDiveMapResponse>(url);
   return data.features ?? [];
 }

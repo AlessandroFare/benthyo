@@ -68,13 +68,13 @@ import {
 // ── Config ──────────────────────────────────────────────────────────
 
 /** Destinations processed per run (each costs image search + N vision calls). */
-const MAX_DESTINATIONS = Number(process.env.DIVE_MAP_MAX_DESTINATIONS ?? 8);
+const MAX_DESTINATIONS = Number(process.env.DIVE_MAP_MAX_DESTINATIONS ?? 30);
 /** Images analysed per destination. */
-const IMAGES_PER_DEST = Number(process.env.DIVE_MAP_IMAGES_PER_DEST ?? 6);
+const IMAGES_PER_DEST = Number(process.env.DIVE_MAP_IMAGES_PER_DEST ?? 10);
 /** Minimum cross-map votes to keep a site (1 = trust single maps). */
 const MIN_VOTES = Number(process.env.DIVE_MAP_MIN_VOTES ?? 1);
 /** LLM-enumerated destinations per region (pre-rotation pool size). */
-const DESTS_PER_REGION = Number(process.env.DIVE_MAP_DESTS_PER_REGION ?? 15);
+const DESTS_PER_REGION = Number(process.env.DIVE_MAP_DESTS_PER_REGION ?? 30);
 
 const SEARCH_QUERIES = ['dive sites map', 'dive site map diving'];
 
@@ -105,14 +105,14 @@ const EnrichmentSchema = z.object({
       name: z.string(),
       is_real_dive_site: z.boolean(),
       site_type: z
-        .enum(['reef', 'wall', 'wreck', 'cave', 'pinnacle', 'muck', 'other'])
+        .enum(['reef', 'wall', 'wreck', 'cave', 'pinnacle', 'muck', 'drift', 'arch', 'artificial reef', 'sandy', 'swim-through', 'other'])
         .nullable(),
       difficulty: z
         .enum(['beginner', 'intermediate', 'advanced', 'technical'])
         .nullable(),
       depth_min: z.number().nullable(),
       depth_max: z.number().nullable(),
-      access_type: z.enum(['shore', 'boat', 'liveaboard']).nullable(),
+      access_type: z.enum(['shore', 'boat', 'liveaboard', 'both']).nullable(),
       description: z.string().nullable(),
     }),
   ),
@@ -318,7 +318,7 @@ async function resolveDestinations(errors: string[]): Promise<Destination[]> {
 
   if (!isLlmConfigured()) {
     logger.warn(
-      'No DIVE_MAP_DESTINATIONS and no OPENCODE_ZEN_API_KEY — cannot enumerate destinations.',
+      'No DIVE_MAP_DESTINATIONS and no LLM API key — cannot enumerate destinations.',
     );
     return [];
   }
