@@ -1,22 +1,40 @@
 /**
- * Shared LLM client for the ETL pipeline — multi-provider with auto-failover.
+ * Shared LLM client for the ETL pipeline — multi-provider chain with
+ * per-provider rate limiting, cooldowns, and automatic recovery.
  *
- * Primary: Groq (fast, free tier 30 req/min, 100K TPD on llama-3.3-70b)
- * Fallback: OpenCode Zen (slower, no documented daily limit)
+ * Provider chain (all free tiers, best RPD/quality first):
+ *   1. google    gemini-2.5-flash-lite   30 RPM / 1,500 RPD — native structured output
+ *   2. mistral   mistral-small-latest    ~1 RPS / 1B tokens-month — native JSON mode
+ *   3. cerebras  llama-3.3-70b           30 RPM / 14,400 RPD / 1M tokens-day
+ *   4. groq      llama-3.1-8b-instant    30 RPM / 14,400 RPD / 500K TPD
+ *   5. opencode-zen  deepseek-v4-flash-free  last resort (flaky JSON)
  *
- * When Groq hits its daily token limit (TPD), the client automatically
- * switches to OpenCode Zen for the rest of the process lifetime. This
- * lets the pipeline complete even on heavy days where Groq's 100K TPD
- * is exhausted after 2-3 regions.
+ * Unlike the previous one-way failover, every provider has an independent
+ * cooldown: a per-minute rate limit puts it on a short cooldown, a daily
+ * limit on a long one. Each request picks the FIRST provider in the chain
+ * whose cooldown has expired, so the pipeline automatically returns to the
+ * primary once its window clears instead of staying on a fallback forever.
  *
- * Config:
- *   ETL_LLM_PROVIDER          'groq' | 'opencode-zen' (default: auto)
- *   GROQ_API_KEY              Groq API key (free at console.groq.com)
- *   GROQ_LLM_MODEL            default llama-3.3-70b-versatile
+ * The `generateObject` capability flag is also tracked PER PROVIDER: an
+ * OpenAI-compatible provider that rejects structured output no longer
+ * disables it for providers that support it natively.
+ *
+ * Config (all optional — chain skips providers without a key):
+ *   ETL_LLM_PROVIDER          force one provider ('google' | 'mistral' | 'cerebras' | 'groq' | 'opencode-zen')
+ *   GOOGLE_AI_API_KEY         aistudio.google.com — free
+ *   GOOGLE_LLM_MODEL          default gemini-2.5-flash-lite
+ *   MISTRAL_API_KEY           console.mistral.ai — free tier
+ *   MISTRAL_LLM_MODEL         default mistral-small-latest
+ *   MISTRAL_BASE_URL          default https://api.mistral.ai/v1
+ *   CEREBRAS_API_KEY          cloud.cerebras.ai — free tier
+ *   CEREBRAS_LLM_MODEL        default llama-3.3-70b
+ *   CEREBRAS_BASE_URL         default https://api.cerebras.ai/v1
+ *   GROQ_API_KEY              console.groq.com — free tier
+ *   GROQ_LLM_MODEL            default llama-3.1-8b-instant
  *   GROQ_BASE_URL             default https://api.groq.com/openai/v1
- *   OPENCODE_ZEN_API_KEY      OpenCode Zen key
- *   OPENCODE_ZEN_BASE_URL     default https://opencode.ai/zen/v1
+ *   OPENCODE_ZEN_API_KEY      opencode.ai
  *   OPENCODE_ZEN_MODEL        default deepseek-v4-flash-free
+ *   OPENCODE_ZEN_BASE_URL     default https://opencode.ai/zen/v1
  */
 
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
@@ -30,171 +48,245 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// ── Provider config ─────────────────────────────────────────────────
+// ── Provider registry ───────────────────────────────────────────────
 
-const GOOGLE_API_KEY = process.env.GOOGLE_AI_API_KEY ?? '';
-const GOOGLE_LLM_MODEL = process.env.GOOGLE_LLM_MODEL ?? 'gemini-2.5-flash';
+type ProviderId = 'google' | 'mistral' | 'cerebras' | 'groq' | 'opencode-zen';
 
-const GROQ_API_KEY = process.env.GROQ_API_KEY ?? '';
-const GROQ_BASE_URL = process.env.GROQ_BASE_URL ?? 'https://api.groq.com/openai/v1';
-const GROQ_LLM_MODEL = process.env.GROQ_LLM_MODEL ?? 'llama-3.3-70b-versatile';
-
-const ZEN_API_KEY = process.env.OPENCODE_ZEN_API_KEY ?? '';
-const ZEN_BASE_URL = process.env.OPENCODE_ZEN_BASE_URL ?? 'https://opencode.ai/zen/v1';
-const ZEN_MODEL_ID = process.env.OPENCODE_ZEN_MODEL ?? 'deepseek-v4-flash-free';
-
-type Provider = 'google' | 'groq' | 'opencode-zen';
-
-/** Active provider — can change at runtime. */
-let activeProvider: Provider;
-
-function resolveInitialProvider(): Provider {
-  const explicit = (process.env.ETL_LLM_PROVIDER ?? '').toLowerCase();
-  if (explicit === 'google' && GOOGLE_API_KEY) return 'google';
-  if (explicit === 'groq' && GROQ_API_KEY) return 'groq';
-  if (explicit === 'opencode-zen' && ZEN_API_KEY) return 'opencode-zen';
-  if (GOOGLE_API_KEY) return 'google';
-  if (GROQ_API_KEY) return 'groq';
-  if (ZEN_API_KEY) return 'opencode-zen';
-  return 'google';
+interface ProviderState {
+  id: ProviderId;
+  apiKey: string;
+  modelId: string;
+  baseURL: string | null; // null → native Google SDK
+  /** Minimum ms between calls to this provider. */
+  minIntervalMs: number;
+  /** Timestamp of the last call to this provider. */
+  lastCallAt: number;
+  /** Whether generateObject (structured output) still works on this provider. */
+  generateObjectSupported: boolean;
+  /** Provider is unavailable until this timestamp (rate/daily limits). */
+  cooldownUntil: number;
+  /** Consecutive per-minute rate limits (reset on success). */
+  consecutiveRateLimits: number;
+  /** Lazily-created AI SDK model instance. */
+  instance: LanguageModel | null;
 }
 
-activeProvider = resolveInitialProvider();
+function makeProvider(
+  id: ProviderId,
+  apiKey: string,
+  modelId: string,
+  baseURL: string | null,
+  minIntervalMs: number,
+): ProviderState {
+  return {
+    id,
+    apiKey,
+    modelId,
+    baseURL,
+    minIntervalMs,
+    lastCallAt: 0,
+    generateObjectSupported: true,
+    cooldownUntil: 0,
+    consecutiveRateLimits: 0,
+    instance: null,
+  };
+}
 
-/** True when any LLM key is configured. */
+/** Ordered best-first. Providers without a key are skipped at selection time. */
+const PROVIDERS: ProviderState[] = [
+  makeProvider(
+    'google',
+    process.env.GOOGLE_AI_API_KEY ?? '',
+    process.env.GOOGLE_LLM_MODEL ?? 'gemini-2.5-flash-lite',
+    null,
+    2500, // 30 RPM free → 24/min with buffer
+  ),
+  makeProvider(
+    'mistral',
+    process.env.MISTRAL_API_KEY ?? '',
+    process.env.MISTRAL_LLM_MODEL ?? 'mistral-small-latest',
+    process.env.MISTRAL_BASE_URL ?? 'https://api.mistral.ai/v1',
+    1500, // free tier ~1 req/s
+  ),
+  makeProvider(
+    'cerebras',
+    process.env.CEREBRAS_API_KEY ?? '',
+    process.env.CEREBRAS_LLM_MODEL ?? 'llama-3.3-70b',
+    process.env.CEREBRAS_BASE_URL ?? 'https://api.cerebras.ai/v1',
+    2500, // 30 RPM free
+  ),
+  makeProvider(
+    'groq',
+    process.env.GROQ_API_KEY ?? '',
+    process.env.GROQ_LLM_MODEL ?? 'llama-3.1-8b-instant',
+    process.env.GROQ_BASE_URL ?? 'https://api.groq.com/openai/v1',
+    2500, // 30 RPM free
+  ),
+  makeProvider(
+    'opencode-zen',
+    process.env.OPENCODE_ZEN_API_KEY ?? '',
+    process.env.OPENCODE_ZEN_MODEL ?? 'deepseek-v4-flash-free',
+    process.env.OPENCODE_ZEN_BASE_URL ?? 'https://opencode.ai/zen/v1',
+    3000,
+  ),
+];
+
+/** Cooldown applied when a provider hits a per-minute rate limit twice in a row. */
+const SHORT_COOLDOWN_MS = 90_000;
+/** Cooldown applied when a provider hits a daily/TPD limit. */
+const DAILY_COOLDOWN_MS = 6 * 60 * 60 * 1000;
+
+const FORCED_PROVIDER = (process.env.ETL_LLM_PROVIDER ?? '').toLowerCase() as
+  | ProviderId
+  | '';
+
+function configuredProviders(): ProviderState[] {
+  const withKeys = PROVIDERS.filter((p) => p.apiKey.trim().length > 0);
+  if (FORCED_PROVIDER) {
+    const forced = withKeys.filter((p) => p.id === FORCED_PROVIDER);
+    if (forced.length > 0) return forced;
+  }
+  return withKeys;
+}
+
+/** True when at least one LLM key is configured. */
 export function isLlmConfigured(): boolean {
-  return GOOGLE_API_KEY.trim().length > 0 || GROQ_API_KEY.trim().length > 0 || ZEN_API_KEY.trim().length > 0;
+  return configuredProviders().length > 0;
 }
 
-/** Human-readable label for logs. */
-export function llmLabel(): string {
-  if (activeProvider === 'google') return `google (${GOOGLE_LLM_MODEL})`;
-  if (activeProvider === 'groq') return `groq (${GROQ_LLM_MODEL})`;
-  return `opencode-zen (${ZEN_MODEL_ID})`;
-}
-
-let googleModel: LanguageModel | null = null;
-let groqModel: LanguageModel | null = null;
-let zenModel: LanguageModel | null = null;
-  // Try generateObject on all providers; disable per-provider on first failure.
-  let generateObjectSupported = true;
-
-function getGoogleModel(): LanguageModel {
-  if (!googleModel) {
-    const provider = createGoogleGenerativeAI({
-      apiKey: GOOGLE_API_KEY,
-    });
-    googleModel = provider.chat(GOOGLE_LLM_MODEL) as unknown as LanguageModel;
-  }
-  return googleModel;
-}
-
-function getGroqModel(): LanguageModel {
-  if (!groqModel) {
-    const provider = createOpenAICompatible({
-      name: 'groq',
-      baseURL: GROQ_BASE_URL,
-      apiKey: GROQ_API_KEY,
-    });
-    groqModel = provider.chatModel(GROQ_LLM_MODEL);
-  }
-  return groqModel;
-}
-
-function getZenModelInternal(): LanguageModel {
-  if (!zenModel) {
-    const provider = createOpenAICompatible({
-      name: 'opencode-zen',
-      baseURL: ZEN_BASE_URL,
-      apiKey: ZEN_API_KEY,
-    });
-    zenModel = provider.chatModel(ZEN_MODEL_ID);
-  }
-  return zenModel;
-}
-
-/** Get the model for the currently active provider. */
-export function getLlmModel(): LanguageModel {
-  if (!isLlmConfigured()) {
+/**
+ * Pick the best available provider: first in the chain whose cooldown has
+ * expired. When ALL are cooling down, wait for the soonest one.
+ */
+async function pickProvider(): Promise<ProviderState> {
+  const candidates = configuredProviders();
+  if (candidates.length === 0) {
     throw new Error(
-      'No LLM API key is set — set GOOGLE_AI_API_KEY, GROQ_API_KEY, or OPENCODE_ZEN_API_KEY',
+      'No LLM API key is set — set GOOGLE_AI_API_KEY, MISTRAL_API_KEY, CEREBRAS_API_KEY, GROQ_API_KEY, or OPENCODE_ZEN_API_KEY',
     );
   }
-  if (activeProvider === 'google') {
-    if (!GOOGLE_API_KEY) throw new Error('GOOGLE_AI_API_KEY not set');
-    return getGoogleModel();
+  const now = Date.now();
+  const ready = candidates.find((p) => p.cooldownUntil <= now);
+  if (ready) return ready;
+
+  // Everyone is cooling down — wait for the soonest.
+  const soonest = candidates.reduce((a, b) =>
+    a.cooldownUntil <= b.cooldownUntil ? a : b,
+  );
+  const waitMs = Math.max(soonest.cooldownUntil - now, 1000);
+  logger.warn(
+    `All LLM providers cooling down — waiting ${Math.ceil(waitMs / 1000)}s for ${soonest.id}`,
+  );
+  await sleep(waitMs);
+  soonest.cooldownUntil = 0;
+  return soonest;
+}
+
+function getModelFor(p: ProviderState): LanguageModel {
+  if (!p.instance) {
+    if (p.baseURL === null) {
+      const provider = createGoogleGenerativeAI({ apiKey: p.apiKey });
+      p.instance = provider.chat(p.modelId) as unknown as LanguageModel;
+    } else {
+      const provider = createOpenAICompatible({
+        name: p.id,
+        baseURL: p.baseURL,
+        apiKey: p.apiKey,
+      });
+      p.instance = provider.chatModel(p.modelId);
+    }
   }
-  if (activeProvider === 'groq') {
-    if (!GROQ_API_KEY) throw new Error('GROQ_API_KEY not set');
-    return getGroqModel();
+  return p.instance;
+}
+
+/** Per-provider rate limit gate. */
+async function rateLimit(p: ProviderState): Promise<void> {
+  const elapsed = Date.now() - p.lastCallAt;
+  const wait = p.minIntervalMs - elapsed;
+  if (wait > 0) await sleep(wait);
+  p.lastCallAt = Date.now();
+}
+
+/** Human-readable label for logs (best currently-available provider). */
+export function llmLabel(): string {
+  const candidates = configuredProviders();
+  if (candidates.length === 0) return 'unconfigured';
+  const now = Date.now();
+  const active = candidates.find((p) => p.cooldownUntil <= now) ?? candidates[0];
+  return `${active.id} (${active.modelId})`;
+}
+
+/** Get the model for the best currently-available provider (sync, no wait). */
+export function getLlmModel(): LanguageModel {
+  const candidates = configuredProviders();
+  if (candidates.length === 0) {
+    throw new Error('No LLM API key is set');
   }
-  if (!ZEN_API_KEY) throw new Error('OPENCODE_ZEN_API_KEY not set');
-  return getZenModelInternal();
+  const now = Date.now();
+  const active = candidates.find((p) => p.cooldownUntil <= now) ?? candidates[0];
+  return getModelFor(active);
 }
 
 /** Backward compat alias. */
 export const getZenModel = getLlmModel;
 
-// ── Rate limiting ───────────────────────────────────────────────────
-
-const TEXT_INTERVAL_MS = 4000; // Google free: 20 req/min → 4s = 15/min (safe buffer for retries)
-let lastTextCallAt = 0;
-
-async function textRateLimit(): Promise<void> {
-  const elapsed = Date.now() - lastTextCallAt;
-  const wait = TEXT_INTERVAL_MS - elapsed;
-  if (wait > 0) await sleep(wait);
-  lastTextCallAt = Date.now();
-}
-
-// ── Failover detection ──────────────────────────────────────────────
+// ── Error classification ────────────────────────────────────────────
 
 /** True when an error message indicates a per-minute quota/rate limit (recoverable after wait). */
 function isMinuteRateLimit(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
-  return /rate limit/i.test(msg) || /quota exceeded/i.test(msg) || /current quota/i.test(msg);
+  return /rate limit/i.test(msg) || /quota exceeded/i.test(msg) || /current quota/i.test(msg) || /429/.test(msg);
 }
 
-/** Extract retry-after seconds from a Google "Please retry in Xs" message. */
+/** Extract retry-after seconds from a "Please retry in Xs" message. */
 function parseRetrySeconds(err: unknown): number {
   const msg = err instanceof Error ? err.message : String(err);
   const m = msg.match(/retry in ([\d.]+)s/i);
   return m ? Math.ceil(Number(m[1])) + 2 : 15;
 }
 
-/** True when an error message indicates a daily limit (unrecoverable, must failover). */
+/** True when an error message indicates a daily limit (put provider on long cooldown). */
 function isDailyLimit(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
   return (
-    /TPD|TPM/i.test(msg) ||
+    /TPD/i.test(msg) ||
     /tokens per day/i.test(msg) ||
     /daily limit/i.test(msg) ||
     /daily.*request.*quota/i.test(msg) ||
-    /dailyLimitExceeded/i.test(msg)
+    /dailyLimitExceeded/i.test(msg) ||
+    /PerDay/i.test(msg)
   );
 }
 
-const PROVIDER_CHAIN: Provider[] = ['google', 'groq', 'opencode-zen'];
-
-/** Try the next provider in the chain. Returns true when a fallback is available. */
-function failoverToNextProvider(): boolean {
-  const idx = PROVIDER_CHAIN.indexOf(activeProvider);
-  for (let i = idx + 1; i < PROVIDER_CHAIN.length; i++) {
-    const next = PROVIDER_CHAIN[i];
-    if (next === 'groq' && GROQ_API_KEY) {
-      activeProvider = 'groq';
-      generateObjectSupported = true;
-      logger.warn(`Failing over to groq (${GROQ_LLM_MODEL})`);
-      return true;
-    }
-    if (next === 'opencode-zen' && ZEN_API_KEY) {
-      activeProvider = 'opencode-zen';
-      generateObjectSupported = true;
-      logger.warn(`Failing over to OpenCode Zen (${ZEN_MODEL_ID})`);
-      return true;
-    }
+/**
+ * Record a failure against a provider and apply the right cooldown.
+ * Returns true when the caller should retry (on another provider or after wait).
+ */
+function recordFailure(p: ProviderState, err: unknown): void {
+  if (isDailyLimit(err)) {
+    p.cooldownUntil = Date.now() + DAILY_COOLDOWN_MS;
+    p.consecutiveRateLimits = 0;
+    logger.warn(`${p.id} hit a daily limit — cooling down for 6h`);
+    return;
   }
-  return false;
+  if (isMinuteRateLimit(err)) {
+    p.consecutiveRateLimits++;
+    if (p.consecutiveRateLimits >= 2) {
+      p.cooldownUntil = Date.now() + SHORT_COOLDOWN_MS;
+      p.consecutiveRateLimits = 0;
+      logger.warn(`${p.id} rate-limited twice — cooling down for 90s`);
+    } else {
+      const waitSec = parseRetrySeconds(err);
+      p.cooldownUntil = Date.now() + waitSec * 1000;
+      logger.warn(`${p.id} rate-limited — cooling down for ${waitSec}s`);
+    }
+    return;
+  }
+  // Generic failure — brief cooldown so we rotate to the next provider.
+  p.cooldownUntil = Date.now() + 30_000;
+  logger.warn(
+    `${p.id} failed (${err instanceof Error ? err.message.slice(0, 160) : String(err).slice(0, 160)}) — cooling down for 30s`,
+  );
 }
 
 // ── Truncated JSON repair ───────────────────────────────────────────
@@ -204,27 +296,17 @@ function repairJson(text: string): string | null {
   const start = text.search(/[[{]/);
   if (start === -1) return null;
   let json = text.slice(start);
-  const quoteStack: number[] = [];
+  // If inside a string (odd number of unescaped quotes), close it
+  let quotes = 0;
   let escaped = false;
-  for (let i = 0; i < json.length; i++) {
-    const ch = json[i];
+  for (const ch of json) {
     if (escaped) { escaped = false; continue; }
     if (ch === '\\') { escaped = true; continue; }
-    if (ch === '"') {
-      if (quoteStack.length > 0 && quoteStack[quoteStack.length - 1] === i - 1) {
-        // empty string — leave
-      }
-      quoteStack.push(i);
-      continue;
-    }
+    if (ch === '"') quotes++;
   }
-  // If inside a string (odd number of quotes), close it
-  if (quoteStack.length % 2 !== 0) {
-    json += '"';
-  }
+  if (quotes % 2 !== 0) json += '"';
   // Count structural brackets
-  let opens = 0;
-  let closes = 0;
+  const stack: string[] = [];
   let inStr = false;
   let esc = false;
   for (const ch of json) {
@@ -232,17 +314,17 @@ function repairJson(text: string): string | null {
     if (ch === '\\') { esc = true; continue; }
     if (ch === '"') { inStr = !inStr; continue; }
     if (inStr) continue;
-    if (ch === '{' || ch === '[') opens++;
-    if (ch === '}' || ch === ']') closes++;
+    if (ch === '{') stack.push('}');
+    if (ch === '[') stack.push(']');
+    if (ch === '}' || ch === ']') stack.pop();
   }
-  const diff = opens - closes;
-  if (diff > 0) {
-    json += ']}'[json.startsWith('[') ? 0 : 1].repeat(diff);
-  }
+  while (stack.length > 0) json += stack.pop();
   try { JSON.parse(json); return json; } catch { return null; }
 }
 
 // ── generateJson ────────────────────────────────────────────────────
+
+const MAX_ATTEMPTS = 8;
 
 export async function generateJson<T>(
   schema: z.ZodType<T>,
@@ -250,54 +332,49 @@ export async function generateJson<T>(
 ): Promise<T> {
   const temperature = opts.temperature ?? 0.2;
   const maxOutputTokens = opts.maxOutputTokens ?? 8192;
+  const example = schemaToExample(schema);
 
-  // Try generateObject first (once)
-  if (generateObjectSupported) {
-    try {
-      await textRateLimit();
-      const systemWithJson = opts.system
-        ? `${opts.system} (in JSON format)`
-        : 'Respond in JSON format.';
-      const { object } = await generateObject({
-        model: getLlmModel(),
-        schema,
-        system: systemWithJson,
-        prompt: opts.prompt,
-        temperature,
-        maxOutputTokens,
-      });
-      return object as T;
-    } catch (err) {
-      generateObjectSupported = false;
-      if (isDailyLimit(err) && failoverToNextProvider()) {
-        return generateJson(schema, opts);
-      }
-      // generateObject rate limit → wait once then fall through to generateText
-      if (isMinuteRateLimit(err)) {
-        const waitSec = parseRetrySeconds(err);
-        logger.warn(`Rate limit hit, waiting ${waitSec}s…`);
-        await sleep(waitSec * 1000);
-        // fall through to generateText
-      } else {
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    const provider = await pickProvider();
+    await rateLimit(provider);
+
+    // Path A: structured output when the provider still supports it.
+    if (provider.generateObjectSupported) {
+      try {
+        const systemWithJson = opts.system
+          ? `${opts.system} (in JSON format)`
+          : 'Respond in JSON format.';
+        const { object } = await generateObject({
+          model: getModelFor(provider),
+          schema,
+          system: systemWithJson,
+          prompt: opts.prompt,
+          temperature,
+          maxOutputTokens,
+        });
+        provider.consecutiveRateLimits = 0;
+        return object as T;
+      } catch (err) {
+        if (isMinuteRateLimit(err) || isDailyLimit(err)) {
+          recordFailure(provider, err);
+          continue; // pick again (same provider after wait, or next in chain)
+        }
+        // Schema/format failure → disable structured output for THIS provider only.
+        provider.generateObjectSupported = false;
         logger.warn(
-          `generateObject failed: ${err instanceof Error ? err.message : String(err)}`,
+          `generateObject unsupported on ${provider.id}, falling back to text+parse: ${
+            err instanceof Error ? err.message.slice(0, 160) : String(err)
+          }`,
         );
+        // fall through to Path B on the same provider without re-picking
+        await rateLimit(provider);
       }
     }
-  }
 
-  const example = schemaToExample(schema);
-  let consecutiveRateLimits = 0;
-
-  // Fallback: generateText + manual JSON parse
-  // Max 6 attempts — rate limit retries wait Google's suggested time so each
-  // retry gives the rolling window time to clear.
-  const MAX_FALLBACK_ATTEMPTS = 6;
-  for (let attempt = 0; attempt < MAX_FALLBACK_ATTEMPTS; attempt++) {
-    await textRateLimit();
+    // Path B: generateText + manual JSON extraction.
     try {
       const { text } = await generateText({
-        model: getLlmModel(),
+        model: getModelFor(provider),
         system:
           (opts.system ? `${opts.system}\n\n` : '') +
           'Respond with ONLY valid minified JSON. No markdown, no code fences, no prose.\n' +
@@ -307,48 +384,37 @@ export async function generateJson<T>(
         temperature,
         maxOutputTokens,
       });
-
-      // Reset rate limit counter on success
-      consecutiveRateLimits = 0;
+      provider.consecutiveRateLimits = 0;
 
       let json: unknown;
       try {
         json = extractJson(text);
-      } catch (extractErr) {
-        if (attempt === 0) {
-          logger.warn(
-            `JSON extraction failed (${extractErr instanceof Error ? extractErr.message : String(extractErr)}). Retrying with reduced scope…`,
-          );
-          const reducedPrompt = opts.prompt.replace(/up to \d+/gi, 'up to 15') +
-            '\n\nKeep the JSON concise. Return at most 15 items. Return the result as JSON.';
-          try {
-            const { text: retryText } = await generateText({
-              model: getLlmModel(),
-              system:
-                (opts.system ? `${opts.system}\n\n` : '') +
-                'Respond with ONLY valid minified JSON. No markdown, no code fences.\n' +
-                'Return ONLY the JSON object matching this structure:\n' +
-                example,
-              prompt: reducedPrompt,
-              temperature,
-              maxOutputTokens,
-            });
-            json = extractJson(retryText);
-          } catch (reExtractErr) {
-            throw reExtractErr;
-          }
-        } else {
-          throw extractErr;
-        }
+      } catch {
+        // One in-place retry with reduced scope (long lists often truncate).
+        logger.warn(`JSON extraction failed on ${provider.id}. Retrying with reduced scope…`);
+        await rateLimit(provider);
+        const reducedPrompt =
+          opts.prompt.replace(/up to \d+/gi, 'up to 15') +
+          '\n\nKeep the JSON concise. Return at most 15 items. Return the result as JSON.';
+        const { text: retryText } = await generateText({
+          model: getModelFor(provider),
+          system:
+            (opts.system ? `${opts.system}\n\n` : '') +
+            'Respond with ONLY valid minified JSON. No markdown, no code fences.\n' +
+            'Return ONLY the JSON object matching this structure:\n' +
+            example,
+          prompt: reducedPrompt,
+          temperature,
+          maxOutputTokens,
+        });
+        json = extractJson(retryText);
       }
 
       try {
         return schema.parse(json);
       } catch (parseErr) {
-        // Try lenient parse first
         const lenient = lenientParse(schema, json);
         if (lenient !== undefined) return lenient;
-        // Try repaired JSON
         const repaired = repairJson(JSON.stringify(json));
         if (repaired) {
           try {
@@ -359,36 +425,12 @@ export async function generateJson<T>(
         throw parseErr;
       }
     } catch (err) {
-      if (isDailyLimit(err) && failoverToNextProvider()) {
-        consecutiveRateLimits = 0;
-        continue;
-      }
-      if (isMinuteRateLimit(err)) {
-        consecutiveRateLimits++;
-        // After 2 consecutive per-minute rate limits → treat as daily and failover
-        if (consecutiveRateLimits >= 2 && failoverToNextProvider()) {
-          logger.warn(`2 consecutive rate limits — failing over to next provider`);
-          continue;
-        }
-        const waitSec = Math.max(parseRetrySeconds(err), 10);
-        logger.warn(`Rate limit (${attempt + 1}/${MAX_FALLBACK_ATTEMPTS}), waiting ${waitSec}s…`);
-        await sleep(waitSec * 1000);
-        continue;
-      }
-      // Any persistent failure → try next provider in chain
-      if (failoverToNextProvider()) {
-        consecutiveRateLimits = 0;
-        continue;
-      }
-      throw err;
+      recordFailure(provider, err);
+      continue;
     }
   }
 
-  // Last resort: try the next provider regardless of error type
-  if (failoverToNextProvider()) {
-    return generateJson(schema, opts);
-  }
-  throw new Error(`generateJson failed after ${MAX_FALLBACK_ATTEMPTS} retries and provider fallbacks`);
+  throw new Error(`generateJson failed after ${MAX_ATTEMPTS} attempts across the provider chain`);
 }
 
 // ── Lenient parse (drop invalid array elements) ─────────────────────
@@ -476,7 +518,14 @@ export function extractJson(raw: string): unknown {
     return JSON.parse(body);
   } catch {
     const objMatch = body.match(/[[{][\s\S]*[\]}]/);
-    if (objMatch) return JSON.parse(objMatch[0]);
+    if (objMatch) {
+      try {
+        return JSON.parse(objMatch[0]);
+      } catch {
+        const repaired = repairJson(objMatch[0]);
+        if (repaired) return JSON.parse(repaired);
+      }
+    }
     throw new Error(`Could not extract JSON from LLM response: ${raw.slice(0, 200)}`);
   }
 }
@@ -488,26 +537,21 @@ export async function generatePlainText(opts: {
   prompt: string;
   temperature?: number;
 }): Promise<string> {
-  await textRateLimit();
-  try {
-    const { text } = await generateText({
-      model: getLlmModel(),
-      system: opts.system,
-      prompt: opts.prompt,
-      temperature: opts.temperature ?? 0.2,
-    });
-    return text;
-  } catch (err) {
-    if (failoverToNextProvider()) {
-      await textRateLimit();
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const provider = await pickProvider();
+    await rateLimit(provider);
+    try {
       const { text } = await generateText({
-        model: getLlmModel(),
+        model: getModelFor(provider),
         system: opts.system,
         prompt: opts.prompt,
         temperature: opts.temperature ?? 0.2,
       });
+      provider.consecutiveRateLimits = 0;
       return text;
+    } catch (err) {
+      recordFailure(provider, err);
     }
-    throw err;
   }
+  throw new Error('generatePlainText failed after 4 attempts across the provider chain');
 }

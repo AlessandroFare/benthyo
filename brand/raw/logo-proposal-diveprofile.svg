@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Benthyo — minimal dive profile logo">
+  <!--
+    Benthyo logo proposal — "The Dive Profile"
+
+    Concept: a single continuous stroke tracing a dive profile
+    (descent → bottom time → ascent → safety stop → surface),
+    the most iconic diagram in scuba diving and the essence of a
+    dive-log app. Two bubbles rise from the bottom segment where
+    the diver is. Minimal, abstract, instantly readable at 16px.
+
+    Palette (3 colors):
+      #08172B deep navy   (background / abyss)
+      #35D0BA aqua        (profile stroke / brand accent)
+      #E8F4F8 foam white  (surface line + bubbles)
+  -->
+  <rect x="0" y="0" width="512" height="512" rx="112" fill="#08172B"/>
+
+  <!-- Surface line (extends past the profile so it reads as the horizon) -->
+  <line x1="60" y1="140" x2="452" y2="140" stroke="#E8F4F8" stroke-width="9" stroke-linecap="round" opacity="0.75"/>
+
+  <!-- Dive profile: fast descent, bottom time, ascent, safety stop, surface -->
+  <path
+    d="M 116 140
+       L 236 356
+       L 318 356
+       L 346 238
+       L 404 238
+       L 424 140"
+    fill="none"
+    stroke="#35D0BA"
+    stroke-width="24"
+    stroke-linecap="round"
+    stroke-linejoin="round"/>
+
+  <!-- Bubbles rising from the bottom segment -->
+  <circle cx="276" cy="300" r="8"  fill="none" stroke="#E8F4F8" stroke-width="7" opacity="0.9"/>
+  <circle cx="290" cy="260" r="12" fill="none" stroke="#E8F4F8" stroke-width="7" opacity="0.9"/>
+</svg>
