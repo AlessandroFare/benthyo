@@ -101,10 +101,13 @@ export async function runAllDataEtl(): Promise<void> {
 
   // 2. Dive site sources in parallel, each isolated so one source's
   //    failure does not discard the others' ingested sites.
-  await parallelSources([
+  //
+  // Dive Number is EXCLUDED by default: its site returns 404/HTML on the
+  // endpoints this ETL scrapes (seen consistently in nightly logs). Opt back
+  // in with ETL_ENABLE_DIVENUMBER=true once a working endpoint is verified.
+  const siteSources = [
     { name: 'opendivemap', fn: runOpenDiveMapEtl },
     { name: 'overpass', fn: runOverpassEtl },
-    { name: 'divenumber', fn: runDiveNumberEtl },
     // Wikidata SPARQL: hand-curated, exact coordinates for shipwrecks, reefs,
     // cenotes, blue holes, and seamounts. Runs alongside the other map sources.
     { name: 'wikidata', fn: runWikidataEtl },
